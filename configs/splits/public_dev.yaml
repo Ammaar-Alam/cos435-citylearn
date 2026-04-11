@@ -1,0 +1,5 @@
+split:
+  name: public_dev
+  intent: initial shared split for scaffold configs
+  tuning_allowed: true
+  held_out: false

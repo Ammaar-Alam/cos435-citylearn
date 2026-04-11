@@ -1,0 +1,29 @@
+env:
+  base_config: configs/env/citylearn_2023.yaml
+  split: public_dev
+
+algorithm:
+  name: sac
+  control_mode: centralized
+  policy: gaussian_mlp
+
+reward:
+  version: reward_v0
+
+features:
+  version: base_central_obs
+
+training:
+  total_timesteps: 250000
+  seed: 0
+  batch_size: 256
+  learning_rate: 0.0003
+  replay_buffer_size: 100000
+
+evaluation:
+  deterministic: true
+  eval_episodes: 1
+
+logging:
+  run_group: sac_baseline
+  output_root: results/runs

@@ -1,0 +1,14 @@
+env:
+  base_config: configs/env/citylearn_2023.yaml
+  split: public_dev
+
+evaluation:
+  controller_ref: null
+  eval_episodes: 1
+  deterministic: true
+  save_rollout_trace: true
+
+logging:
+  metrics_root: results/metrics
+  tables_root: results/tables
+  manifests_root: results/manifests

@@ -1,0 +1,28 @@
+env:
+  base_config: configs/env/citylearn_2023.yaml
+  split: public_dev
+
+algorithm:
+  name: ppo
+  control_mode: centralized
+  policy: gaussian_mlp
+
+reward:
+  version: reward_v0
+
+features:
+  version: base_central_obs
+
+training:
+  total_timesteps: 250000
+  seed: 0
+  rollout_steps: 2048
+  learning_rate: 0.0003
+
+evaluation:
+  deterministic: true
+  eval_episodes: 1
+
+logging:
+  run_group: ppo_baseline
+  output_root: results/runs

@@ -1,0 +1,25 @@
+env:
+  base_config: configs/env/citylearn_2023.yaml
+  split: public_dev
+
+algorithm:
+  name: rbc
+  controller: built_in
+
+reward:
+  version: official_eval_only
+
+features:
+  version: raw_env
+
+training:
+  mode: evaluate_only
+  seed: 0
+
+evaluation:
+  deterministic: true
+  save_rollout_trace: true
+
+logging:
+  run_group: baseline
+  output_root: results/runs

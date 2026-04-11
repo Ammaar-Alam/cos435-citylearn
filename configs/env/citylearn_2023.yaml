@@ -1,0 +1,8 @@
+env:
+  name: citylearn_2023
+  citylearn_version: 2.1b12
+  dataset_root: data/external/citylearn_2023
+  challenge_year: 2023
+  central_agent: true
+  seed: 0
+  notes: official challenge target for the benchmark branch
