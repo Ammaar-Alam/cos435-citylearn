@@ -22,7 +22,7 @@ def list_jobs(request: Request) -> list[JobSummary]:
 def create_job(request: Request, payload: LaunchJobRequest) -> JobSummary:
     try:
         return request.app.state.job_manager.submit(payload)
-    except (KeyError, ValueError) as exc:
+    except (FileNotFoundError, KeyError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

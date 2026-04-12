@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from cos435_citylearn.api.app import create_app
+from cos435_citylearn.api.schemas import JobSummary
 from cos435_citylearn.api.services.job_manager import JobManager
 from cos435_citylearn.api.settings import ApiSettings
 from cos435_citylearn.io import write_json
@@ -102,6 +103,22 @@ def test_unknown_job_logs_and_artifacts_return_404(tmp_path: Path) -> None:
 
     assert logs_response.status_code == 404
     assert artifacts_response.status_code == 404
+
+
+def test_create_job_maps_missing_split_file_to_400(tmp_path: Path) -> None:
+    settings = build_test_settings(tmp_path)
+    app = create_app(settings)
+
+    def raise_missing_file(_payload) -> JobSummary:
+        raise FileNotFoundError("unknown split config")
+
+    app.state.job_manager.submit = raise_missing_file  # type: ignore[method-assign]
+    client = TestClient(app)
+
+    response = client.post("/api/jobs", json={"runner_id": "rbc_builtin", "split": "missing"})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "unknown split config"
 
 
 def test_recover_jobs_marks_state_store_orphaned(tmp_path: Path) -> None:

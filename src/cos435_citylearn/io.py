@@ -2,6 +2,7 @@ import csv
 import hashlib
 import json
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -20,9 +21,23 @@ def write_json(path: str | Path, payload: Any) -> Path:
 
 def write_json_atomic(path: str | Path, payload: Any) -> Path:
     target = ensure_parent(path)
-    temp_path = target.with_suffix(f"{target.suffix}.tmp")
-    temp_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-    os.replace(temp_path, target)
+    payload_text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=target.parent,
+            prefix=f"{target.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            handle.write(payload_text)
+            temp_path = Path(handle.name)
+        os.replace(temp_path, target)
+    finally:
+        if temp_path is not None and temp_path.exists():
+            temp_path.unlink()
     return target
 
 
