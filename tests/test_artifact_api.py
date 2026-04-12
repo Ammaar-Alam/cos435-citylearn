@@ -83,7 +83,8 @@ def test_artifact_import_round_trips_playback_payload(tmp_path: Path) -> None:
     playback = playback_response.json()
     assert playback["run_id"] == "imported_run"
     assert playback["stored_steps"] == 3
-    assert playback["total_steps"] == 4
+    assert playback["total_steps"] == 3
+    assert playback["truncated"] is False
     assert playback["mode"] == "full"
 
 

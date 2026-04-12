@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -162,3 +163,38 @@ def test_recover_jobs_marks_state_store_orphaned(tmp_path: Path) -> None:
     assert state["latest_preview_path"] is None
     assert state["progress_current"] is None
     assert state["progress_total"] is None
+
+
+def test_watch_process_triggers_refresh_when_subprocess_exits(tmp_path: Path) -> None:
+    class DummyProcess:
+        def __init__(self) -> None:
+            self._done = threading.Event()
+
+        def poll(self):
+            return 0 if self._done.is_set() else None
+
+        def wait(self):
+            self._done.wait(timeout=2)
+            return 0
+
+        def finish(self) -> None:
+            self._done.set()
+
+    settings = build_test_settings(tmp_path)
+    manager = JobManager(settings)
+    process = DummyProcess()
+    manager._processes["job_watch"] = process  # type: ignore[assignment]
+
+    refreshed = threading.Event()
+
+    def fake_refresh() -> None:
+        refreshed.set()
+
+    manager.refresh = fake_refresh  # type: ignore[method-assign]
+
+    watcher = threading.Thread(target=manager._watch_process, args=("job_watch", process), daemon=True)
+    watcher.start()
+    process.finish()
+    watcher.join(timeout=2)
+
+    assert refreshed.wait(timeout=2)

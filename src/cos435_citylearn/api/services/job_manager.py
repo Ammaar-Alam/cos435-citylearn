@@ -220,6 +220,11 @@ class JobManager:
         )
         self._processes[job_id] = process
         self._log_handles[job_id] = log_handle
+        threading.Thread(
+            target=self._watch_process,
+            args=(job_id, process),
+            daemon=True,
+        ).start()
         state["status"] = "running"
         state["started_at"] = utc_now_iso()
         state["pid"] = process.pid
@@ -233,6 +238,12 @@ class JobManager:
                 "payload": {"pid": process.pid},
             },
         )
+
+    def _watch_process(self, job_id: str, process: subprocess.Popen[str]) -> None:
+        process.wait()
+        with self._lock:
+            if self._processes.get(job_id) is process:
+                self.refresh()
 
     def _merge_live_state(self, payload: dict[str, Any]) -> dict[str, Any]:
         state = self.state_store.get(payload["job_id"])

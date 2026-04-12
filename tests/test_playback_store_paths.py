@@ -75,4 +75,5 @@ def test_artifact_playback_resolves_repo_relative_results_path(tmp_path: Path) -
     playback = store.get_artifact_playback("results/dashboard/artifacts/artifact_a/playback.json")
     assert playback.run_id == "imported_run"
     assert playback.stored_steps == 3
-    assert playback.total_steps == 4
+    assert playback.total_steps == 3
+    assert playback.truncated is False

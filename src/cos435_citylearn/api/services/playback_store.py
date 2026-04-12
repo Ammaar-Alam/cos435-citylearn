@@ -39,7 +39,7 @@ class PlaybackStore:
         trace = payload.get("trace", [])
         trace_slice = trace[offset : offset + limit]
         total_steps = int(
-            payload.get("episode_total_steps", payload.get("decision_steps", len(trace)))
+            payload.get("decision_steps", payload.get("episode_total_steps", len(trace)))
         )
         return PlaybackResponse(
             run_id=run_id,
