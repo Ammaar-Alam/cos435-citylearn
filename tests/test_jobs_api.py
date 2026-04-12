@@ -215,3 +215,117 @@ def test_watch_process_triggers_refresh_when_subprocess_exits(tmp_path: Path) ->
     watcher.join(timeout=2)
 
     assert refreshed.wait(timeout=2)
+
+
+def test_refresh_preserves_cancelled_status_when_result_exists(tmp_path: Path) -> None:
+    class FinishedProcess:
+        def poll(self):
+            return 0
+
+    settings = build_test_settings(tmp_path)
+    manager = JobManager(settings)
+    job_id = "job_cancelled"
+    job_dir = settings.jobs_root / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+
+    write_json(
+        job_dir / "job.json",
+        {
+            "job_id": job_id,
+            "runner_id": "rbc_builtin",
+            "status": "cancelled",
+            "submitted_at": "2026-04-12T00:00:00Z",
+            "started_at": "2026-04-12T00:00:10Z",
+            "finished_at": None,
+            "pid": 123,
+            "config_path": "config.yaml",
+            "eval_config_path": "eval.yaml",
+            "run_id": None,
+            "average_score": None,
+            "error_message": None,
+            "phase": "cancelled",
+            "progress_current": None,
+            "progress_total": None,
+            "progress_label": None,
+            "heartbeat_at": None,
+            "latest_preview_path": None,
+        },
+    )
+    write_json(job_dir / "result.json", {"run_id": "run_1", "average_score": 1.23})
+    manager._processes[job_id] = FinishedProcess()  # type: ignore[assignment]
+
+    manager.refresh()
+
+    refreshed = manager.get_job(job_id)
+    assert refreshed.status == "cancelled"
+    assert refreshed.phase == "cancelled"
+    assert refreshed.run_id is None
+
+
+def test_drain_queue_marks_start_failures_failed(tmp_path: Path) -> None:
+    settings = build_test_settings(tmp_path)
+    manager = JobManager(settings)
+    job_id = "job_start_failure"
+    job_dir = settings.jobs_root / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+
+    write_json(
+        job_dir / "job.json",
+        {
+            "job_id": job_id,
+            "runner_id": "rbc_builtin",
+            "status": "queued",
+            "submitted_at": "2026-04-12T00:00:00Z",
+            "started_at": None,
+            "finished_at": None,
+            "pid": None,
+            "config_path": "config.yaml",
+            "eval_config_path": "eval.yaml",
+            "run_id": None,
+            "average_score": None,
+            "error_message": None,
+            "phase": "queued",
+            "progress_current": None,
+            "progress_total": None,
+            "progress_label": None,
+            "heartbeat_at": None,
+            "latest_preview_path": None,
+        },
+    )
+    manager.state_store.write(
+        job_id,
+        {
+            "job_id": job_id,
+            "job_kind": "evaluation",
+            "status": "queued",
+            "phase": "queued",
+            "progress_current": 0,
+            "progress_total": None,
+            "progress_label": "queued",
+            "heartbeat_at": "2026-04-12T00:00:00Z",
+            "latest_run_id": None,
+            "latest_preview_path": None,
+            "latest_checkpoint_id": None,
+            "latest_log_offset": None,
+            "error_message": None,
+        },
+    )
+    manager._queue.append(job_id)
+
+    def raise_start_failure(_job_id: str, _state: dict[str, object]) -> None:
+        raise FileNotFoundError("missing python executable")
+
+    manager._start = raise_start_failure  # type: ignore[method-assign]
+
+    manager._drain_queue()
+
+    failed = manager.get_job(job_id)
+    events = manager.get_events(job_id)
+    state = manager.get_state(job_id)
+
+    assert failed.status == "failed"
+    assert failed.phase == "failed"
+    assert failed.error_message == "missing python executable"
+    assert state["status"] == "failed"
+    assert not manager._queue
+    assert any(event["event_type"] == "process_spawn_failed" for event in events)

@@ -194,7 +194,39 @@ class JobManager:
             state = self._load_job(job_id)
             if state["status"] != "queued":
                 continue
-            self._start(job_id, state)
+            try:
+                self._start(job_id, state)
+            except Exception as exc:
+                self._record_start_failure(job_id, state, exc)
+
+    def _record_start_failure(self, job_id: str, state: dict[str, Any], exc: Exception) -> None:
+        timestamp = utc_now_iso()
+        state["status"] = "failed"
+        state["phase"] = "failed"
+        state["finished_at"] = timestamp
+        state["error_message"] = str(exc)
+        self._write_job(job_id, state)
+        self.state_store.write(
+            job_id,
+            {
+                **(self.state_store.get(job_id) or {}),
+                "job_id": job_id,
+                "job_kind": "evaluation",
+                "status": "failed",
+                "phase": "failed",
+                "heartbeat_at": timestamp,
+                "error_message": str(exc),
+            },
+        )
+        self.event_store.append(
+            job_id,
+            {
+                "job_id": job_id,
+                "event_type": "process_spawn_failed",
+                "created_at": timestamp,
+                "payload": {"error": str(exc)},
+            },
+        )
 
     def _start(self, job_id: str, state: dict[str, Any]) -> None:
         request_path = self._job_request_path(job_id)
@@ -204,20 +236,24 @@ class JobManager:
         env["COS435_REQUIRE_DATA"] = "1"
         env["MPLCONFIGDIR"] = str(self.settings.mpl_config_dir)
 
-        process = subprocess.Popen(
-            [
-                str(self.settings.python_executable),
-                "-m",
-                "cos435_citylearn.api.worker_main",
-                "--job-file",
-                str(request_path),
-            ],
-            cwd=self.settings.repo_root,
-            env=env,
-            stdout=log_handle,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
+        try:
+            process = subprocess.Popen(
+                [
+                    str(self.settings.python_executable),
+                    "-m",
+                    "cos435_citylearn.api.worker_main",
+                    "--job-file",
+                    str(request_path),
+                ],
+                cwd=self.settings.repo_root,
+                env=env,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+        except Exception:
+            log_handle.close()
+            raise
         self._processes[job_id] = process
         self._log_handles[job_id] = log_handle
         threading.Thread(
@@ -281,13 +317,13 @@ class JobManager:
 
             self._processes.pop(job_id, None)
 
-            if return_code == 0 and self._job_result_path(job_id).exists():
+            if state["status"] == "cancelled":
+                pass
+            elif return_code == 0 and self._job_result_path(job_id).exists():
                 result = json.loads(self._job_result_path(job_id).read_text())
                 state["status"] = "succeeded"
                 state["run_id"] = result.get("run_id")
                 state["average_score"] = result.get("average_score")
-            elif state["status"] == "cancelled":
-                pass
             else:
                 state["status"] = "failed"
                 if self._job_error_path(job_id).exists():
