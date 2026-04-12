@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import fcntl
 import json
+import os
 from pathlib import Path
 from typing import Any
 
-from cos435_citylearn.io import append_jsonl
+from cos435_citylearn.io import ensure_parent
 
 
 class JobEventStore:
@@ -15,12 +17,19 @@ class JobEventStore:
         return self.jobs_root / job_id / "events.jsonl"
 
     def append(self, job_id: str, payload: dict[str, Any]) -> Path:
-        path = self._path(job_id)
-        seq = 1
-        if path.exists():
-            with path.open(encoding="utf-8") as handle:
-                seq = sum(1 for _ in handle) + 1
-        return append_jsonl(path, {"seq": seq, **payload})
+        path = ensure_parent(self._path(job_id))
+        with path.open("a+", encoding="utf-8") as handle:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                handle.seek(0)
+                seq = sum(1 for _ in handle if _.strip()) + 1
+                handle.seek(0, os.SEEK_END)
+                handle.write(json.dumps({"seq": seq, **payload}, sort_keys=True) + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        return path
 
     def list_after(self, job_id: str, after_seq: int = 0) -> list[dict[str, Any]]:
         path = self._path(job_id)

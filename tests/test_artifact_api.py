@@ -85,3 +85,19 @@ def test_artifact_import_round_trips_playback_payload(tmp_path: Path) -> None:
     assert playback["stored_steps"] == 3
     assert playback["total_steps"] == 4
     assert playback["mode"] == "full"
+
+
+def test_artifact_import_rejects_unknown_artifact_kind(tmp_path: Path) -> None:
+    settings = build_test_settings(tmp_path)
+    client = TestClient(create_app(settings))
+
+    response = client.post(
+        "/api/artifacts/import",
+        data={
+            "artifact_kind": "mystery_blob",
+            "label": "bad kind",
+        },
+        files={"file": ("artifact.bin", b"payload", "application/octet-stream")},
+    )
+
+    assert response.status_code == 422

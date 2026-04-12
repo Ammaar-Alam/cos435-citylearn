@@ -5,6 +5,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
+ArtifactKind = Literal["checkpoint", "run_bundle", "simulation_bundle"]
+
+
 class RunnerSummary(BaseModel):
     runner_id: str
     label: str
@@ -122,7 +125,7 @@ class JobEvent(BaseModel):
 
 class ArtifactSummary(BaseModel):
     artifact_id: str
-    artifact_kind: Literal["checkpoint", "run_bundle", "simulation_bundle"]
+    artifact_kind: ArtifactKind
     label: str
     source_filename: str
     imported_at: str

@@ -4,6 +4,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from cos435_citylearn.api.schemas import (
     ArtifactDetail,
+    ArtifactKind,
     ArtifactSummary,
     EvaluateArtifactRequest,
     JobSummary,
@@ -44,7 +45,7 @@ def get_artifact_playback(request: Request, artifact_id: str) -> PlaybackRespons
 async def import_artifact(
     request: Request,
     file: UploadFile = File(...),
-    artifact_kind: str = Form(...),
+    artifact_kind: ArtifactKind = Form(...),
     label: str = Form(""),
     notes: str | None = Form(default=None),
     runner_id: str | None = Form(default=None),

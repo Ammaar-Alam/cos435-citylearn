@@ -8,7 +8,12 @@ from uuid import uuid4
 
 from fastapi import UploadFile
 
-from cos435_citylearn.api.schemas import ArtifactDetail, ArtifactSummary, EvaluateArtifactRequest
+from cos435_citylearn.api.schemas import (
+    ArtifactDetail,
+    ArtifactKind,
+    ArtifactSummary,
+    EvaluateArtifactRequest,
+)
 from cos435_citylearn.api.services.runner_registry import get_runner
 from cos435_citylearn.api.settings import ApiSettings
 from cos435_citylearn.io import ensure_parent, write_json_atomic
@@ -18,7 +23,7 @@ from cos435_citylearn.runtime import utc_now_iso
 @dataclass(frozen=True)
 class ImportedArtifactRecord:
     artifact_id: str
-    artifact_kind: str
+    artifact_kind: ArtifactKind
     label: str
     source_filename: str
     imported_at: str
@@ -76,7 +81,7 @@ class ArtifactStore:
         self,
         *,
         file: UploadFile,
-        artifact_kind: str,
+        artifact_kind: ArtifactKind,
         label: str,
         notes: str | None,
         runner_id: str | None,

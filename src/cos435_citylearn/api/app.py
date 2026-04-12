@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from cos435_citylearn.api.routers.artifacts import router as artifacts_router
@@ -24,6 +25,19 @@ def _bind_services(app: FastAPI, settings: ApiSettings) -> None:
     app.state.run_store = RunStore(settings)
     app.state.playback_store = PlaybackStore(settings)
     app.state.artifact_store = ArtifactStore(settings)
+
+
+def _safe_dashboard_file(frontend_dist: Path, path: str) -> Path | None:
+    if not path:
+        return None
+    candidate = (frontend_dist / path).resolve()
+    try:
+        candidate.relative_to(frontend_dist.resolve())
+    except ValueError:
+        return None
+    if candidate.exists() and candidate.is_file():
+        return candidate
+    return None
 
 
 def create_app(settings: ApiSettings = SETTINGS) -> FastAPI:
@@ -61,10 +75,12 @@ def create_app(settings: ApiSettings = SETTINGS) -> FastAPI:
             )
 
         @app.get("/dashboard/{path:path}", include_in_schema=False)
-        def dashboard(path: str) -> FileResponse:
-            candidate = frontend_dist / path
-            if path and candidate.exists() and candidate.is_file():
+        def dashboard(path: str) -> Response:
+            candidate = _safe_dashboard_file(frontend_dist, path)
+            if candidate is not None:
                 return FileResponse(candidate)
+            if path and ".." in Path(path).parts:
+                return JSONResponse({"detail": "not found"}, status_code=404)
             return FileResponse(frontend_dist / "index.html")
 
     else:
