@@ -80,6 +80,19 @@ export function RunDetailPage() {
       }));
   }, [detail]);
 
+  if (detailQuery.isError || playbackQuery.isError) {
+    return (
+      <div className="page-stack page-stack--run-detail">
+        <div className="panel">
+          <div className="note-block" style={{ color: 'var(--danger)' }}>
+            <strong>Failed to load run detail</strong>
+            <p>The run data could not be retrieved. Check the backend and try again.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!detail || !playback) {
     return (
       <div className="page-stack page-stack--run-detail">

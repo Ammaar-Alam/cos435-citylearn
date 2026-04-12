@@ -207,7 +207,7 @@ img {
   gap: 0.5rem;
   padding-top: 1rem;
   color: var(--muted);
-  font-size: 0.84rem;
+  font-size: var(--text-secondary);
   border-top: 1px solid var(--line);
 }
 
@@ -754,8 +754,7 @@ img {
 .fact-list,
 .timeline-list,
 .artifact-list,
-.trace-table,
-.env-list {
+.trace-table {
   display: grid;
   gap: 0;
 }
@@ -768,9 +767,7 @@ img {
 
 .reference-row,
 .fact-list__row,
-.timeline-row,
-.artifact-row,
-.env-list__row {
+.timeline-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
@@ -782,22 +779,18 @@ img {
 .reference-list > :first-child,
 .fact-list > :first-child,
 .timeline-list > :first-child,
-.artifact-list > :first-child,
-.env-list > :first-child {
+.artifact-list > :first-child {
   border-top: 1px solid rgba(24, 33, 29, 0.08);
 }
 
 .reference-row strong,
 .fact-list__row strong,
-.timeline-row strong,
-.artifact-row strong,
-.env-list__row strong {
+.timeline-row strong {
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 
-.timeline-row,
-.artifact-row {
+.timeline-row {
   display: grid;
   gap: 0.15rem;
 }
@@ -842,8 +835,7 @@ img {
 .table-cell__stack span,
 .building-chip__stats,
 .trace-row__reward,
-.trace-row__actions,
-.env-list__row span {
+.trace-row__actions {
   color: var(--muted);
 }
 
@@ -913,8 +905,8 @@ img {
   grid-column: 1 / -1;
 }
 
-.checkbox-row {
-  display: inline-flex !important;
+label.checkbox-row {
+  display: inline-flex;
   align-items: center;
   gap: 0.6rem;
   color: var(--ink);
@@ -1174,7 +1166,7 @@ img {
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem 0.9rem;
-  font-size: 0.88rem;
+  font-size: var(--text-secondary);
 }
 
 .trace-table {
@@ -1200,7 +1192,7 @@ img {
   flex-wrap: wrap;
   gap: 0.35rem 0.55rem;
   justify-content: flex-end;
-  font-size: 0.84rem;
+  font-size: var(--text-secondary);
 }
 
 .trace-row.is-active {
@@ -1240,7 +1232,7 @@ img {
 }
 
 .artifact-card__meta {
-  font-size: 0.88rem;
+  font-size: var(--text-secondary);
 }
 
 .selection-card__header strong,

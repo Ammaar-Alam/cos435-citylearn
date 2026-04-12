@@ -1,5 +1,5 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { CompareBars, MetricCard, SectionHeader } from "../components";
@@ -17,7 +17,15 @@ const MAX_COMPARE = 4;
 
 export function ComparePage() {
   const [search, setSearch] = useState("");
+  const [showCapWarning, setShowCapWarning] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (!showCapWarning) return;
+    const timer = setTimeout(() => setShowCapWarning(false), 3000);
+    return () => clearTimeout(timer);
+  }, [showCapWarning]);
+
   const runsQuery = useQuery({ queryKey: ["runs"], queryFn: fetchRuns });
   const runs = runsQuery.data ?? [];
 
@@ -72,6 +80,7 @@ export function ComparePage() {
     }
 
     if (next.size >= MAX_COMPARE) {
+      setShowCapWarning(true);
       return;
     }
 
@@ -102,10 +111,23 @@ export function ComparePage() {
 
       <section className="compare-layout">
         <article className="panel panel--quiet">
-          <SectionHeader
-            eyebrow="Selection"
-            title={`Pick 2–4 runs · ${selectedRuns.length}/${MAX_COMPARE}`}
-          />
+          <div className="section-header">
+            <div className="section-header__body">
+              <div className="section-header__eyebrow">Selection</div>
+              <h2 className={selectedIds.size === MAX_COMPARE ? "is-full" : ""}>{`Pick 2\u20134 runs \u00b7 ${selectedRuns.length}/${MAX_COMPARE}`}</h2>
+            </div>
+          </div>
+          {showCapWarning && (
+            <div className="note-block" style={{ color: 'var(--danger)' }}>
+              Remove a run before adding another.
+            </div>
+          )}
+          {runsQuery.isError ? (
+            <div className="note-block" style={{ color: 'var(--danger)' }}>
+              <strong>Failed to load runs</strong>
+              <p>Check the backend connection and refresh.</p>
+            </div>
+          ) : (
           <div className="selection-list">
             {filteredRuns.map((run) => (
               <button
@@ -131,6 +153,7 @@ export function ComparePage() {
               </button>
             ))}
           </div>
+          )}
         </article>
 
         <div className="page-stack compare-deck">

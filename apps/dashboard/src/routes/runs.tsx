@@ -86,7 +86,12 @@ export function RunsPage() {
             eyebrow="Archive"
             title={`${filteredRuns.length} runs`}
           />
-          {filteredRuns.length > 0 ? (
+          {runsQuery.isError ? (
+            <div className="note-block" style={{ color: 'var(--danger)' }}>
+              <strong>Failed to load runs</strong>
+              <p>Check the backend connection and refresh.</p>
+            </div>
+          ) : filteredRuns.length > 0 ? (
             <RunsTable runs={filteredRuns} selectedRunId={selectedRunId} onSelect={setSelectedRunId} />
           ) : (
             <div className="empty-block empty-block--wide">No runs matched the current search.</div>
@@ -134,7 +139,12 @@ export function RunsPage() {
                 </div>
               </div>
 
-              {detailQuery.data ? (
+              {detailQuery.isError ? (
+                <div className="note-block" style={{ color: 'var(--danger)' }}>
+                  <strong>Failed to load run detail</strong>
+                  <p>Check the backend connection and refresh.</p>
+                </div>
+              ) : detailQuery.data ? (
                 <div className="selected-run-grid">
                   <div className="chart-frame">
                     <div className="panel__title">Score anatomy</div>

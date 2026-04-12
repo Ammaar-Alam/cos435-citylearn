@@ -28,6 +28,15 @@ import {
   getRunArtifactKinds,
 } from "./lib/format";
 
+const CHART_COLORS = {
+  primary: "#234a40",    // matches --accent
+  warm: "#8f5b38",       // matches --warm
+  mint: "#5f7f68",       // matches --mint
+  teal: "#365b6b",       // secondary data color
+  grid: "rgba(24, 33, 29, 0.10)",
+  tick: "#5c655f",       // matches --muted
+} as const;
+
 export function SectionHeader({
   eyebrow,
   title,
@@ -255,11 +264,11 @@ export function ChallengeMetricChart({ detail }: { detail: RunDetail }) {
   return (
     <ResponsiveContainer width="100%" height={280}>
       <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="2 4" stroke="rgba(42, 52, 48, 0.12)" />
-        <XAxis dataKey="label" tick={{ fill: "#51605a", fontSize: 12 }} />
-        <YAxis tick={{ fill: "#51605a", fontSize: 12 }} />
+        <CartesianGrid strokeDasharray="2 4" stroke={CHART_COLORS.grid} />
+        <XAxis dataKey="label" tick={{ fill: CHART_COLORS.tick, fontSize: 12 }} />
+        <YAxis tick={{ fill: CHART_COLORS.tick, fontSize: 12 }} />
         <Tooltip />
-        <Bar dataKey="value" fill="#264a3f" radius={[10, 10, 4, 4]} />
+        <Bar dataKey="value" fill={CHART_COLORS.primary} radius={[10, 10, 4, 4]} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -378,12 +387,12 @@ export function TimeseriesPanel({
           <div className="panel__title">District load / battery</div>
           <ResponsiveContainer width="100%" height={240}>
             <LineChart data={chartData} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="2 4" stroke="rgba(42, 52, 48, 0.12)" />
+              <CartesianGrid strokeDasharray="2 4" stroke={CHART_COLORS.grid} />
               <XAxis dataKey="timestamp" tick={false} />
-              <YAxis tick={{ fill: "#51605a", fontSize: 12 }} />
+              <YAxis tick={{ fill: CHART_COLORS.tick, fontSize: 12 }} />
               <Tooltip />
-              <Line type="monotone" dataKey="district" stroke="#1e4036" strokeWidth={2.25} dot={false} />
-              <Line type="monotone" dataKey="battery" stroke="#b56744" strokeWidth={2.25} dot={false} />
+              <Line type="monotone" dataKey="district" stroke={CHART_COLORS.primary} strokeWidth={2.25} dot={false} />
+              <Line type="monotone" dataKey="battery" stroke={CHART_COLORS.warm} strokeWidth={2.25} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -391,12 +400,12 @@ export function TimeseriesPanel({
           <div className="panel__title">{selectedBuilding?.name ?? "Building"} load / indoor</div>
           <ResponsiveContainer width="100%" height={240}>
             <AreaChart data={chartData} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="2 4" stroke="rgba(42, 52, 48, 0.12)" />
+              <CartesianGrid strokeDasharray="2 4" stroke={CHART_COLORS.grid} />
               <XAxis dataKey="timestamp" tick={false} />
-              <YAxis tick={{ fill: "#51605a", fontSize: 12 }} />
+              <YAxis tick={{ fill: CHART_COLORS.tick, fontSize: 12 }} />
               <Tooltip />
-              <Area type="monotone" dataKey="indoor" stroke="#6c8259" fill="rgba(108, 130, 89, 0.18)" />
-              <Area type="monotone" dataKey="load" stroke="#365b6b" fill="rgba(54, 91, 107, 0.14)" />
+              <Area type="monotone" dataKey="indoor" stroke={CHART_COLORS.mint} fill="rgba(95, 127, 104, 0.16)" />
+              <Area type="monotone" dataKey="load" stroke={CHART_COLORS.teal} fill="rgba(54, 91, 107, 0.14)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -453,11 +462,11 @@ export function CompareBars({ runs }: { runs: RunSummary[] }) {
   return (
     <ResponsiveContainer width="100%" height={Math.max(240, runs.length * 56)}>
       <BarChart data={data} layout="vertical" margin={{ top: 8, right: 8, left: 36, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="2 4" stroke="rgba(42, 52, 48, 0.12)" />
-        <XAxis type="number" tick={{ fill: "#51605a", fontSize: 12 }} />
-        <YAxis dataKey="name" type="category" tick={{ fill: "#51605a", fontSize: 12 }} width={132} />
+        <CartesianGrid strokeDasharray="2 4" stroke={CHART_COLORS.grid} />
+        <XAxis type="number" tick={{ fill: CHART_COLORS.tick, fontSize: 12 }} />
+        <YAxis dataKey="name" type="category" tick={{ fill: CHART_COLORS.tick, fontSize: 12 }} width={132} />
         <Tooltip />
-        <Bar dataKey="score" fill="#1e4036" radius={[0, 10, 10, 0]} />
+        <Bar dataKey="score" fill={CHART_COLORS.primary} radius={[0, 10, 10, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

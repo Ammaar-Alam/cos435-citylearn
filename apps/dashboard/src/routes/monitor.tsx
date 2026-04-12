@@ -213,6 +213,12 @@ export function MonitorPage() {
           <div className="page-header__eyebrow">Live</div>
           <h1>Live monitor</h1>
           <p>Selected job, preview, trace.</p>
+          {jobsQuery.isError ? (
+            <div className="note-block" style={{ color: 'var(--danger)' }}>
+              <strong>Failed to load jobs</strong>
+              <p>Check the backend connection and refresh.</p>
+            </div>
+          ) : null}
         </div>
         <div className="page-header__actions">
           {selectedJob?.run_id ? (
@@ -260,6 +266,12 @@ export function MonitorPage() {
         <div className="monitor-rail">
           <article className="panel panel--quiet">
             <SectionHeader eyebrow="Status" title="Job state" />
+            {stateQuery.isError ? (
+              <div className="note-block" style={{ color: 'var(--danger)' }}>
+                <strong>Failed to load job state</strong>
+                <p>Check the backend connection and refresh.</p>
+              </div>
+            ) : null}
             <div className="metric-row metric-row--artifact">
               <MetricCard label="runner" value={selectedJob?.runner_id ?? "—"} />
               <MetricCard label="status" value={selectedJob?.status ?? "idle"} tone="mint" />
@@ -338,7 +350,9 @@ export function MonitorPage() {
         <article className="panel panel--quiet">
           <SectionHeader eyebrow="Logs" title="Worker log" />
           <pre className="job-log-output">
-            {selectedJob ? logsQuery.data?.logs?.trim() || "Waiting for log output." : "Select a job to inspect its log."}
+            {logsQuery.isError
+              ? "Failed to load logs. Check the backend connection and refresh."
+              : selectedJob ? logsQuery.data?.logs?.trim() || "Waiting for log output." : "Select a job to inspect its log."}
           </pre>
         </article>
       </section>

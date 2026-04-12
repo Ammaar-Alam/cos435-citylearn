@@ -225,6 +225,12 @@ export function ArtifactsPage() {
             </button>
             <div className="muted-copy">{readinessCopy}</div>
           </div>
+          {uploadMutation.isError ? (
+            <div className="note-block" style={{ color: 'var(--danger)' }}>
+              <strong>Import failed</strong>
+              <p>The artifact could not be registered. Check the file and try again.</p>
+            </div>
+          ) : null}
         </article>
 
         <div className="page-stack">
@@ -234,7 +240,12 @@ export function ArtifactsPage() {
               title="Stored records"
             />
             <div className="artifact-list">
-              {totalArtifacts === 0 ? (
+              {artifactsQuery.isError ? (
+                <div className="note-block" style={{ color: 'var(--danger)' }}>
+                  <strong>Failed to load artifacts</strong>
+                  <p>Check the backend connection and refresh.</p>
+                </div>
+              ) : totalArtifacts === 0 ? (
                 <div className="empty-block">No imported artifacts yet.</div>
               ) : (
                 (artifactsQuery.data ?? []).map((artifact) => (

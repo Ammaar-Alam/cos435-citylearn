@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -31,6 +31,13 @@ export function OverviewPage() {
   const [traceLimit, setTraceLimit] = useState(96);
   const [captureFrames, setCaptureFrames] = useState(true);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [confirmLaunch, setConfirmLaunch] = useState(false);
+
+  useEffect(() => {
+    if (!confirmLaunch) return;
+    const timer = setTimeout(() => setConfirmLaunch(false), 3000);
+    return () => clearTimeout(timer);
+  }, [confirmLaunch]);
 
   const envQuery = useQuery({ queryKey: ["env"], queryFn: fetchEnvironment });
   const runnersQuery = useQuery({ queryKey: ["runners"], queryFn: fetchRunners });
@@ -103,6 +110,13 @@ export function OverviewPage() {
     ? latestRun.average_score - OFFICIAL_BENCHMARK.baselinePrivate
     : null;
 
+  const hasRunningJob = (jobsQuery.data ?? []).some((job) => job.status === "running");
+  const heroTitle = hasRunningJob
+    ? "Run in progress"
+    : latestRun
+      ? `Latest: ${formatRunTitle(latestRun)}`
+      : "Ready to launch";
+
   const environmentPackages = (envQuery.data?.packages ?? {}) as Record<string, string>;
   const environmentRows = [
     { label: "python", value: String(envQuery.data?.python ?? "—") },
@@ -115,7 +129,7 @@ export function OverviewPage() {
       <section className="page-header">
         <div className="page-header__body">
           <div className="page-header__eyebrow">Overview</div>
-          <h1>Benchmark desk</h1>
+          <h1>{heroTitle}</h1>
           <p>Latest run, launch control, and queue state.</p>
         </div>
         <div className="page-header__actions">
@@ -129,48 +143,55 @@ export function OverviewPage() {
       </section>
 
       <section className="overview-hero">
-        <article className="panel latest-run-card">
-          <div className="latest-run-card__media">
-            {latestRunPoster ? (
-              <img alt="Latest run poster" src={latestRunPoster} />
-            ) : (
-              <div className="scene-placeholder">No poster captured yet.</div>
-            )}
+        {runsQuery.isError ? (
+          <div className="note-block" style={{ color: 'var(--danger)' }}>
+            <strong>Failed to load runs</strong>
+            <p>Check the backend connection and refresh.</p>
           </div>
-          <div className="latest-run-card__body">
-            <div className="panel__title">Latest run</div>
-            <h2>{latestRun ? formatRunTitle(latestRun) : "No completed runs yet"}</h2>
-            <p>{latestRun ? formatRunContext(latestRun) : "Launch the first benchmark run."}</p>
-            <div className="metric-row">
-              <MetricCard
-                label="score"
-                value={latestRun ? formatScore(latestRun.average_score) : "—"}
-                tone="warm"
-                hint="lower is better"
-              />
-              <MetricCard
-                label="vs RBC private"
-                value={latestRunGap === null ? "—" : formatScore(latestRunGap)}
-                hint="local minus baseline"
-              />
-              <MetricCard
-                label="files"
-                value={latestRunArtifacts.length ? String(latestRunArtifacts.length) : "0"}
-                hint={latestRunArtifacts.length ? latestRunArtifacts.join(" • ") : "pending"}
-              />
+        ) : (
+          <article className="panel latest-run-card">
+            <div className="latest-run-card__media">
+              {latestRunPoster ? (
+                <img alt="Latest run poster" src={latestRunPoster} />
+              ) : (
+                <div className="scene-placeholder">No poster captured yet.</div>
+              )}
             </div>
-            {latestRun ? (
-              <div className="inline-actions">
-                <Link className="ghost-button" to={`/runs/${latestRun.run_id}`}>
-                  open run
-                </Link>
-                <Link className="ghost-button" to={`/compare?runIds=${latestRun.run_id}`}>
-                  compare
-                </Link>
+            <div className="latest-run-card__body">
+              <div className="panel__title">Latest run</div>
+              <h2>{latestRun ? formatRunTitle(latestRun) : "No completed runs yet"}</h2>
+              <p>{latestRun ? formatRunContext(latestRun) : "Launch the first benchmark run."}</p>
+              <div className="metric-row">
+                <MetricCard
+                  label="score"
+                  value={latestRun ? formatScore(latestRun.average_score) : "—"}
+                  tone="warm"
+                  hint="lower is better"
+                />
+                <MetricCard
+                  label="vs RBC private"
+                  value={latestRunGap === null ? "—" : formatScore(latestRunGap)}
+                  hint="local minus baseline"
+                />
+                <MetricCard
+                  label="files"
+                  value={latestRunArtifacts.length ? String(latestRunArtifacts.length) : "0"}
+                  hint={latestRunArtifacts.length ? latestRunArtifacts.join(" • ") : "pending"}
+                />
               </div>
-            ) : null}
-          </div>
-        </article>
+              {latestRun ? (
+                <div className="inline-actions">
+                  <Link className="ghost-button" to={`/runs/${latestRun.run_id}`}>
+                    open run
+                  </Link>
+                  <Link className="ghost-button" to={`/compare?runIds=${latestRun.run_id}`}>
+                    compare
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+          </article>
+        )}
 
         <div className="overview-rail">
           <article className="panel panel--quiet">
@@ -199,17 +220,24 @@ export function OverviewPage() {
             </div>
           </article>
 
-          <article className="panel panel--quiet">
-            <SectionHeader eyebrow="System" title="Bench lock" />
-            <div className="fact-list">
-              {environmentRows.map((row) => (
-                <div key={row.label} className="fact-list__row">
-                  <span>{row.label}</span>
-                  <strong>{row.value}</strong>
-                </div>
-              ))}
+          {envQuery.isError ? (
+            <div className="note-block" style={{ color: 'var(--danger)' }}>
+              <strong>Failed to load environment</strong>
+              <p>Check the backend connection and refresh.</p>
             </div>
-          </article>
+          ) : (
+            <article className="panel panel--quiet">
+              <SectionHeader eyebrow="System" title="Bench lock" />
+              <div className="fact-list">
+                {environmentRows.map((row) => (
+                  <div key={row.label} className="fact-list__row">
+                    <span>{row.label}</span>
+                    <strong>{row.value}</strong>
+                  </div>
+                ))}
+              </div>
+            </article>
+          )}
         </div>
       </section>
 
@@ -219,7 +247,12 @@ export function OverviewPage() {
             eyebrow="Launch"
             title="Run control"
           />
-          {availableRunners.length > 0 ? (
+          {runnersQuery.isError ? (
+            <div className="note-block" style={{ color: 'var(--danger)' }}>
+              <strong>Failed to load runners</strong>
+              <p>Check the backend connection and refresh.</p>
+            </div>
+          ) : availableRunners.length > 0 ? (
             <RunnerGrid
               runners={availableRunners}
               selectedRunnerId={selectedRunnerId}
@@ -255,7 +288,12 @@ export function OverviewPage() {
               <button
                 className="primary-button"
                 disabled={!launchableRunner?.launchable || launchMutation.isPending}
-                onClick={() =>
+                onClick={() => {
+                  if (!confirmLaunch) {
+                    setConfirmLaunch(true);
+                    return;
+                  }
+                  setConfirmLaunch(false);
                   launchMutation.mutate(
                     {
                       runner_id: selectedRunnerId,
@@ -268,11 +306,11 @@ export function OverviewPage() {
                         setSelectedJobId(job.job_id);
                       },
                     },
-                  )
-                }
+                  );
+                }}
                 type="button"
               >
-                {launchMutation.isPending ? "launching…" : "launch benchmark"}
+                {launchMutation.isPending ? "launching…" : confirmLaunch ? "confirm launch?" : "launch benchmark"}
               </button>
             </div>
           </details>
@@ -299,19 +337,28 @@ export function OverviewPage() {
               </Link>
             }
           />
-          <JobsRail
-            jobs={jobsQuery.data ?? []}
-            selectedJobId={effectiveSelectedJobId}
-            onSelect={setSelectedJobId}
-            onCancel={(jobId) => cancelMutation.mutate(jobId)}
-            limit={4}
-          />
-          <details className="detail-block">
-            <summary>Latest log tail</summary>
-            <pre className="job-log-output">
-              {selectedJob ? jobLogsQuery.data?.logs?.trim() || "Waiting for log output." : "Select a job to inspect its log."}
-            </pre>
-          </details>
+          {jobsQuery.isError ? (
+            <div className="note-block" style={{ color: 'var(--danger)' }}>
+              <strong>Failed to load jobs</strong>
+              <p>Check the backend connection and refresh.</p>
+            </div>
+          ) : (
+            <>
+              <JobsRail
+                jobs={jobsQuery.data ?? []}
+                selectedJobId={effectiveSelectedJobId}
+                onSelect={setSelectedJobId}
+                onCancel={(jobId) => cancelMutation.mutate(jobId)}
+                limit={4}
+              />
+              <details className="detail-block">
+                <summary>Latest log tail</summary>
+                <pre className="job-log-output">
+                  {selectedJob ? jobLogsQuery.data?.logs?.trim() || "Waiting for log output." : "Select a job to inspect its log."}
+                </pre>
+              </details>
+            </>
+          )}
         </article>
       </section>
 
