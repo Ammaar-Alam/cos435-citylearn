@@ -1,10 +1,5 @@
 import { createBrowserRouter, NavLink, Outlet } from "react-router-dom";
 
-import { OverviewPage } from "./routes/overview";
-import { RunsPage } from "./routes/runs";
-import { RunDetailPage } from "./routes/run-detail";
-import { ComparePage } from "./routes/compare";
-
 function Shell() {
   return (
     <div className="shell">
@@ -19,8 +14,10 @@ function Shell() {
           <NavLink to="/" end>
             Overview
           </NavLink>
+          <NavLink to="/monitor">Monitor</NavLink>
           <NavLink to="/runs">Runs</NavLink>
           <NavLink to="/compare">Compare</NavLink>
+          <NavLink to="/artifacts">Imports</NavLink>
         </nav>
 
         <div className="sidebar__note">
@@ -35,15 +32,38 @@ function Shell() {
   );
 }
 
-export const router = createBrowserRouter([
-  {
-    path: "/",
-    element: <Shell />,
-    children: [
-      { index: true, element: <OverviewPage /> },
-      { path: "runs", element: <RunsPage /> },
-      { path: "runs/:runId", element: <RunDetailPage /> },
-      { path: "compare", element: <ComparePage /> },
-    ],
-  },
-]);
+export const router = createBrowserRouter(
+  [
+    {
+      path: "/",
+      element: <Shell />,
+      children: [
+        {
+          index: true,
+          lazy: () => import("./routes/overview").then((mod) => ({ Component: mod.OverviewPage })),
+        },
+        {
+          path: "monitor",
+          lazy: () => import("./routes/monitor").then((mod) => ({ Component: mod.MonitorPage })),
+        },
+        {
+          path: "runs",
+          lazy: () => import("./routes/runs").then((mod) => ({ Component: mod.RunsPage })),
+        },
+        {
+          path: "runs/:runId",
+          lazy: () => import("./routes/run-detail").then((mod) => ({ Component: mod.RunDetailPage })),
+        },
+        {
+          path: "compare",
+          lazy: () => import("./routes/compare").then((mod) => ({ Component: mod.ComparePage })),
+        },
+        {
+          path: "artifacts",
+          lazy: () => import("./routes/artifacts").then((mod) => ({ Component: mod.ArtifactsPage })),
+        },
+      ],
+    },
+  ],
+  { basename: "/dashboard" },
+);

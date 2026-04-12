@@ -33,5 +33,9 @@ export function artifactUrl(path: string | null | undefined): string | null {
     return null;
   }
 
-  return `/artifacts/${path}`;
+  const normalized = path
+    .replace(/^\/+/, "")
+    .replace(/^results\//, "");
+
+  return `/artifacts/${normalized}`;
 }

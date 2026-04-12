@@ -166,6 +166,17 @@ export function JobsRail({
               <span>{job.status}</span>
             </div>
             <div className="job-card__meta">submitted {formatRelativeTime(job.submitted_at)}</div>
+            {job.phase ? <div className="job-card__meta">phase {job.phase}</div> : null}
+            {job.progress_current !== null && job.progress_total !== null ? (
+              <div className="job-progress">
+                <div
+                  className="job-progress__fill"
+                  style={{
+                    width: `${Math.max(4, Math.min(100, (job.progress_current / Math.max(job.progress_total, 1)) * 100))}%`,
+                  }}
+                />
+              </div>
+            ) : null}
             {job.run_id ? <div className="job-card__meta">run {job.run_id}</div> : null}
             {job.average_score !== null ? (
               <div className="job-card__score">score {formatScore(job.average_score)}</div>

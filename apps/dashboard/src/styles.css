@@ -346,12 +346,20 @@ input {
 }
 
 .launch-form input[type="number"],
-.search-input {
+.search-input,
+.form-grid input,
+.form-grid select,
+.form-grid textarea {
   width: 100%;
   padding: 0.8rem 0.9rem;
   border-radius: 1rem;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.92);
+}
+
+.form-grid textarea {
+  min-height: 6.5rem;
+  resize: vertical;
 }
 
 .checkbox-row {
@@ -442,6 +450,20 @@ input {
   margin: 0.4rem 0;
   font-family: "Sora", sans-serif;
   font-size: 1.2rem;
+}
+
+.job-progress {
+  height: 10px;
+  margin: 0.55rem 0 0.2rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(29, 59, 47, 0.08);
+}
+
+.job-progress__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--mint), var(--accent));
 }
 
 .job-card--running {
@@ -581,6 +603,93 @@ input {
   line-height: 1.55;
 }
 
+.timeline-list,
+.artifact-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.timeline-row,
+.artifact-row,
+.artifact-card {
+  padding: 0.95rem 1rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(37, 67, 53, 0.08);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.timeline-row code,
+.artifact-row span,
+.artifact-card__meta,
+.muted-copy {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.timeline-row__meta,
+.artifact-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.35rem;
+}
+
+.artifact-row,
+.artifact-card {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.artifact-card {
+  text-align: left;
+  cursor: pointer;
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease;
+}
+
+.artifact-card:hover,
+.artifact-card.is-active {
+  transform: translateY(-1px);
+  border-color: rgba(34, 97, 71, 0.22);
+  background: color-mix(in oklch, var(--panel) 84%, var(--accent-soft));
+}
+
+.form-grid {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-grid label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.form-grid__wide {
+  grid-column: 1 / -1;
+}
+
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.empty-block--wide {
+  min-height: 12rem;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.metric-row--artifact {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 @media (max-width: 1100px) {
   .shell,
   .hero,
@@ -597,6 +706,11 @@ input {
   }
 
   .runner-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid,
+  .metric-row--artifact {
     grid-template-columns: 1fr;
   }
 }

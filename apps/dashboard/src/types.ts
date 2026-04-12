@@ -7,12 +7,14 @@ export type RunnerSummary = {
   config_path: string;
   eval_config_path: string;
   launchable: boolean;
+  supports_checkpoint_eval: boolean;
 };
 
 export type JobSummary = {
   job_id: string;
   runner_id: string;
   status: "queued" | "running" | "succeeded" | "failed" | "orphaned" | "cancelled";
+  phase: string | null;
   submitted_at: string;
   started_at: string | null;
   finished_at: string | null;
@@ -22,6 +24,11 @@ export type JobSummary = {
   run_id: string | null;
   average_score: number | null;
   error_message: string | null;
+  progress_current: number | null;
+  progress_total: number | null;
+  progress_label: string | null;
+  heartbeat_at: string | null;
+  latest_preview_path: string | null;
 };
 
 export type RunSummary = {
@@ -67,6 +74,65 @@ export type PlaybackPayload = {
 
 export type LaunchJobPayload = {
   runner_id: string;
+  artifact_id?: string;
+  seed?: number;
+  split?: string;
+  trace_limit?: number;
+  capture_render_frames?: boolean;
+  max_render_frames?: number;
+  render_frame_width?: number;
+};
+
+export type JobState = {
+  job_id: string;
+  job_kind: string;
+  status: string;
+  phase: string;
+  progress_current: number | null;
+  progress_total: number | null;
+  progress_label: string | null;
+  heartbeat_at: string;
+  latest_run_id: string | null;
+  latest_preview_path: string | null;
+  latest_checkpoint_id: string | null;
+  latest_log_offset: number | null;
+  error_message: string | null;
+};
+
+export type JobEvent = {
+  seq: number;
+  job_id: string;
+  event_type: string;
+  created_at: string;
+  payload: Record<string, any>;
+};
+
+export type JobArtifact = {
+  kind: string;
+  label: string;
+  path: string;
+};
+
+export type ArtifactSummary = {
+  artifact_id: string;
+  artifact_kind: "checkpoint" | "run_bundle" | "simulation_bundle";
+  label: string;
+  source_filename: string;
+  imported_at: string;
+  algorithm: string;
+  runner_id: string | null;
+  status: string;
+  evaluable: boolean;
+  playback_path: string | null;
+  simulation_dir: string | null;
+};
+
+export type ArtifactDetail = ArtifactSummary & {
+  file_path: string;
+  notes: string | null;
+};
+
+export type EvaluateArtifactPayload = {
   seed?: number;
   split?: string;
   trace_limit?: number;

@@ -98,8 +98,14 @@ export function OverviewPage() {
             <Link className="primary-button" to={latestRun ? `/runs/${latestRun.run_id}` : "/runs"}>
               inspect latest run
             </Link>
+            <Link className="ghost-button" to="/monitor">
+              open live monitor
+            </Link>
             <Link className="ghost-button" to="/compare">
               compare runs
+            </Link>
+            <Link className="ghost-button" to="/artifacts">
+              import artifacts
             </Link>
           </div>
         </div>
