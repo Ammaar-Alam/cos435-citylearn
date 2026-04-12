@@ -41,11 +41,16 @@ class RunStore:
             self._load_json(playback_manifest_path) if playback_manifest_path.exists() else {}
         )
         media = playback_payload.get("media", {})
+        trace_steps = (
+            int(playback_payload.get("decision_steps", manifest["step_count"]))
+            if trace_path.exists()
+            else 0
+        )
 
         artifacts = {
             "metrics": True,
             "rollout_trace": trace_path.exists(),
-            "trace_steps": len(self._load_json(trace_path)) if trace_path.exists() else 0,
+            "trace_steps": trace_steps,
             "playback": bool(manifest.get("playback_path")),
             "simulation_export": bool(simulation_dir),
             "gif": bool(media.get("gif_path")),

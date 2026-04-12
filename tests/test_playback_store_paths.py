@@ -77,3 +77,4 @@ def test_artifact_playback_resolves_repo_relative_results_path(tmp_path: Path) -
     assert playback.stored_steps == 3
     assert playback.total_steps == 3
     assert playback.truncated is False
+    assert "trace" not in playback.payload

@@ -41,6 +41,7 @@ class PlaybackStore:
         total_steps = int(
             payload.get("decision_steps", payload.get("episode_total_steps", len(trace)))
         )
+        payload_meta = {key: value for key, value in payload.items() if key != "trace"}
         return PlaybackResponse(
             run_id=run_id,
             mode=mode,
@@ -52,7 +53,7 @@ class PlaybackStore:
             offset=offset,
             limit=limit,
             trace_frames=[PlaybackFrame(**frame) for frame in trace_slice],
-            payload=payload,
+            payload=payload_meta,
         )
 
     def get_playback(self, run_id: str, *, offset: int = 0, limit: int = 256) -> PlaybackResponse:
