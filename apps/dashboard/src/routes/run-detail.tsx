@@ -199,7 +199,7 @@ export function RunDetailPage() {
       <article className="panel">
         <SectionHeader
           eyebrow="Playback"
-          title="Playback"
+          title="Step viewer"
           action={
             <div className="playback-controls">
               <button className="ghost-button ghost-button--small" onClick={() => setIsPlaying((value) => !value)} type="button">

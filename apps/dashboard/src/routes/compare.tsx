@@ -138,7 +138,7 @@ export function ComparePage() {
             <>
               <article className="panel">
                 <SectionHeader
-                  eyebrow="Overview"
+                  eyebrow="Scores"
                   title="Score spread"
                 />
                 <CompareBars runs={selectedRuns} />
