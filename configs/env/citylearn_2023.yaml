@@ -2,7 +2,14 @@ env:
   name: citylearn_2023
   citylearn_version: 2.1b12
   dataset_root: data/external/citylearn_2023
+  dataset_doi: doi:10.18738/T8/SXFWTI
+  default_dataset: citylearn_challenge_2023_phase_2_local_evaluation
+  default_schema: data/external/citylearn_2023/citylearn_challenge_2023_phase_2_local_evaluation/schema.json
   challenge_year: 2023
   central_agent: true
+  shared_observations: []
+  episode_time_steps: null
+  rolling_episode_split: false
+  random_episode_split: false
   seed: 0
-  notes: official challenge target for the benchmark branch
+  notes: official 2023 local evaluation dataset for environment and built-in baseline validation

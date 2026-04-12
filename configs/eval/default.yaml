@@ -7,6 +7,8 @@ evaluation:
   eval_episodes: 1
   deterministic: true
   save_rollout_trace: true
+  save_raw_kpis: true
+  save_challenge_metrics: true
 
 logging:
   metrics_root: results/metrics

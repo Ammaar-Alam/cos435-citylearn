@@ -1,5 +1,8 @@
 split:
   name: public_dev
-  intent: initial shared split for scaffold configs
+  dataset_name: citylearn_challenge_2023_phase_2_local_evaluation
+  intent: shared public local-evaluation split for environment validation and built-in RBC
   tuning_allowed: true
   held_out: false
+  central_agent: true
+  buildings: []

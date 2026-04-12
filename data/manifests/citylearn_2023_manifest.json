@@ -1,0 +1,127 @@
+{
+  "all_available_datasets": [
+    "citylearn_challenge_2023_phase_1",
+    "citylearn_challenge_2023_phase_2_local_evaluation",
+    "citylearn_challenge_2023_phase_2_online_evaluation_1",
+    "citylearn_challenge_2023_phase_2_online_evaluation_2",
+    "citylearn_challenge_2023_phase_2_online_evaluation_3",
+    "citylearn_challenge_2023_phase_3_1",
+    "citylearn_challenge_2023_phase_3_2",
+    "citylearn_challenge_2023_phase_3_3"
+  ],
+  "api_url": "https://dataverse.tdl.org/api/datasets/:persistentId/?persistentId=doi:10.18738/T8/SXFWTI",
+  "dataset_doi": "doi:10.18738/T8/SXFWTI",
+  "default_dataset": "citylearn_challenge_2023_phase_2_local_evaluation",
+  "download_root": "/Users/alam/GitHub/cos435-citylearn/data/external/citylearn_2023",
+  "downloaded_datasets": [
+    "citylearn_challenge_2023_phase_2_local_evaluation"
+  ],
+  "downloaded_file_count": 10,
+  "files": [
+    {
+      "datafile_id": 592826,
+      "directory_label": "citylearn_challenge_2023_phase_2_local_evaluation",
+      "filename": "Building_1.csv",
+      "md5": "38ac1ead003c7661ada3dc4c17a19a78",
+      "relative_path": "citylearn_challenge_2023_phase_2_local_evaluation/Building_1.csv",
+      "size_bytes": 110637,
+      "source_label": "Building_1.tab",
+      "status": "downloaded"
+    },
+    {
+      "datafile_id": 592821,
+      "directory_label": "citylearn_challenge_2023_phase_2_local_evaluation",
+      "filename": "Building_1.pth",
+      "md5": "ce6c33d9dbf9b03819c21c64cfeaa96c",
+      "relative_path": "citylearn_challenge_2023_phase_2_local_evaluation/Building_1.pth",
+      "size_bytes": 62071,
+      "source_label": "Building_1.pth",
+      "status": "downloaded"
+    },
+    {
+      "datafile_id": 592822,
+      "directory_label": "citylearn_challenge_2023_phase_2_local_evaluation",
+      "filename": "Building_2.csv",
+      "md5": "c211a5bb1087497713c9fb5c65ff545e",
+      "relative_path": "citylearn_challenge_2023_phase_2_local_evaluation/Building_2.csv",
+      "size_bytes": 102982,
+      "source_label": "Building_2.tab",
+      "status": "downloaded"
+    },
+    {
+      "datafile_id": 592819,
+      "directory_label": "citylearn_challenge_2023_phase_2_local_evaluation",
+      "filename": "Building_2.pth",
+      "md5": "4b871854905a8c690956464b42ba060f",
+      "relative_path": "citylearn_challenge_2023_phase_2_local_evaluation/Building_2.pth",
+      "size_bytes": 62071,
+      "source_label": "Building_2.pth",
+      "status": "downloaded"
+    },
+    {
+      "datafile_id": 592818,
+      "directory_label": "citylearn_challenge_2023_phase_2_local_evaluation",
+      "filename": "Building_3.csv",
+      "md5": "d5a5e82a58527c998e41175d5c16d2ee",
+      "relative_path": "citylearn_challenge_2023_phase_2_local_evaluation/Building_3.csv",
+      "size_bytes": 110100,
+      "source_label": "Building_3.tab",
+      "status": "downloaded"
+    },
+    {
+      "datafile_id": 592824,
+      "directory_label": "citylearn_challenge_2023_phase_2_local_evaluation",
+      "filename": "Building_3.pth",
+      "md5": "34f760e60c6a0c04c4a2e00992314abc",
+      "relative_path": "citylearn_challenge_2023_phase_2_local_evaluation/Building_3.pth",
+      "size_bytes": 62071,
+      "source_label": "Building_3.pth",
+      "status": "downloaded"
+    },
+    {
+      "datafile_id": 592823,
+      "directory_label": "citylearn_challenge_2023_phase_2_local_evaluation",
+      "filename": "carbon_intensity.csv",
+      "md5": "4b4c682fb3a4eccde14fe7cc9ec221a8",
+      "relative_path": "citylearn_challenge_2023_phase_2_local_evaluation/carbon_intensity.csv",
+      "size_bytes": 13894,
+      "source_label": "carbon_intensity.tab",
+      "status": "downloaded"
+    },
+    {
+      "datafile_id": 592820,
+      "directory_label": "citylearn_challenge_2023_phase_2_local_evaluation",
+      "filename": "pricing.csv",
+      "md5": "dbbf6004ff9ccab3058099e7757daae0",
+      "relative_path": "citylearn_challenge_2023_phase_2_local_evaluation/pricing.csv",
+      "size_bytes": 23040,
+      "source_label": "pricing.tab",
+      "status": "downloaded"
+    },
+    {
+      "datafile_id": 592825,
+      "directory_label": "citylearn_challenge_2023_phase_2_local_evaluation",
+      "filename": "schema.json",
+      "md5": "29fe70b822ba6e368b3cd7acae8d88b7",
+      "relative_path": "citylearn_challenge_2023_phase_2_local_evaluation/schema.json",
+      "size_bytes": 23336,
+      "source_label": "schema.json",
+      "status": "downloaded"
+    },
+    {
+      "datafile_id": 592817,
+      "directory_label": "citylearn_challenge_2023_phase_2_local_evaluation",
+      "filename": "weather.csv",
+      "md5": "644f7afc57b5377cf57fb8b45d12e498",
+      "relative_path": "citylearn_challenge_2023_phase_2_local_evaluation/weather.csv",
+      "size_bytes": 144848,
+      "source_label": "weather.tab",
+      "status": "downloaded"
+    }
+  ],
+  "generated_at": "2026-04-11T22:35:11.003245+00:00",
+  "persistent_url": "https://doi.org/10.18738/T8/SXFWTI",
+  "publication_date": "2024-02-03",
+  "version_minor_number": 1,
+  "version_number": 1
+}
