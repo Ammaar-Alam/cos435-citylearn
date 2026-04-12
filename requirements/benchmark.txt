@@ -1,3 +1,13 @@
--r base.txt
+-r dev.txt
 CityLearn==2.1b12
 stable-baselines3==2.4.0
+torch==2.11.0
+torchvision==0.26.0
+numpy==1.26.4
+pandas==1.3.5
+scikit-learn==1.0.2
+scipy==1.15.3
+gym==0.26.2
+gymnasium==1.0.0
+matplotlib==3.10.8
+simplejson==3.20.2

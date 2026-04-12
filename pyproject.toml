@@ -20,6 +20,9 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "smoke: benchmark smoke coverage that requires the CityLearn runtime and dataset",
+]
 
 [tool.ruff]
 target-version = "py310"
