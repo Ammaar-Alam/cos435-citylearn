@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import {
   ChallengeMetricChart,
@@ -11,7 +11,19 @@ import {
   TraceTable,
 } from "../components";
 import { fetchPlayback, fetchRunDetail } from "../lib/api";
-import { formatMetricLabel, formatScore } from "../lib/format";
+import { OFFICIAL_BENCHMARK } from "../lib/benchmark";
+import {
+  artifactUrl,
+  formatDatasetName,
+  formatMetricLabel,
+  formatRelativeTime,
+  formatRunContext,
+  formatRunTitle,
+  formatScore,
+  formatSignedScore,
+  getRunArtifactKinds,
+  getRunArtifactPath,
+} from "../lib/format";
 import { useInterval } from "../lib/useInterval";
 
 export function RunDetailPage() {
@@ -21,6 +33,7 @@ export function RunDetailPage() {
     queryKey: ["playback", runId],
     queryFn: () => fetchPlayback(runId),
   });
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [selectedBuildingIndex, setSelectedBuildingIndex] = useState(0);
@@ -38,61 +51,158 @@ export function RunDetailPage() {
 
   const detail = detailQuery.data;
   const playback = playbackQuery.data;
-  const buildingNames = playback?.payload?.building_names ?? playback?.building_names ?? [];
 
   useEffect(() => {
-    if (selectedBuildingIndex >= buildingNames.length) {
+    setStepIndex(0);
+    setSelectedBuildingIndex(0);
+    setIsPlaying(false);
+  }, [runId]);
+
+  useEffect(() => {
+    const buildingCount = playback?.payload?.buildings?.length ?? playback?.building_names?.length ?? 0;
+    if (selectedBuildingIndex >= buildingCount) {
       setSelectedBuildingIndex(0);
     }
-  }, [buildingNames.length, selectedBuildingIndex]);
+  }, [playback?.building_names?.length, playback?.payload?.buildings?.length, selectedBuildingIndex]);
+
   const scoreCards = useMemo(() => {
     if (!detail) {
       return [];
     }
 
     return Object.entries(detail.challenge_metrics)
+      .filter(([key]) => key !== "average_score")
       .slice(0, 4)
       .map(([key, metric]) => ({
         key,
-        label: metric.display_name,
+        label: metric.display_name || formatMetricLabel(key),
         value: formatScore(metric.value),
       }));
   }, [detail]);
 
   if (!detail || !playback) {
-    return <div className="page-stack"><div className="panel">Loading run detail…</div></div>;
+    return (
+      <div className="page-stack page-stack--run-detail">
+        <div className="panel">Loading run detail…</div>
+      </div>
+    );
   }
 
-  const totalSteps = playback.total_steps ?? detail.summary.step_count;
+  const summary = detail.summary;
+  const totalSteps = playback.total_steps ?? summary.step_count;
+  const posterPath = playback.payload?.media?.poster_path ?? getRunArtifactPath(summary, "poster");
   const districtRows = Object.entries(detail.district_kpis).slice(0, 8);
+  const baselineGap = summary.average_score === null ? null : summary.average_score - OFFICIAL_BENCHMARK.baselinePrivate;
+  const winnerGap = summary.average_score === null ? null : summary.average_score - OFFICIAL_BENCHMARK.winnerPrivate;
+
+  const artifactRows = [
+    { label: "poster", path: posterPath },
+    { label: "gif playback", path: playback.payload?.media?.gif_path ?? getRunArtifactPath(summary, "gif") },
+    { label: "playback payload", path: getRunArtifactPath(summary, "playback") },
+    { label: "simulation export", path: getRunArtifactPath(summary, "simulation_export") },
+  ]
+    .filter((row): row is { label: string; path: string } => Boolean(row.path))
+    .filter((row, index, array) => array.findIndex((candidate) => candidate.path === row.path) === index);
 
   return (
-    <div className="page-stack">
-      <section className="panel panel--feature">
-        <SectionHeader
-          eyebrow={detail.summary.algorithm.toUpperCase()}
-          title={detail.summary.run_id}
-          copy="The literal scene and the data-first schematic stay in sync. This view is designed for actual inspection and for capturing slide-ready snapshots."
-        />
-        <div className="metric-row">
-          <MetricCard label="average score" value={formatScore(detail.summary.average_score)} tone="warm" />
-          <MetricCard label="split" value={detail.summary.split} />
-          <MetricCard label="dataset" value={detail.summary.dataset_name.replace(/_/g, " ")} />
-          <MetricCard label="steps" value={String(detail.summary.step_count)} />
-          {scoreCards.map((card) => (
-            <MetricCard key={card.key} label={card.label} value={card.value} tone="mint" />
-          ))}
+    <div className="page-stack page-stack--run-detail">
+      <section className="page-header">
+        <div className="page-header__body">
+          <div className="page-header__eyebrow">Run detail</div>
+          <h1>{formatRunTitle(summary)}</h1>
+          <p>{`${formatRunContext(summary)} · ${formatDatasetName(summary.dataset_name)}`}</p>
+        </div>
+        <div className="page-header__actions">
+          <Link className="primary-button" to={`/compare?runIds=${summary.run_id}`}>
+            compare
+          </Link>
+          <Link className="ghost-button" to="/runs">
+            archive
+          </Link>
         </div>
       </section>
 
-      <section className="panel">
+      <section className="run-detail-hero">
+        <article className="panel selected-run-card selected-run-card--detail">
+          <div className="selected-run-card__media">
+            {posterPath ? (
+              <img alt="Run poster" src={artifactUrl(posterPath) ?? ""} />
+            ) : (
+              <div className="scene-placeholder">No poster captured for this run.</div>
+            )}
+          </div>
+          <div className="selected-run-card__body">
+            <div className="panel__title">{formatDatasetName(summary.dataset_name)}</div>
+            <h2>{formatRunContext(summary)}</h2>
+            <p>{summary.run_id}</p>
+            <div className="metric-row metric-row--artifact">
+              <MetricCard label="score" value={formatScore(summary.average_score)} tone="warm" hint="lower is better" />
+              <MetricCard label="vs RBC private" value={formatSignedScore(baselineGap)} />
+              <MetricCard label="vs winner" value={formatSignedScore(winnerGap)} />
+              <MetricCard label="steps" value={String(summary.step_count)} />
+            </div>
+            {scoreCards.length > 0 ? (
+              <div className="artifact-strip">
+                {scoreCards.map((card) => (
+                  <span key={card.key}>
+                    {card.label}: {card.value}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </article>
+
+        <article className="panel panel--quiet">
+          <SectionHeader eyebrow="Evidence" title="Run facts" />
+          <div className="fact-list">
+            <div className="fact-list__row">
+              <span>dataset</span>
+              <strong>{formatDatasetName(summary.dataset_name)}</strong>
+            </div>
+            <div className="fact-list__row">
+              <span>split</span>
+              <strong>{formatMetricLabel(summary.split)}</strong>
+            </div>
+            <div className="fact-list__row">
+              <span>seed</span>
+              <strong>{summary.seed}</strong>
+            </div>
+            <div className="fact-list__row">
+              <span>generated</span>
+              <strong>{formatRelativeTime(summary.generated_at)}</strong>
+            </div>
+            <div className="fact-list__row">
+              <span>stored steps</span>
+              <strong>{playback.stored_steps}</strong>
+            </div>
+            <div className="fact-list__row">
+              <span>artifacts</span>
+              <strong>{getRunArtifactKinds(summary).join(" • ") || "pending"}</strong>
+            </div>
+          </div>
+          <div className="artifact-list">
+            {artifactRows.length > 0 ? (
+              artifactRows.map((artifact) => (
+                <a key={artifact.path} className="artifact-row" href={artifactUrl(artifact.path) ?? "#"} rel="noreferrer" target="_blank">
+                  <strong>{artifact.label}</strong>
+                  <span>{artifact.path.split("/").filter(Boolean).pop() ?? artifact.path}</span>
+                </a>
+              ))
+            ) : (
+              <div className="empty-block">No addressable files were attached to this run.</div>
+            )}
+          </div>
+        </article>
+      </section>
+
+      <article className="panel">
         <SectionHeader
-          eyebrow="playback"
-          title="Literal scene + schematic"
-          copy="This is driven from the saved playback payload and media artifacts, not from a silent rerun."
+          eyebrow="Playback"
+          title="Playback"
           action={
             <div className="playback-controls">
-              <button className="ghost-button" onClick={() => setIsPlaying((value) => !value)} type="button">
+              <button className="ghost-button ghost-button--small" onClick={() => setIsPlaying((value) => !value)} type="button">
                 {isPlaying ? "pause" : "play"}
               </button>
               <input
@@ -108,7 +218,7 @@ export function RunDetailPage() {
           }
         />
         <PlaybackScene playback={playback} stepIndex={stepIndex} />
-      </section>
+      </article>
 
       <TimeseriesPanel
         playback={playback}
@@ -118,45 +228,30 @@ export function RunDetailPage() {
       />
 
       <section className="content-grid">
-        <div className="panel">
-          <SectionHeader
-            eyebrow="challenge metrics"
-            title="Score anatomy"
-            copy="These are the same challenge metrics exported in the benchmark run directory."
-          />
+        <article className="panel panel--quiet">
+          <SectionHeader eyebrow="Challenge metrics" title="Score anatomy" />
           <ChallengeMetricChart detail={detail} />
-        </div>
-        <div className="panel">
-          <SectionHeader
-            eyebrow="district kpis"
-            title="Raw KPI slice"
-            copy="Keep the full table in the JSON. This panel is just a quick inspection slice."
-          />
-          <div className="env-list">
+        </article>
+        <article className="panel panel--quiet">
+          <SectionHeader eyebrow="District KPI slice" title="District KPIs" />
+          <div className="fact-list">
             {districtRows.map(([key, value]) => (
-              <div key={key} className="env-list__row">
+              <div key={key} className="fact-list__row">
                 <span>{formatMetricLabel(key)}</span>
                 <strong>{formatScore(value)}</strong>
               </div>
             ))}
           </div>
-        </div>
+        </article>
       </section>
 
-      <section className="panel">
+      <article className="panel panel--quiet">
         <SectionHeader
-          eyebrow="trace"
-          title={playback.mode === "full" ? "Recorded action trace" : "Preview trace"}
-          copy={
-            playback.mode === "full"
-              ? playback.truncated
-                ? "The playback payload is richer than the saved trace, so this table shows the stored slice only."
-                : "The trace is synced with the richer playback payload."
-              : "This run only has the lightweight rollout preview artifact."
-          }
+          eyebrow="Trace"
+          title={playback.mode === "full" ? "Recorded trace" : "Preview trace"}
         />
-        <TraceTable frames={playback.trace_frames} stepIndex={stepIndex} />
-      </section>
+        <TraceTable frames={playback.trace_frames} stepIndex={stepIndex} windowSize={12} />
+      </article>
     </div>
   );
 }

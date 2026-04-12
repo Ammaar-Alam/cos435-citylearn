@@ -1,28 +1,34 @@
 import { createBrowserRouter, NavLink, Outlet } from "react-router-dom";
 
+function HydrateFallback() {
+  return (
+    <main className="main">
+      <div className="page-stack">
+        <div className="panel">Loading dashboard…</div>
+      </div>
+    </main>
+  );
+}
+
 function Shell() {
   return (
     <div className="shell">
       <aside className="sidebar">
         <div className="sidebar__brand">
           <div className="sidebar__eyebrow">COS435 • CityLearn</div>
-          <h1>Benchmark cockpit</h1>
-          <p>One dashboard for launching, watching, and comparing runs.</p>
+          <h1>Benchmark desk</h1>
+          <p>Launch runs, review evidence, compare results.</p>
         </div>
 
         <nav className="sidebar__nav">
           <NavLink to="/" end>
             Overview
           </NavLink>
-          <NavLink to="/monitor">Monitor</NavLink>
+          <NavLink to="/monitor">Live</NavLink>
           <NavLink to="/runs">Runs</NavLink>
           <NavLink to="/compare">Compare</NavLink>
-          <NavLink to="/artifacts">Imports</NavLink>
+          <NavLink to="/artifacts">Artifacts</NavLink>
         </nav>
-
-        <div className="sidebar__note">
-          Completed eval runs export simulation data automatically. Held-out evaluation stays out of the default flow.
-        </div>
       </aside>
 
       <main className="main">
@@ -37,6 +43,7 @@ export const router = createBrowserRouter(
     {
       path: "/",
       element: <Shell />,
+      hydrateFallbackElement: <HydrateFallback />,
       children: [
         {
           index: true,

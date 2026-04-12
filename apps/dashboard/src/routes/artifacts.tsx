@@ -4,34 +4,50 @@ import { Link } from "react-router-dom";
 
 import {
   evaluateArtifact,
+  fetchArtifact,
   fetchArtifactPlayback,
   fetchArtifacts,
   fetchRunners,
   importArtifact,
 } from "../lib/api";
-import { formatRelativeTime } from "../lib/format";
-import { JobsRail, PlaybackScene, SectionHeader, TimeseriesPanel, TraceTable } from "../components";
+import { artifactUrl, basename, formatRelativeTime, formatStatusLabel } from "../lib/format";
+import { MetricCard, PlaybackScene, SectionHeader, TimeseriesPanel, TraceTable } from "../components";
+
+type ArtifactKind = "checkpoint" | "run_bundle" | "simulation_bundle";
 
 export function ArtifactsPage() {
   const queryClient = useQueryClient();
-  const [artifactKind, setArtifactKind] = useState<"checkpoint" | "run_bundle" | "simulation_bundle">("checkpoint");
+  const [artifactKind, setArtifactKind] = useState<ArtifactKind>("run_bundle");
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
-  const [selectedRunnerId, setSelectedRunnerId] = useState<string>("");
+  const [selectedRunnerId, setSelectedRunnerId] = useState("");
   const [label, setLabel] = useState("");
   const [notes, setNotes] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedBuildingIndex, setSelectedBuildingIndex] = useState(0);
   const [stepIndex, setStepIndex] = useState(0);
+
   const artifactsQuery = useQuery({ queryKey: ["artifacts"], queryFn: fetchArtifacts });
   const runnersQuery = useQuery({ queryKey: ["runners"], queryFn: fetchRunners });
+
   const selectedArtifact = useMemo(
-    () => artifactsQuery.data?.find((artifact) => artifact.artifact_id === selectedArtifactId) ?? artifactsQuery.data?.[0] ?? null,
+    () =>
+      artifactsQuery.data?.find((artifact) => artifact.artifact_id === selectedArtifactId) ??
+      artifactsQuery.data?.[0] ??
+      null,
     [artifactsQuery.data, selectedArtifactId],
   );
+
+  const artifactDetailQuery = useQuery({
+    queryKey: ["artifact", selectedArtifact?.artifact_id],
+    queryFn: () => fetchArtifact(selectedArtifact!.artifact_id),
+    enabled: Boolean(selectedArtifact?.artifact_id),
+  });
+
   const playbackQuery = useQuery({
     queryKey: ["artifact-playback", selectedArtifact?.artifact_id],
     queryFn: () => fetchArtifactPlayback(selectedArtifact!.artifact_id),
     enabled: Boolean(selectedArtifact?.artifact_id && selectedArtifact?.playback_path),
+    retry: false,
   });
 
   useEffect(() => {
@@ -96,23 +112,80 @@ export function ArtifactsPage() {
 
   const checkpointRunners = (runnersQuery.data ?? []).filter((runner) => runner.supports_checkpoint_eval);
   const playback = playbackQuery.data;
+  const totalArtifacts = artifactsQuery.data?.length ?? 0;
+  const playbackCount = (artifactsQuery.data ?? []).filter((artifact) => artifact.playback_path).length;
+  const checkpointCount = (artifactsQuery.data ?? []).filter((artifact) => artifact.artifact_kind === "checkpoint").length;
+  const evaluableCount = (artifactsQuery.data ?? []).filter((artifact) => artifact.evaluable).length;
+
+  const selectedArtifactRows = useMemo(() => {
+    if (!selectedArtifact) {
+      return [];
+    }
+
+    const rows = [
+      selectedArtifact.playback_path
+        ? { label: "playback payload", path: selectedArtifact.playback_path }
+        : null,
+      selectedArtifact.simulation_dir
+        ? { label: "simulation export", path: selectedArtifact.simulation_dir }
+        : null,
+    ].filter((row): row is { label: string; path: string } => Boolean(row));
+
+    if (artifactDetailQuery.data?.file_path) {
+      rows.unshift({ label: "registry file", path: artifactDetailQuery.data.file_path });
+    }
+
+    return rows.filter(
+      (row, index, array) => array.findIndex((candidate) => candidate.path === row.path) === index,
+    );
+  }, [artifactDetailQuery.data?.file_path, selectedArtifact]);
+
+  const readinessCopy =
+    artifactKind === "checkpoint"
+      ? checkpointRunners.length > 0
+        ? "Bind a runner when you want to stage the next eval."
+        : "Store the checkpoint now and bind it once the evaluator path lands."
+      : "Run bundles and simulation exports can be inspected immediately.";
 
   return (
-    <div className="page-stack">
-      <section className="split-grid">
-        <div className="panel panel--feature">
+    <div className="page-stack page-stack--artifacts">
+      <section className="page-header">
+        <div className="page-header__body">
+          <div className="page-header__eyebrow">Artifacts</div>
+          <h1>Artifact registry</h1>
+          <p>Register files, inspect playback, and queue local evaluation.</p>
+        </div>
+        <div className="page-header__actions">
+          {evaluateMutation.data ? (
+            <Link className="primary-button" to="/monitor">
+              live monitor
+            </Link>
+          ) : null}
+          <Link className="ghost-button" to="/runs">
+            run archive
+          </Link>
+        </div>
+      </section>
+
+      <section className="artifacts-shell">
+        <article className="panel panel--feature">
           <SectionHeader
-            eyebrow="imports"
-            title="Bring outside artifacts into the same dashboard"
-            copy="Playback payloads can be inspected immediately. Checkpoints can be registered now, but this branch still does not have a checkpoint evaluator for SAC or PPO."
+            eyebrow="Intake"
+            title="Register artifact"
           />
+          <div className="metric-row metric-row--artifact">
+            <MetricCard label="registry total" value={String(totalArtifacts)} />
+            <MetricCard label="playback ready" value={String(playbackCount)} tone="mint" />
+            <MetricCard label="checkpoint records" value={String(checkpointCount)} />
+            <MetricCard label="eval ready" value={String(evaluableCount)} tone="warm" />
+          </div>
           <div className="form-grid">
             <label>
               artifact kind
-              <select value={artifactKind} onChange={(event) => setArtifactKind(event.target.value as typeof artifactKind)}>
-                <option value="checkpoint">checkpoint</option>
+              <select value={artifactKind} onChange={(event) => setArtifactKind(event.target.value as ArtifactKind)}>
                 <option value="run_bundle">run bundle</option>
                 <option value="simulation_bundle">simulation bundle</option>
+                <option value="checkpoint">checkpoint</option>
               </select>
             </label>
             <label>
@@ -121,16 +194,13 @@ export function ArtifactsPage() {
             </label>
             <label className="form-grid__wide">
               file
-              <input
-                onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
-                type="file"
-              />
+              <input onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} type="file" />
             </label>
             {artifactKind === "checkpoint" ? (
               <label className="form-grid__wide">
-                checkpoint runner
+                runner binding
                 <select value={selectedRunnerId} onChange={(event) => setSelectedRunnerId(event.target.value)}>
-                  <option value="">select runner</option>
+                  <option value="">store without binding</option>
                   {checkpointRunners.map((runner) => (
                     <option key={runner.runner_id} value={runner.runner_id}>
                       {runner.label}
@@ -141,58 +211,88 @@ export function ArtifactsPage() {
             ) : null}
             <label className="form-grid__wide">
               notes
-              <textarea onChange={(event) => setNotes(event.target.value)} placeholder="what this artifact is for" rows={3} value={notes} />
+              <textarea
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="optional intake note"
+                rows={3}
+                value={notes}
+              />
             </label>
           </div>
           <div className="inline-actions">
             <button className="primary-button" disabled={!selectedFile || uploadMutation.isPending} onClick={handleSubmit} type="button">
-              {uploadMutation.isPending ? "importing…" : "import artifact"}
+              {uploadMutation.isPending ? "importing…" : "register artifact"}
             </button>
-            <div className="muted-copy">
-              {artifactKind === "checkpoint" && checkpointRunners.length === 0
-                ? "No local checkpoint-evaluable runners exist yet in this branch. You can still register the checkpoint so it is ready once inference support lands."
-                : "Playback JSON imports become inspectable immediately if they already contain a saved trace."}
-            </div>
+            <div className="muted-copy">{readinessCopy}</div>
           </div>
-        </div>
+        </article>
 
-        <div className="panel">
-          <SectionHeader
-            eyebrow="registry"
-            title="Imported artifacts"
-            copy="Artifacts stay on disk under the dashboard registry so they can be re-used without rebuilding the underlying run folders."
-          />
-          <div className="artifact-list">
-            {(artifactsQuery.data ?? []).length === 0 ? (
-              <div className="empty-block">No imported artifacts yet.</div>
-            ) : (
-              (artifactsQuery.data ?? []).map((artifact) => (
-                <button
-                  key={artifact.artifact_id}
-                  className={`artifact-card ${selectedArtifact?.artifact_id === artifact.artifact_id ? "is-active" : ""}`}
-                  onClick={() => setSelectedArtifactId(artifact.artifact_id)}
-                  type="button"
-                >
-                  <div className="artifact-card__header">
-                    <strong>{artifact.label}</strong>
-                    <span>{artifact.status}</span>
-                  </div>
-                  <div className="artifact-card__meta">{artifact.artifact_kind.replace(/_/g, " ")}</div>
-                  <div className="artifact-card__meta">{artifact.algorithm}</div>
-                  <div className="artifact-card__meta">{formatRelativeTime(artifact.imported_at)}</div>
-                </button>
-              ))
-            )}
-          </div>
+        <div className="page-stack">
+          <article className="panel panel--quiet">
+            <SectionHeader
+              eyebrow="Registry"
+              title="Stored records"
+            />
+            <div className="artifact-list">
+              {totalArtifacts === 0 ? (
+                <div className="empty-block">No imported artifacts yet.</div>
+              ) : (
+                (artifactsQuery.data ?? []).map((artifact) => (
+                  <button
+                    key={artifact.artifact_id}
+                    className={`artifact-card ${selectedArtifact?.artifact_id === artifact.artifact_id ? "is-active" : ""}`}
+                    onClick={() => setSelectedArtifactId(artifact.artifact_id)}
+                    type="button"
+                  >
+                    <div className="artifact-card__header">
+                      <strong>{artifact.label}</strong>
+                      <span className={`status-chip ${artifact.evaluable ? "is-succeeded" : "is-muted"}`}>
+                        {artifact.evaluable ? "ready" : "stored"}
+                      </span>
+                    </div>
+                    <div className="artifact-card__meta">{artifact.artifact_kind.replace(/_/g, " ")}</div>
+                    <div className="artifact-card__meta">{artifact.algorithm}</div>
+                    <div className="artifact-card__meta">{formatRelativeTime(artifact.imported_at)}</div>
+                  </button>
+                ))
+              )}
+            </div>
+          </article>
+
+          <article className="panel panel--quiet">
+            <SectionHeader eyebrow="Readiness" title="Registry state" />
+            <div className="fact-list">
+              <div className="fact-list__row">
+                <span>run bundles</span>
+                <strong>{(artifactsQuery.data ?? []).filter((artifact) => artifact.artifact_kind === "run_bundle").length}</strong>
+              </div>
+              <div className="fact-list__row">
+                <span>simulation bundles</span>
+                <strong>{(artifactsQuery.data ?? []).filter((artifact) => artifact.artifact_kind === "simulation_bundle").length}</strong>
+              </div>
+              <div className="fact-list__row">
+                <span>checkpoints</span>
+                <strong>{checkpointCount}</strong>
+              </div>
+              <div className="fact-list__row">
+                <span>playback attached</span>
+                <strong>{playbackCount}</strong>
+              </div>
+              <div className="fact-list__row">
+                <span>ready for eval</span>
+                <strong>{evaluableCount}</strong>
+              </div>
+            </div>
+          </article>
         </div>
       </section>
 
       {selectedArtifact ? (
-        <section className="panel">
+        <article className="panel panel--quiet">
           <SectionHeader
-            eyebrow="selected artifact"
+            eyebrow="Selected artifact"
             title={selectedArtifact.label}
-            copy={`${selectedArtifact.artifact_kind.replace(/_/g, " ")} • ${selectedArtifact.source_filename}`}
+            copy={`${selectedArtifact.artifact_kind.replace(/_/g, " ")} · ${selectedArtifact.source_filename}`}
             action={
               selectedArtifact.evaluable ? (
                 <button
@@ -201,39 +301,80 @@ export function ArtifactsPage() {
                   onClick={() => evaluateMutation.mutate(selectedArtifact.artifact_id)}
                   type="button"
                 >
-                  {evaluateMutation.isPending ? "starting eval…" : "evaluate locally"}
+                  {evaluateMutation.isPending ? "starting eval…" : "evaluate"}
                 </button>
               ) : null
             }
           />
-          <div className="metric-row metric-row--artifact">
-            <div className="metric-card">
-              <div className="metric-card__label">artifact id</div>
-              <div className="metric-card__hint">{selectedArtifact.artifact_id}</div>
+          <section className="content-grid">
+            <div className="page-stack">
+              <div className="metric-row metric-row--artifact">
+                <MetricCard label="status" value={formatStatusLabel(selectedArtifact.status)} />
+                <MetricCard
+                  label="runner binding"
+                  value={selectedArtifact.runner_id ?? "none"}
+                  hint={selectedArtifact.evaluable ? "evaluation path available" : "binding only"}
+                />
+                <MetricCard
+                  label="playback"
+                  value={selectedArtifact.playback_path ? "attached" : "missing"}
+                  tone={selectedArtifact.playback_path ? "mint" : "neutral"}
+                />
+                <MetricCard label="imported" value={formatRelativeTime(selectedArtifact.imported_at)} />
+              </div>
+              {artifactDetailQuery.data?.notes ? (
+                <div className="note-block">
+                  <strong>Notes</strong>
+                  <p>{artifactDetailQuery.data.notes}</p>
+                </div>
+              ) : null}
             </div>
-            <div className="metric-card">
-              <div className="metric-card__label">runner binding</div>
-              <div className="metric-card__hint">{selectedArtifact.runner_id ?? "none"}</div>
+
+            <div className="page-stack">
+              <div className="artifact-list">
+                {selectedArtifactRows.length > 0 ? (
+                  selectedArtifactRows.map((row) => {
+                    const href = artifactUrl(row.path);
+
+                    if (href) {
+                      return (
+                        <a key={`${row.label}-${row.path}`} className="artifact-row" href={href} rel="noreferrer" target="_blank">
+                          <strong>{row.label}</strong>
+                          <span>{basename(row.path)}</span>
+                        </a>
+                      );
+                    }
+
+                    return (
+                      <div key={`${row.label}-${row.path}`} className="artifact-row">
+                        <strong>{row.label}</strong>
+                        <span>{basename(row.path)}</span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="empty-block">No addressable files are attached yet.</div>
+                )}
+              </div>
+              <div className="note-block">
+                <strong>{selectedArtifact.evaluable ? "Eval path ready" : "Stored for later"}</strong>
+                <p>
+                  {selectedArtifact.evaluable
+                    ? "Launching from here creates a fresh local run bundle."
+                    : "This record stays addressable even without an evaluator path."}
+                </p>
+              </div>
             </div>
-            <div className="metric-card">
-              <div className="metric-card__label">playback</div>
-              <div className="metric-card__hint">{selectedArtifact.playback_path ?? "not present"}</div>
-            </div>
-            <div className="metric-card">
-              <div className="metric-card__label">simulation data</div>
-              <div className="metric-card__hint">{selectedArtifact.simulation_dir ?? "not present"}</div>
-            </div>
-          </div>
-        </section>
+          </section>
+        </article>
       ) : null}
 
       {playback ? (
         <>
-          <section className="panel">
+          <article className="panel panel--quiet">
             <SectionHeader
-              eyebrow="playback"
-              title="Imported playback preview"
-              copy="If the imported file already contains a saved playback payload, you can inspect it here before deciding whether it needs a fresh local evaluation."
+              eyebrow="Playback"
+              title="Playback preview"
               action={
                 <div className="playback-controls">
                   <input
@@ -249,35 +390,36 @@ export function ArtifactsPage() {
               }
             />
             <PlaybackScene playback={playback} stepIndex={Math.min(stepIndex, Math.max(playback.stored_steps - 1, 0))} />
-          </section>
+          </article>
+
           <TimeseriesPanel
             playback={playback}
             stepIndex={Math.min(stepIndex, Math.max(playback.stored_steps - 1, 0))}
             selectedBuildingIndex={selectedBuildingIndex}
             onSelectBuilding={setSelectedBuildingIndex}
           />
-          <section className="panel">
-            <SectionHeader
-              eyebrow="trace"
-              title="Imported trace"
-              copy="This is the recorded action history from the uploaded playback payload."
+
+          <article className="panel panel--quiet">
+            <SectionHeader eyebrow="Trace" title="Stored trace" />
+            <TraceTable
+              frames={playback.trace_frames}
+              stepIndex={Math.min(stepIndex, Math.max(playback.stored_steps - 1, 0))}
+              windowSize={12}
             />
-            <TraceTable frames={playback.trace_frames} stepIndex={Math.min(stepIndex, Math.max(playback.stored_steps - 1, 0))} />
-          </section>
+          </article>
         </>
       ) : selectedArtifact ? (
-        <section className="panel">
-          <SectionHeader
-            eyebrow="next action"
-            title="No playback attached yet"
-            copy="Checkpoint artifacts are still useful even before a local eval exists. Once the runner supports checkpoint evaluation, this page can launch an eval and then hand you off to the monitor."
-          />
-          {evaluateMutation.data ? (
-            <Link className="primary-button" to="/monitor">
-              open monitor
-            </Link>
-          ) : null}
-        </section>
+        <article className="panel panel--quiet">
+          <SectionHeader eyebrow="Next step" title="No playback attached yet" />
+          <div className="note-block">
+            <strong>{selectedArtifact.artifact_kind === "checkpoint" ? "Checkpoint record" : "Registry record"}</strong>
+            <p>
+              {selectedArtifact.artifact_kind === "checkpoint"
+                ? "Use the runner binding when you want to queue a local evaluation."
+                : "This import is stored now and can be revisited later."}
+            </p>
+          </div>
+        </article>
       ) : null}
     </div>
   );

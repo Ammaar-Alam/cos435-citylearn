@@ -3,17 +3,23 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
-  fetchJobArtifacts,
   cancelJob,
+  fetchJobArtifacts,
   fetchJobEvents,
   fetchJobLogs,
   fetchJobPreview,
   fetchJobs,
   fetchJobState,
 } from "../lib/api";
-import { artifactUrl, formatRelativeTime, formatScore } from "../lib/format";
+import {
+  artifactUrl,
+  basename,
+  formatRelativeTime,
+  formatScore,
+} from "../lib/format";
 import { useInterval } from "../lib/useInterval";
 import { JobsRail, MetricCard, PlaybackScene, SectionHeader, TimeseriesPanel, TraceTable } from "../components";
+import type { JobEvent } from "../types";
 
 function formatProgress(current: number | null, total: number | null): string {
   if (current === null || total === null || total <= 0) {
@@ -23,12 +29,77 @@ function formatProgress(current: number | null, total: number | null): string {
   return `${Math.min(100, (current / total) * 100).toFixed(0)}%`;
 }
 
+function summarizeEvent(event: JobEvent): { title: string; note: string } {
+  if (event.event_type === "job_submitted") {
+    return { title: "Job submitted", note: event.payload.runner_id ?? "runner queued" };
+  }
+  if (event.event_type === "process_spawned") {
+    return { title: "Worker spawned", note: `pid ${String(event.payload.pid ?? "—")}` };
+  }
+  if (event.event_type === "job_started") {
+    return {
+      title: "Rollout started",
+      note: `${String(event.payload.progress_label ?? "benchmark rollout")} · ${String(event.payload.progress_total ?? "—")} steps`,
+    };
+  }
+  if (event.event_type === "progress") {
+    return {
+      title: "Progress checkpoint",
+      note: `${String(event.payload.progress_current ?? "—")}/${String(event.payload.progress_total ?? "—")} · ${String(event.payload.progress_label ?? "rollout")}`,
+    };
+  }
+  if (event.event_type === "artifact_written") {
+    return {
+      title: String(event.payload.label ?? "Artifact written"),
+      note: basename(String(event.payload.path ?? "")),
+    };
+  }
+  if (event.event_type === "job_finished") {
+    return {
+      title: "Run completed",
+      note: event.payload.average_score !== null && event.payload.average_score !== undefined
+        ? `score ${formatScore(Number(event.payload.average_score))}`
+        : "result written",
+    };
+  }
+
+  return {
+    title: event.event_type.replace(/_/g, " "),
+    note: Object.entries(event.payload).slice(0, 2).map(([key, value]) => `${key}: ${String(value)}`).join(" · "),
+  };
+}
+
+function buildMilestones(events: JobEvent[]): JobEvent[] {
+  const milestones: JobEvent[] = [];
+  let lastBucket = -1;
+
+  for (const event of events) {
+    if (event.event_type !== "progress") {
+      milestones.push(event);
+      continue;
+    }
+
+    const current = Number(event.payload.progress_current ?? 0);
+    const total = Number(event.payload.progress_total ?? 0);
+    const bucket = total > 0 ? Math.floor((current / total) * 4) : -1;
+    const isLast = total > 0 && current >= total;
+
+    if (bucket > lastBucket || isLast) {
+      milestones.push(event);
+      lastBucket = Math.max(lastBucket, bucket);
+    }
+  }
+
+  return milestones.slice(-8);
+}
+
 export function MonitorPage() {
   const queryClient = useQueryClient();
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [selectedBuildingIndex, setSelectedBuildingIndex] = useState(0);
   const [autoFollow, setAutoFollow] = useState(true);
   const [stepIndex, setStepIndex] = useState(0);
+
   const jobsQuery = useQuery({ queryKey: ["jobs"], queryFn: fetchJobs });
   const effectiveJobId = useMemo(() => {
     if (selectedJobId) {
@@ -45,7 +116,9 @@ export function MonitorPage() {
       null
     );
   }, [jobsQuery.data, selectedJobId]);
+
   const selectedJob = jobsQuery.data?.find((job) => job.job_id === effectiveJobId) ?? null;
+
   const stateQuery = useQuery({
     queryKey: ["job-state", effectiveJobId],
     queryFn: () => fetchJobState(effectiveJobId!),
@@ -72,6 +145,7 @@ export function MonitorPage() {
     queryFn: () => fetchJobArtifacts(effectiveJobId!),
     enabled: Boolean(effectiveJobId),
   });
+
   const cancelMutation = useMutation({
     mutationFn: cancelJob,
     onSuccess: () => {
@@ -117,6 +191,7 @@ export function MonitorPage() {
   }, [preview?.building_names?.length, preview?.payload?.buildings?.length, selectedBuildingIndex]);
 
   const eventRows = eventsQuery.data ?? [];
+  const milestones = useMemo(() => buildMilestones(eventRows), [eventRows]);
   const media = preview?.payload?.media ?? {};
   const previewArtifacts = [
     { kind: "simulation_export", label: "simulation export", path: preview?.payload?.ui_export?.simulation_dir ?? null },
@@ -132,108 +207,99 @@ export function MonitorPage() {
   }
 
   return (
-    <div className="page-stack">
-      <section className="panel panel--feature">
-        <SectionHeader
-          eyebrow="live monitor"
-          title="Watch the benchmark worker while it is still writing artifacts"
-          copy="The monitor reads job state, live preview payloads, events, and process logs from disk. Later checkpoint-eval training can plug into the same surface without changing the benchmark artifact contract."
-        />
-        <div className="metric-row">
-          <MetricCard label="selected job" value={selectedJob?.runner_id ?? "—"} />
-          <MetricCard label="status" value={selectedJob?.status ?? "idle"} tone="mint" />
-          <MetricCard label="phase" value={state?.phase ?? selectedJob?.phase ?? "—"} />
-          <MetricCard
-            label="progress"
-            value={formatProgress(state?.progress_current ?? null, state?.progress_total ?? null)}
-            hint={state?.progress_label ?? "waiting for live state"}
-            tone="warm"
-          />
-          <MetricCard
-            label="run id"
-            value={selectedJob?.run_id ?? state?.latest_run_id ?? "—"}
-            hint={selectedJob?.submitted_at ? `submitted ${formatRelativeTime(selectedJob.submitted_at)}` : undefined}
-          />
-          <MetricCard
-            label="live trace"
-            value={preview ? `${preview.stored_steps}/${preview.total_steps}` : "—"}
-            hint={preview ? (preview.truncated ? "preview is still growing" : "full episode captured") : "no preview yet"}
-          />
+    <div className="page-stack page-stack--monitor">
+      <section className="page-header">
+        <div className="page-header__body">
+          <div className="page-header__eyebrow">Live</div>
+          <h1>Live monitor</h1>
+          <p>Selected job, preview, trace.</p>
+        </div>
+        <div className="page-header__actions">
+          {selectedJob?.run_id ? (
+            <Link className="primary-button" to={`/runs/${selectedJob.run_id}`}>
+              open run
+            </Link>
+          ) : null}
         </div>
       </section>
 
-      <section className="content-grid">
-        <div className="panel">
+      <section className="monitor-shell">
+        <article className="panel">
           <SectionHeader
-            eyebrow="jobs"
-            title="Current queue"
-            copy="Pick the active job you want to follow. The monitor defaults to the newest running job."
+            eyebrow="Preview"
+            title={selectedJob ? selectedJob.runner_id.replace(/_/g, " ") : "Waiting for preview"}
+            copy={selectedJob?.run_id ?? "Pick a job to begin monitoring."}
           />
-          <JobsRail
-            jobs={jobsQuery.data ?? []}
-            selectedJobId={effectiveJobId}
-            onSelect={setSelectedJobId}
-            onCancel={(jobId) => cancelMutation.mutate(jobId)}
-          />
-        </div>
-        <div className="panel">
-          <SectionHeader
-            eyebrow="events"
-            title="Job timeline"
-            copy="Each progress heartbeat and artifact write is recorded so the live view can stay anchored to real worker state."
-          />
-          <div className="timeline-list">
-            {eventRows.length === 0 ? (
-              <div className="empty-block">No events yet for this job.</div>
-            ) : (
-              eventRows
-                .slice()
-                .reverse()
-                .map((event) => (
-                  <div key={event.seq} className="timeline-row">
-                    <div className="timeline-row__meta">
-                      <strong>{event.event_type.replace(/_/g, " ")}</strong>
-                      <span>{formatRelativeTime(event.created_at)}</span>
-                    </div>
-                    <code>{JSON.stringify(event.payload)}</code>
-                  </div>
-                ))
-            )}
-          </div>
-        </div>
-      </section>
+          {preview ? (
+            <>
+              <PlaybackScene playback={preview} stepIndex={Math.min(stepIndex, Math.max(preview.stored_steps - 1, 0))} />
+              <div className="playback-controls">
+                <label className="checkbox-row">
+                  <input checked={autoFollow} onChange={(event) => setAutoFollow(event.target.checked)} type="checkbox" />
+                  follow live
+                </label>
+                <input
+                  className="playback-slider"
+                  max={Math.max((preview?.stored_steps ?? 1) - 1, 0)}
+                  min={0}
+                  onChange={(event) => {
+                    setAutoFollow(false);
+                    setStepIndex(Number(event.target.value));
+                  }}
+                  type="range"
+                  value={Math.min(stepIndex, Math.max((preview?.stored_steps ?? 1) - 1, 0))}
+                />
+                <span>step {preview ? Math.min(stepIndex, Math.max(preview.stored_steps - 1, 0)) : 0}</span>
+              </div>
+            </>
+          ) : (
+            <div className="empty-block empty-block--wide">No live preview yet. Launch a run or wait for the first preview heartbeat.</div>
+          )}
+        </article>
 
-      <section className="panel">
-        <SectionHeader
-          eyebrow="preview"
-          title="Latest live preview"
-          copy="This preview is written by the worker while the rollout progresses. It uses the same playback schema as completed runs, just with a shorter stored trace."
-          action={
-            <div className="playback-controls">
-              <label className="checkbox-row">
-                <input checked={autoFollow} onChange={(event) => setAutoFollow(event.target.checked)} type="checkbox" />
-                follow latest step
-              </label>
-              <input
-                className="playback-slider"
-                max={Math.max((preview?.stored_steps ?? 1) - 1, 0)}
-                min={0}
-                onChange={(event) => {
-                  setAutoFollow(false);
-                  setStepIndex(Number(event.target.value));
-                }}
-                type="range"
-                value={Math.min(stepIndex, Math.max((preview?.stored_steps ?? 1) - 1, 0))}
+        <div className="monitor-rail">
+          <article className="panel panel--quiet">
+            <SectionHeader eyebrow="Status" title="Job state" />
+            <div className="metric-row metric-row--artifact">
+              <MetricCard label="runner" value={selectedJob?.runner_id ?? "—"} />
+              <MetricCard label="status" value={selectedJob?.status ?? "idle"} tone="mint" />
+              <MetricCard label="phase" value={state?.phase ?? selectedJob?.phase ?? "—"} />
+              <MetricCard
+                label="progress"
+                value={formatProgress(state?.progress_current ?? null, state?.progress_total ?? null)}
+                hint={state?.progress_label ?? "no live label"}
+                tone="warm"
               />
-              <span>step {preview ? Math.min(stepIndex, Math.max(preview.stored_steps - 1, 0)) : 0}</span>
             </div>
-          }
-        />
-        {preview ? (
-          <PlaybackScene playback={preview} stepIndex={Math.min(stepIndex, Math.max(preview.stored_steps - 1, 0))} />
-        ) : (
-          <div className="empty-block empty-block--wide">No live preview yet. Launch an eval job or wait for the first preview heartbeat.</div>
-        )}
+          </article>
+
+          <article className="panel panel--quiet">
+            <SectionHeader eyebrow="Queue" title="Recent jobs" />
+            <JobsRail
+              jobs={jobsQuery.data ?? []}
+              selectedJobId={effectiveJobId}
+              onSelect={setSelectedJobId}
+              onCancel={(jobId) => cancelMutation.mutate(jobId)}
+              limit={4}
+            />
+          </article>
+
+          <article className="panel panel--quiet">
+            <SectionHeader eyebrow="Outputs" title="Captured files" />
+            <div className="artifact-list">
+              {artifactRows.length === 0 ? (
+                <div className="empty-block">No artifacts written yet.</div>
+              ) : (
+                artifactRows.map((artifact) => (
+                  <a key={artifact.path} className="artifact-row" href={artifactUrl(artifact.path) ?? "#"} target="_blank" rel="noreferrer">
+                    <strong>{artifact.label}</strong>
+                    <span>{basename(artifact.path)}</span>
+                  </a>
+                ))
+              )}
+            </div>
+          </article>
+        </div>
       </section>
 
       {preview ? (
@@ -246,60 +312,49 @@ export function MonitorPage() {
       ) : null}
 
       <section className="content-grid">
-        <div className="panel">
-          <SectionHeader
-            eyebrow="trace"
-            title="Current action slice"
-            copy="The monitor table is intentionally local to the selected job, so you can watch the action and reward history accumulate without opening the full run detail page."
-          />
-          {preview ? (
-            <TraceTable frames={preview.trace_frames} stepIndex={Math.min(stepIndex, Math.max(preview.stored_steps - 1, 0))} />
-          ) : (
-            <div className="empty-block">No trace frames yet.</div>
-          )}
-        </div>
-        <div className="panel">
-          <SectionHeader
-            eyebrow="artifacts"
-            title="Live outputs"
-            copy="These are the same files the run detail page will read after the job finishes."
-          />
-          <div className="artifact-list">
-            {artifactRows.length === 0 ? (
-              <div className="empty-block">No preview artifacts written yet.</div>
+        <article className="panel panel--quiet">
+          <SectionHeader eyebrow="Milestones" title="Event log" />
+          <div className="timeline-list">
+            {milestones.length === 0 ? (
+              <div className="empty-block">No milestones yet.</div>
             ) : (
-              artifactRows.map((item) => (
-                <a
-                  key={item.label}
-                  className="artifact-row"
-                  href={artifactUrl(item.path) ?? undefined}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  <strong>{item.label}</strong>
-                  <span>{item.path}</span>
-                </a>
-              ))
+              milestones.map((event) => {
+                const summary = summarizeEvent(event);
+
+                return (
+                  <div key={event.seq} className="timeline-row">
+                    <div className="timeline-row__meta">
+                      <strong>{summary.title}</strong>
+                      <span>{formatRelativeTime(event.created_at)}</span>
+                    </div>
+                    <span>{summary.note}</span>
+                  </div>
+                );
+              })
             )}
           </div>
-          {selectedJob?.run_id ? (
-            <Link className="ghost-button" to={`/runs/${selectedJob.run_id}`}>
-              open completed run
-            </Link>
-          ) : null}
-        </div>
+        </article>
+
+        <article className="panel panel--quiet">
+          <SectionHeader eyebrow="Logs" title="Worker log" />
+          <pre className="job-log-output">
+            {selectedJob ? logsQuery.data?.logs?.trim() || "Waiting for log output." : "Select a job to inspect its log."}
+          </pre>
+        </article>
       </section>
 
-      <section className="panel">
-        <SectionHeader
-          eyebrow="logs"
-          title="Worker log tail"
-          copy="This is the direct subprocess output. If the job fails, this is where the first useful signal usually shows up."
-        />
-        <pre className="job-log-output">
-          {logsQuery.data?.logs?.trim() || "No logs yet for the selected job."}
-        </pre>
-      </section>
+      <article className="panel panel--quiet">
+        <SectionHeader eyebrow="Trace" title="Current slice" />
+        {preview ? (
+          <TraceTable
+            frames={preview.trace_frames}
+            stepIndex={Math.min(stepIndex, Math.max(preview.stored_steps - 1, 0))}
+            windowSize={12}
+          />
+        ) : (
+          <div className="empty-block">No trace frames yet.</div>
+        )}
+      </article>
     </div>
   );
 }
