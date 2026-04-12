@@ -11,6 +11,7 @@ from cos435_citylearn.io import write_csv_row, write_json
 from cos435_citylearn.paths import RESULTS_DIR
 from cos435_citylearn.run_id import build_run_id
 from cos435_citylearn.runtime import build_environment_lock, utc_now_iso
+from cos435_citylearn.ui_exports import DashboardCapture, export_simulation_bundle
 
 
 def _import_from_path(path: str):
@@ -57,23 +58,35 @@ def run_rbc(
     )
     run_dir = run_root / run_id
     rollout_trace = []
+    playback_trace = []
     observations = adapter.reset()
     trace_limit = int(config["evaluation"].get("trace_limit", 96))
+    capture = DashboardCapture(
+        run_id=run_id,
+        dataset_name=env_bundle.dataset_name,
+        enabled=bool(eval_config["evaluation"].get("export_simulation_data", True)),
+        capture_frames=bool(eval_config["evaluation"].get("capture_render_frames", True)),
+        max_frames=int(eval_config["evaluation"].get("max_render_frames", 60)),
+        frame_width=int(eval_config["evaluation"].get("render_frame_width", 960)),
+    )
+    capture.configure(env_bundle.env)
     step_index = 0
 
     while not adapter.done:
         actions = controller.predict(observations)
-        result = adapter.step(actions)
+        applied_actions = adapter.clip_actions(actions)
+        result = adapter.step(applied_actions)
+        frame_payload = {
+            "step": step_index,
+            "actions": applied_actions,
+            "rewards": result.rewards,
+            "terminated": result.terminated,
+        }
+        playback_trace.append(frame_payload)
         if config["evaluation"]["save_rollout_trace"] and step_index < trace_limit:
-            rollout_trace.append(
-                {
-                    "step": step_index,
-                    "actions": actions,
-                    "rewards": result.rewards,
-                    "terminated": result.terminated,
-                }
-            )
+            rollout_trace.append(frame_payload)
         observations = result.observations
+        capture.maybe_capture(env=env_bundle.env, step_index=step_index, force=result.terminated)
         step_index += 1
 
     run_context = {
@@ -86,6 +99,16 @@ def run_rbc(
     }
     metrics_payload = build_metrics_payload(env_bundle.env, run_context)
     row = flatten_metrics_row(metrics_payload)
+    ui_export_payload = None
+    if eval_config["evaluation"].get("export_simulation_data", True):
+        ui_export_payload = export_simulation_bundle(
+            env=env_bundle.env,
+            run_id=run_id,
+            run_context=run_context,
+            metrics_payload=metrics_payload,
+            rollout_trace=playback_trace,
+            capture=capture,
+        )
     manifest = {
         "generated_at": utc_now_iso(),
         "run_id": run_id,
@@ -96,9 +119,14 @@ def run_rbc(
         "seed": env_bundle.seed,
         "step_count": step_index,
     }
+    if ui_export_payload is not None:
+        manifest["simulation_dir"] = ui_export_payload["simulation_dir"]
+        manifest["playback_path"] = ui_export_payload["playback_path"]
 
     write_json(run_dir / "manifest.json", manifest)
     write_json(run_dir / "metrics.json", metrics_payload)
+    if ui_export_payload is not None:
+        write_json(run_dir / "playback_manifest.json", ui_export_payload)
     if config["evaluation"]["save_rollout_trace"]:
         write_json(run_dir / "rollout_trace.json", rollout_trace)
 
@@ -115,10 +143,15 @@ def run_rbc(
         ),
     )
 
-    return {
+    payload = {
         "run_dir": str(run_dir),
         "metrics_path": str(run_dir / "metrics.json"),
         "csv_path": str(metrics_dir / f"{run_id}.csv"),
         "run_id": run_id,
         "average_score": metrics_payload["average_score"],
     }
+    if ui_export_payload is not None:
+        payload["simulation_dir"] = ui_export_payload["simulation_dir"]
+        payload["playback_path"] = ui_export_payload["playback_path"]
+
+    return payload
