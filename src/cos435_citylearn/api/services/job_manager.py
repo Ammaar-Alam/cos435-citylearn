@@ -279,15 +279,25 @@ class JobManager:
 
     def cancel(self, job_id: str) -> JobSummary:
         with self._lock:
+            self.refresh()
             state = self._load_job(job_id)
             process = self._processes.get(job_id)
+            cancelled = False
             if process is not None and process.poll() is None:
                 process.terminate()
-                state["status"] = "cancelled"
-                state["finished_at"] = utc_now_iso()
+                cancelled = True
             elif state["status"] == "queued":
-                state["status"] = "cancelled"
-                state["finished_at"] = utc_now_iso()
+                try:
+                    self._queue.remove(job_id)
+                except ValueError:
+                    pass
+                cancelled = True
+            if not cancelled:
+                return JobSummary(**self._merge_live_state(state))
+
+            state["status"] = "cancelled"
+            state["phase"] = "cancelled"
+            state["finished_at"] = utc_now_iso()
             self._write_job(job_id, state)
             self.state_store.write(
                 job_id,
@@ -304,6 +314,8 @@ class JobManager:
             return JobSummary(**self._merge_live_state(state))
 
     def tail_logs(self, job_id: str, tail: int = 200) -> str:
+        if not self._job_dir(job_id).exists():
+            raise KeyError(f"unknown job: {job_id}")
         log_path = self._job_log_path(job_id)
         if not log_path.exists():
             return ""
@@ -347,6 +359,8 @@ class JobManager:
         return preview_path
 
     def list_artifacts(self, job_id: str) -> list[dict[str, Any]]:
+        if not self._job_dir(job_id).exists():
+            raise KeyError(f"unknown job: {job_id}")
         path = self._job_artifacts_path(job_id)
         if not path.exists():
             return []
