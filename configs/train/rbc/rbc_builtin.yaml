@@ -5,6 +5,8 @@ env:
 algorithm:
   name: rbc
   controller: built_in
+  controller_class: citylearn.agents.rbc.BasicRBC
+  variant: basic_rbc
 
 reward:
   version: official_eval_only
@@ -19,7 +21,10 @@ training:
 evaluation:
   deterministic: true
   save_rollout_trace: true
+  trace_limit: 96
 
 logging:
   run_group: baseline
   output_root: results/runs
+  metrics_root: results/metrics
+  manifests_root: results/manifests
