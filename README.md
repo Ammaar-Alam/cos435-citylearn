@@ -121,6 +121,12 @@ results/    generated manifests, metrics, and run artifacts stay out of git
 - a `SimulationData/<run_id>/` export under `results/ui_exports/`
 - a playback payload under `results/ui_exports/playback/`
 
+You can validate the exported `SimulationData/...` tree against the official CityLearn UI upload contract with:
+
+```bash
+make check-ui-exports
+```
+
 ## local dashboard
 
 The dashboard is a repo-native localhost UI. It does not replace the benchmark path; it launches the same runner and reads the same run artifacts.
@@ -172,8 +178,11 @@ make dashboard-backend
 
 The dashboard currently supports:
 - launching the built-in RBC benchmark from the UI
+- watching live preview payloads and worker logs while the benchmark job runs
 - listing discovered runs from `results/runs/`
 - inspecting one run with synchronized metrics, trace playback, and render media
 - comparing multiple runs side by side
+- importing playback payloads or other artifacts into a local registry
+- inspecting imported playback payloads directly in the UI
 
-The dashboard does not pretend PPO or SAC exist yet. Those presets appear as config contracts until their runners are implemented.
+The dashboard does not pretend PPO or SAC exist yet. Those presets appear as config contracts until their runners are implemented. Imported checkpoints can be registered now, but they are not locally evaluable until a checkpoint-capable runner exists.

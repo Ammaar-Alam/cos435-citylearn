@@ -2,7 +2,7 @@ PYTHON := .venv/bin/python
 MPLCONFIGDIR := $(CURDIR)/.cache/matplotlib
 NPM_CACHE := $(CURDIR)/.npm-cache
 
-.PHONY: install install-benchmark test check env-info repo-tree download-citylearn env-schema smoke train-rbc dashboard-install dashboard-build dashboard-check dashboard-backend dashboard-frontend ui ui-open
+.PHONY: install install-benchmark test check env-info repo-tree download-citylearn env-schema smoke train-rbc check-ui-exports dashboard-install dashboard-build dashboard-check dashboard-backend dashboard-frontend ui ui-open
 
 install:
 	bash scripts/setup/install_env.sh
@@ -33,6 +33,9 @@ smoke:
 
 train-rbc:
 	COS435_REQUIRE_DATA=1 MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/train/run_rbc.py
+
+check-ui-exports:
+	$(PYTHON) scripts/check/validate_official_ui_exports.py
 
 dashboard-install:
 	cd apps/dashboard && npm_config_cache="$(NPM_CACHE)" npm ci
