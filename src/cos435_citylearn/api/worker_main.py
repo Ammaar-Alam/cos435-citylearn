@@ -1,18 +1,14 @@
 from __future__ import annotations
 
 import argparse
-import importlib
 import json
 import traceback
 from pathlib import Path
 
+from cos435_citylearn.api.services.job_event_store import JobEventStore
+from cos435_citylearn.api.services.job_state_store import JobStateStore
+from cos435_citylearn.api.workloads import WorkloadContext, get_workload
 from cos435_citylearn.io import write_json
-
-
-def _load_callable(path: str):
-    module_name, symbol_name = path.rsplit(".", 1)
-    module = importlib.import_module(module_name)
-    return getattr(module, symbol_name)
 
 
 def main() -> None:
@@ -23,14 +19,21 @@ def main() -> None:
     request = json.loads(Path(args.job_file).read_text())
     result_path = Path(request["result_path"])
     error_path = Path(request["error_path"])
+    job_dir = Path(args.job_file).parent
+    jobs_root = job_dir.parent
+    context = WorkloadContext(
+        job_id=request["job_id"],
+        job_dir=job_dir,
+        state_store=JobStateStore(jobs_root),
+        event_store=JobEventStore(jobs_root),
+        job_kind=request.get("job_kind", "evaluation"),
+    )
 
     try:
-        runner = _load_callable(request["callable_path"])
-        payload = runner(
-            config_path=request["config_path"],
-            eval_config_path=request["eval_config_path"],
-        )
+        workload = get_workload(request["workload_id"])
+        payload = workload(request, context)
         write_json(result_path, payload)
+        context.finish(result=payload)
         print(json.dumps(payload, indent=2, sort_keys=True))
     except Exception as exc:
         error_payload = {
@@ -38,6 +41,7 @@ def main() -> None:
             "traceback": traceback.format_exc(),
         }
         write_json(error_path, error_payload)
+        context.fail(error_message=str(exc))
         print(error_payload["traceback"], flush=True)
         raise
 

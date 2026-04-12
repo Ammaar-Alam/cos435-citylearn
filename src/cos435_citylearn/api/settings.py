@@ -16,6 +16,7 @@ class ApiSettings:
     manifests_root: Path = RESULTS_DIR / "manifests"
     ui_exports_root: Path = RESULTS_DIR / "ui_exports"
     jobs_root: Path = RESULTS_DIR / "dashboard" / "jobs"
+    imported_artifacts_root: Path = RESULTS_DIR / "dashboard" / "artifacts"
     artifacts_root: Path = RESULTS_DIR
     frontend_root: Path = REPO_ROOT / "apps" / "dashboard"
     frontend_dist: Path = REPO_ROOT / "apps" / "dashboard" / "dist"

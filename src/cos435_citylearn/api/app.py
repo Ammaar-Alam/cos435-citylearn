@@ -7,9 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from cos435_citylearn.api.routers.artifacts import router as artifacts_router
 from cos435_citylearn.api.routers.jobs import router as jobs_router
 from cos435_citylearn.api.routers.runs import router as runs_router
 from cos435_citylearn.api.routers.system import router as system_router
+from cos435_citylearn.api.services.artifact_store import ArtifactStore
 from cos435_citylearn.api.services.job_manager import JobManager
 from cos435_citylearn.api.services.playback_store import PlaybackStore
 from cos435_citylearn.api.services.run_store import RunStore
@@ -21,6 +23,7 @@ def _bind_services(app: FastAPI, settings: ApiSettings) -> None:
     app.state.job_manager = JobManager(settings)
     app.state.run_store = RunStore(settings)
     app.state.playback_store = PlaybackStore(settings)
+    app.state.artifact_store = ArtifactStore(settings)
 
 
 def create_app(settings: ApiSettings = SETTINGS) -> FastAPI:
@@ -41,6 +44,7 @@ def create_app(settings: ApiSettings = SETTINGS) -> FastAPI:
     app.include_router(system_router)
     app.include_router(jobs_router)
     app.include_router(runs_router)
+    app.include_router(artifacts_router)
 
     artifacts_root = settings.artifacts_root
     if artifacts_root.exists():

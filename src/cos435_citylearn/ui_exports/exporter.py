@@ -36,6 +36,12 @@ def _to_int_list(values: Any) -> list[int]:
     return [int(value) for value in values]
 
 
+def _trim(values: list[Any], limit: int | None) -> list[Any]:
+    if limit is None:
+        return values
+    return values[:limit]
+
+
 def _relative_repo_path(path: Path | None) -> str | None:
     if path is None:
         return None
@@ -169,6 +175,7 @@ def _playback_payload(
     timestamps: list[str],
     simulation_dir: Path,
     media_manifest: dict[str, Any],
+    series_limit: int | None = None,
 ) -> dict[str, Any]:
     buildings = []
 
@@ -177,58 +184,86 @@ def _playback_payload(
             {
                 "name": building.name,
                 "series": {
-                    "net_electricity_consumption": _to_float_list(
-                        building.net_electricity_consumption
+                    "net_electricity_consumption": _trim(
+                        _to_float_list(building.net_electricity_consumption), series_limit
                     ),
-                    "non_shiftable_load": _to_float_list(building.non_shiftable_load),
-                    "solar_generation": _to_float_list(building.solar_generation, scale=-1.0),
-                    "cooling_demand": _to_float_list(building.cooling_demand),
-                    "dhw_demand": _to_float_list(building.dhw_demand),
-                    "indoor_temperature": _to_float_list(building.indoor_dry_bulb_temperature),
-                    "temperature_set_point": _to_float_list(
+                    "non_shiftable_load": _trim(
+                        _to_float_list(building.non_shiftable_load), series_limit
+                    ),
+                    "solar_generation": _trim(
+                        _to_float_list(building.solar_generation, scale=-1.0), series_limit
+                    ),
+                    "cooling_demand": _trim(_to_float_list(building.cooling_demand), series_limit),
+                    "dhw_demand": _trim(_to_float_list(building.dhw_demand), series_limit),
+                    "indoor_temperature": _trim(
+                        _to_float_list(building.indoor_dry_bulb_temperature), series_limit
+                    ),
+                    "temperature_set_point": _trim(
+                        _to_float_list(
                         building.indoor_dry_bulb_temperature_set_point
+                        ),
+                        series_limit,
                     ),
-                    "occupant_count": _to_float_list(building.occupant_count),
-                    "power_outage": _to_int_list(building.power_outage_signal),
-                    "battery_soc": _to_float_list(building.electrical_storage.soc, scale=100.0),
-                    "battery_delta": _to_float_list(building.electrical_storage.energy_balance),
-                    "electricity_pricing": _to_float_list(building.pricing.electricity_pricing),
-                    "electricity_pricing_predicted_6h": _to_float_list(
-                        building.pricing.electricity_pricing_predicted_6h
+                    "occupant_count": _trim(_to_float_list(building.occupant_count), series_limit),
+                    "power_outage": _trim(_to_int_list(building.power_outage_signal), series_limit),
+                    "battery_soc": _trim(
+                        _to_float_list(building.electrical_storage.soc, scale=100.0), series_limit
                     ),
-                    "electricity_pricing_predicted_12h": _to_float_list(
-                        building.pricing.electricity_pricing_predicted_12h
+                    "battery_delta": _trim(
+                        _to_float_list(building.electrical_storage.energy_balance), series_limit
                     ),
-                    "electricity_pricing_predicted_24h": _to_float_list(
-                        building.pricing.electricity_pricing_predicted_24h
+                    "electricity_pricing": _trim(
+                        _to_float_list(building.pricing.electricity_pricing), series_limit
                     ),
-                    "carbon_intensity": _to_float_list(
-                        building.carbon_intensity.carbon_intensity
+                    "electricity_pricing_predicted_6h": _trim(
+                        _to_float_list(building.pricing.electricity_pricing_predicted_6h),
+                        series_limit,
+                    ),
+                    "electricity_pricing_predicted_12h": _trim(
+                        _to_float_list(building.pricing.electricity_pricing_predicted_12h),
+                        series_limit,
+                    ),
+                    "electricity_pricing_predicted_24h": _trim(
+                        _to_float_list(building.pricing.electricity_pricing_predicted_24h),
+                        series_limit,
+                    ),
+                    "carbon_intensity": _trim(
+                        _to_float_list(building.carbon_intensity.carbon_intensity), series_limit
                     ),
                 },
             }
         )
 
+    effective_timestamps = timestamps if series_limit is None else timestamps[:series_limit]
+    decision_steps = (
+        len(rollout_trace)
+        if series_limit is None
+        else min(len(rollout_trace), series_limit)
+    )
     return {
         **run_context,
         "generated_at": utc_now_iso(),
-        "timestamps": timestamps,
-        "time_steps": len(timestamps),
-        "decision_steps": len(rollout_trace),
+        "timestamps": effective_timestamps,
+        "time_steps": len(effective_timestamps),
+        "episode_total_steps": len(timestamps),
+        "decision_steps": decision_steps,
         "building_names": [building["name"] for building in buildings],
         "action_names": getattr(env, "action_names", []),
         "metrics": metrics_payload,
         "district": {
-            "net_electricity_consumption": _to_float_list(env.net_electricity_consumption),
-            "net_electricity_consumption_cost": _to_float_list(
-                getattr(env, "net_electricity_consumption_cost", [])
+            "net_electricity_consumption": _trim(
+                _to_float_list(env.net_electricity_consumption), series_limit
             ),
-            "net_electricity_consumption_emission": _to_float_list(
-                getattr(env, "net_electricity_consumption_emission", [])
+            "net_electricity_consumption_cost": _trim(
+                _to_float_list(getattr(env, "net_electricity_consumption_cost", [])), series_limit
+            ),
+            "net_electricity_consumption_emission": _trim(
+                _to_float_list(getattr(env, "net_electricity_consumption_emission", [])),
+                series_limit,
             ),
         },
         "buildings": buildings,
-        "trace": rollout_trace,
+        "trace": rollout_trace if series_limit is None else rollout_trace[:series_limit],
         "ui_export": {
             "simulation_dir": _relative_repo_path(simulation_dir),
         },
@@ -319,6 +354,41 @@ class DashboardCapture:
             "gif_path": _relative_repo_path(self.gif_path),
             "frames": [_relative_repo_path(path) for path in self.frame_paths],
         }
+
+    def snapshot_media(self) -> dict[str, Any]:
+        return {
+            "frame_count": self.frame_count,
+            "frame_stride": self.frame_stride,
+            "poster_path": _relative_repo_path(self.poster_path),
+            "gif_path": _relative_repo_path(self.gif_path),
+            "frames": [_relative_repo_path(path) for path in self.frame_paths],
+        }
+
+
+def build_live_preview_payload(
+    *,
+    env: Any,
+    run_id: str,
+    run_context: dict[str, Any],
+    rollout_trace: list[dict[str, Any]],
+    capture: DashboardCapture,
+    current_step: int,
+) -> dict[str, Any]:
+    series_limit = current_step + 1
+    total_steps = int(getattr(env, "time_steps", series_limit))
+    timestamps = _hourly_timestamps(total_steps)
+    payload = _playback_payload(
+        env=env,
+        run_context=run_context,
+        metrics_payload={},
+        rollout_trace=rollout_trace,
+        timestamps=timestamps,
+        simulation_dir=SIMULATION_ROOT / run_id,
+        media_manifest=capture.snapshot_media(),
+        series_limit=series_limit,
+    )
+    payload["preview_step"] = current_step
+    return payload
 
 
 def export_simulation_bundle(

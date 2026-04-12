@@ -11,7 +11,11 @@ from cos435_citylearn.io import write_csv_row, write_json
 from cos435_citylearn.paths import RESULTS_DIR
 from cos435_citylearn.run_id import build_run_id
 from cos435_citylearn.runtime import build_environment_lock, utc_now_iso
-from cos435_citylearn.ui_exports import DashboardCapture, export_simulation_bundle
+from cos435_citylearn.ui_exports import (
+    DashboardCapture,
+    build_live_preview_payload,
+    export_simulation_bundle,
+)
 
 
 def _import_from_path(path: str):
@@ -26,6 +30,10 @@ def run_rbc(
     output_root: str | Path | None = None,
     metrics_root: str | Path | None = None,
     manifests_root: str | Path | None = None,
+    artifact_id: str | None = None,
+    job_id: str | None = None,
+    job_dir: str | Path | None = None,
+    progress_context: Any | None = None,
 ) -> dict[str, Any]:
     config = load_yaml(config_path)
     eval_config = load_yaml(eval_config_path)
@@ -39,6 +47,7 @@ def run_rbc(
     controller_class = _import_from_path(config["algorithm"]["controller_class"])
     controller = controller_class(env_bundle.env)
     variant = config["algorithm"]["variant"]
+    decision_total = max(int(getattr(env_bundle.env, "time_steps", 0)) - 1, 0)
     run_id = build_run_id(
         algo=config["algorithm"]["name"],
         variant=variant,
@@ -72,6 +81,23 @@ def run_rbc(
     capture.configure(env_bundle.env)
     step_index = 0
 
+    run_context = {
+        "algorithm": config["algorithm"]["name"],
+        "variant": variant,
+        "split": config["env"]["split"],
+        "seed": env_bundle.seed,
+        "dataset_name": env_bundle.dataset_name,
+        "run_id": run_id,
+    }
+    preview_stride = max(1, int(config["evaluation"].get("preview_stride", 12)))
+
+    if progress_context is not None:
+        progress_context.start(
+            phase="rollout",
+            total=decision_total,
+            label=f"{variant} on {config['env']['split']}",
+        )
+
     while not adapter.done:
         actions = controller.predict(observations)
         applied_actions = adapter.clip_actions(actions)
@@ -87,16 +113,27 @@ def run_rbc(
             rollout_trace.append(frame_payload)
         observations = result.observations
         capture.maybe_capture(env=env_bundle.env, step_index=step_index, force=result.terminated)
+        if progress_context is not None and (
+            step_index == 0 or result.terminated or (step_index + 1) % preview_stride == 0
+        ):
+            preview_payload = build_live_preview_payload(
+                env=env_bundle.env,
+                run_id=run_id,
+                run_context=run_context,
+                rollout_trace=playback_trace,
+                capture=capture,
+                current_step=step_index,
+            )
+            progress_context.update(
+                phase="rollout",
+                current=min(step_index + 1, decision_total),
+                total=decision_total,
+                label=f"{variant} rollout",
+                preview_payload=preview_payload,
+                run_id=run_id,
+            )
         step_index += 1
 
-    run_context = {
-        "algorithm": config["algorithm"]["name"],
-        "variant": variant,
-        "split": config["env"]["split"],
-        "seed": env_bundle.seed,
-        "dataset_name": env_bundle.dataset_name,
-        "run_id": run_id,
-    }
     metrics_payload = build_metrics_payload(env_bundle.env, run_context)
     row = flatten_metrics_row(metrics_payload)
     ui_export_payload = None
@@ -119,6 +156,12 @@ def run_rbc(
         "seed": env_bundle.seed,
         "step_count": step_index,
     }
+    if artifact_id:
+        manifest["artifact_id"] = artifact_id
+    if job_id:
+        manifest["job_id"] = job_id
+    if job_dir is not None:
+        manifest["job_dir"] = str(Path(job_dir))
     if ui_export_payload is not None:
         manifest["simulation_dir"] = ui_export_payload["simulation_dir"]
         manifest["playback_path"] = ui_export_payload["playback_path"]
@@ -153,5 +196,24 @@ def run_rbc(
     if ui_export_payload is not None:
         payload["simulation_dir"] = ui_export_payload["simulation_dir"]
         payload["playback_path"] = ui_export_payload["playback_path"]
+
+        if progress_context is not None:
+            progress_context.artifact(
+                kind="playback",
+                path=ui_export_payload["playback_path"],
+                label="playback payload",
+            )
+            progress_context.artifact(
+                kind="simulation_export",
+                path=ui_export_payload["simulation_dir"],
+                label="SimulationData export",
+            )
+            gif_path = ui_export_payload.get("media", {}).get("gif_path")
+            if gif_path:
+                progress_context.artifact(
+                    kind="gif",
+                    path=gif_path,
+                    label="render playback gif",
+                )
 
     return payload

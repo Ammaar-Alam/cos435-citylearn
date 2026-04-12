@@ -1,6 +1,7 @@
 import csv
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,21 @@ def ensure_parent(path: str | Path) -> Path:
 def write_json(path: str | Path, payload: Any) -> Path:
     target = ensure_parent(path)
     target.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    return target
+
+
+def write_json_atomic(path: str | Path, payload: Any) -> Path:
+    target = ensure_parent(path)
+    temp_path = target.with_suffix(f"{target.suffix}.tmp")
+    temp_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    os.replace(temp_path, target)
+    return target
+
+
+def append_jsonl(path: str | Path, payload: Any) -> Path:
+    target = ensure_parent(path)
+    with target.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, sort_keys=True) + "\n")
     return target
 
 

@@ -19,8 +19,10 @@ class RunnerSpec:
     variant: str
     description: str
     callable_path: str | None
+    workload_id: str
     config_path: str
     eval_config_path: str
+    supports_checkpoint_eval: bool = False
 
     @property
     def launchable(self) -> bool:
@@ -35,6 +37,7 @@ RUNNERS: dict[str, RunnerSpec] = {
         variant="basic_rbc",
         description="CityLearn built-in rule-based controller on the official local-eval split",
         callable_path="cos435_citylearn.baselines.rbc.run_rbc",
+        workload_id="eval_builtin_rbc",
         config_path="configs/train/rbc/rbc_builtin.yaml",
         eval_config_path="configs/eval/default.yaml",
     ),
@@ -45,6 +48,7 @@ RUNNERS: dict[str, RunnerSpec] = {
         variant="central_baseline",
         description="Config contract only. The PPO runner has not been implemented yet.",
         callable_path=None,
+        workload_id="eval_ppo_checkpoint",
         config_path="configs/train/ppo/ppo_central_baseline.yaml",
         eval_config_path="configs/eval/default.yaml",
     ),
@@ -55,6 +59,7 @@ RUNNERS: dict[str, RunnerSpec] = {
         variant="central_baseline",
         description="Config contract only. The SAC runner has not been implemented yet.",
         callable_path=None,
+        workload_id="eval_sac_checkpoint",
         config_path="configs/train/sac/sac_central_baseline.yaml",
         eval_config_path="configs/eval/default.yaml",
     ),
@@ -75,6 +80,7 @@ def list_runners() -> list[dict[str, Any]]:
                 "config_path": spec.config_path,
                 "eval_config_path": spec.eval_config_path,
                 "launchable": spec.launchable,
+                "supports_checkpoint_eval": spec.supports_checkpoint_eval,
             }
         )
 

@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from cos435_citylearn.api.schemas import JobSummary, LaunchJobRequest
+from cos435_citylearn.api.schemas import (
+    JobEvent,
+    JobState,
+    JobSummary,
+    LaunchJobRequest,
+    PlaybackResponse,
+)
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
@@ -47,3 +53,40 @@ def get_logs(
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"job_id": job_id, "logs": logs}
+
+
+@router.get("/{job_id}/state")
+def get_state(request: Request, job_id: str) -> JobState:
+    try:
+        return JobState(**request.app.state.job_manager.get_state(job_id))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/{job_id}/events")
+def get_events(
+    request: Request,
+    job_id: str,
+    after_seq: int = Query(default=0, ge=0),
+) -> list[JobEvent]:
+    try:
+        events = request.app.state.job_manager.get_events(job_id, after_seq=after_seq)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return [JobEvent(**event) for event in events]
+
+
+@router.get("/{job_id}/preview")
+def get_preview(request: Request, job_id: str) -> PlaybackResponse:
+    try:
+        return request.app.state.playback_store.get_job_preview(job_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/{job_id}/artifacts")
+def get_artifacts(request: Request, job_id: str) -> list[dict[str, str]]:
+    try:
+        return request.app.state.job_manager.list_artifacts(job_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
