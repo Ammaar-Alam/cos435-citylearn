@@ -25,7 +25,7 @@ def get_playback(
     request: Request,
     run_id: str,
     offset: int = Query(default=0, ge=0),
-    limit: int = Query(default=256, ge=32, le=1024),
+    limit: int = Query(default=256, ge=32, le=50000),
 ) -> PlaybackResponse:
     try:
         return request.app.state.playback_store.get_playback(run_id, offset=offset, limit=limit)

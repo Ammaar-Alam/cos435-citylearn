@@ -101,3 +101,64 @@ def test_unknown_job_logs_and_artifacts_return_404(tmp_path: Path) -> None:
 
     assert logs_response.status_code == 404
     assert artifacts_response.status_code == 404
+
+
+def test_recover_jobs_marks_state_store_orphaned(tmp_path: Path) -> None:
+    settings = build_test_settings(tmp_path)
+    job_id = "job_orphaned"
+    job_dir = settings.jobs_root / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+
+    write_json(
+        job_dir / "job.json",
+        {
+            "job_id": job_id,
+            "runner_id": "rbc_builtin",
+            "status": "running",
+            "submitted_at": "2026-04-12T00:00:00Z",
+            "started_at": "2026-04-12T00:00:10Z",
+            "finished_at": None,
+            "pid": 12345,
+            "config_path": "config.yaml",
+            "eval_config_path": "eval.yaml",
+            "run_id": "run_1",
+            "average_score": None,
+            "error_message": None,
+            "phase": "rollout",
+            "progress_current": 3,
+            "progress_total": 10,
+            "progress_label": "rollout",
+            "heartbeat_at": "2026-04-12T00:00:20Z",
+            "latest_preview_path": None,
+        },
+    )
+    write_json(
+        job_dir / "state.json",
+        {
+            "job_id": job_id,
+            "job_kind": "evaluation",
+            "status": "running",
+            "phase": "rollout",
+            "progress_current": 3,
+            "progress_total": 10,
+            "progress_label": "rollout",
+            "heartbeat_at": "2026-04-12T00:00:20Z",
+            "latest_run_id": "run_1",
+            "latest_preview_path": "preview.json",
+            "latest_checkpoint_id": None,
+            "latest_log_offset": 42,
+            "error_message": None,
+        },
+    )
+
+    manager = JobManager(settings)
+    job = manager.get_job(job_id)
+    state = manager.get_state(job_id)
+
+    assert job.status == "orphaned"
+    assert job.phase == "orphaned"
+    assert state["status"] == "orphaned"
+    assert state["phase"] == "orphaned"
+    assert state["latest_preview_path"] is None
+    assert state["progress_current"] is None
+    assert state["progress_total"] is None

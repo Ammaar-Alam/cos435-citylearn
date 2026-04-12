@@ -12,6 +12,7 @@ from cos435_citylearn.io import ensure_parent, write_json
 from cos435_citylearn.paths import REPO_ROOT, RESULTS_DIR
 from cos435_citylearn.runtime import utc_now_iso
 
+UI_EXPORTS_ROOT = RESULTS_DIR / "ui_exports"
 SIMULATION_ROOT = RESULTS_DIR / "ui_exports" / "SimulationData"
 MEDIA_ROOT = RESULTS_DIR / "ui_exports" / "media"
 
@@ -42,11 +43,23 @@ def _trim(values: list[Any], limit: int | None) -> list[Any]:
     return values[:limit]
 
 
-def _relative_repo_path(path: Path | None) -> str | None:
+def _relative_artifact_path(path: Path | None, *, relative_root: Path | None = None) -> str | None:
     if path is None:
         return None
+    resolved = path.resolve()
+    if relative_root is not None:
+        try:
+            return str(resolved.relative_to(relative_root.resolve()).as_posix())
+        except ValueError:
+            pass
+    try:
+        return str(resolved.relative_to(REPO_ROOT).as_posix())
+    except ValueError:
+        return str(resolved)
 
-    return str(path.resolve().relative_to(REPO_ROOT).as_posix())
+
+def _resolve_ui_exports_root(ui_exports_root: str | Path | None) -> Path:
+    return UI_EXPORTS_ROOT if ui_exports_root is None else Path(ui_exports_root)
 
 
 def _hourly_timestamps(steps: int, start: datetime | None = None) -> list[str]:
@@ -175,6 +188,7 @@ def _playback_payload(
     timestamps: list[str],
     simulation_dir: Path,
     media_manifest: dict[str, Any],
+    artifacts_root: Path | None = None,
     series_limit: int | None = None,
 ) -> dict[str, Any]:
     buildings = []
@@ -265,7 +279,7 @@ def _playback_payload(
         "buildings": buildings,
         "trace": rollout_trace if series_limit is None else rollout_trace[:series_limit],
         "ui_export": {
-            "simulation_dir": _relative_repo_path(simulation_dir),
+            "simulation_dir": _relative_artifact_path(simulation_dir, relative_root=artifacts_root),
         },
         "media": media_manifest,
     }
@@ -275,14 +289,20 @@ def _playback_payload(
 class DashboardCapture:
     run_id: str
     dataset_name: str
+    ui_exports_root: str | Path | None = None
+    artifacts_root: str | Path | None = None
     enabled: bool = True
     capture_frames: bool = True
     max_frames: int = 60
     frame_width: int = 960
 
     def __post_init__(self) -> None:
-        self.simulation_dir = SIMULATION_ROOT / self.run_id
-        self.media_dir = MEDIA_ROOT / self.run_id
+        self.ui_exports_root = _resolve_ui_exports_root(self.ui_exports_root)
+        self.artifacts_root = (
+            self.ui_exports_root.parent if self.artifacts_root is None else Path(self.artifacts_root)
+        )
+        self.simulation_dir = self.ui_exports_root / "SimulationData" / self.run_id
+        self.media_dir = self.ui_exports_root / "media" / self.run_id
         self.frame_dir = self.media_dir / "frames"
         self.frame_count = 0
         self.frame_stride: int | None = None
@@ -350,18 +370,24 @@ class DashboardCapture:
         return {
             "frame_count": self.frame_count,
             "frame_stride": self.frame_stride,
-            "poster_path": _relative_repo_path(self.poster_path),
-            "gif_path": _relative_repo_path(self.gif_path),
-            "frames": [_relative_repo_path(path) for path in self.frame_paths],
+            "poster_path": _relative_artifact_path(self.poster_path, relative_root=self.artifacts_root),
+            "gif_path": _relative_artifact_path(self.gif_path, relative_root=self.artifacts_root),
+            "frames": [
+                _relative_artifact_path(path, relative_root=self.artifacts_root)
+                for path in self.frame_paths
+            ],
         }
 
     def snapshot_media(self) -> dict[str, Any]:
         return {
             "frame_count": self.frame_count,
             "frame_stride": self.frame_stride,
-            "poster_path": _relative_repo_path(self.poster_path),
-            "gif_path": _relative_repo_path(self.gif_path),
-            "frames": [_relative_repo_path(path) for path in self.frame_paths],
+            "poster_path": _relative_artifact_path(self.poster_path, relative_root=self.artifacts_root),
+            "gif_path": _relative_artifact_path(self.gif_path, relative_root=self.artifacts_root),
+            "frames": [
+                _relative_artifact_path(path, relative_root=self.artifacts_root)
+                for path in self.frame_paths
+            ],
         }
 
 
@@ -373,19 +399,31 @@ def build_live_preview_payload(
     rollout_trace: list[dict[str, Any]],
     capture: DashboardCapture,
     current_step: int,
+    ui_exports_root: str | Path | None = None,
+    artifacts_root: str | Path | None = None,
 ) -> dict[str, Any]:
     series_limit = current_step + 1
     total_steps = int(getattr(env, "time_steps", series_limit))
     timestamps = _hourly_timestamps(total_steps)
+    resolved_ui_exports_root = _resolve_ui_exports_root(ui_exports_root)
+    resolved_artifacts_root = (
+        resolved_ui_exports_root.parent if artifacts_root is None else Path(artifacts_root)
+    )
+    simulation_dir = resolved_ui_exports_root / "SimulationData" / run_id
     payload = _playback_payload(
         env=env,
         run_context=run_context,
         metrics_payload={},
         rollout_trace=rollout_trace,
         timestamps=timestamps,
-        simulation_dir=SIMULATION_ROOT / run_id,
+        simulation_dir=simulation_dir,
         media_manifest=capture.snapshot_media(),
+        artifacts_root=resolved_artifacts_root,
         series_limit=series_limit,
+    )
+    payload["ui_export"]["simulation_dir"] = _relative_artifact_path(
+        simulation_dir,
+        relative_root=resolved_artifacts_root,
     )
     payload["preview_step"] = current_step
     return payload
@@ -399,12 +437,18 @@ def export_simulation_bundle(
     metrics_payload: dict[str, Any],
     rollout_trace: list[dict[str, Any]],
     capture: DashboardCapture | None = None,
+    ui_exports_root: str | Path | None = None,
+    artifacts_root: str | Path | None = None,
 ) -> dict[str, Any]:
+    resolved_ui_exports_root = _resolve_ui_exports_root(ui_exports_root)
+    resolved_artifacts_root = (
+        resolved_ui_exports_root.parent if artifacts_root is None else Path(artifacts_root)
+    )
     total_steps = int(
         getattr(env, "time_steps", len(env.buildings[0].net_electricity_consumption))
     )
     timestamps = _hourly_timestamps(total_steps)
-    simulation_dir = SIMULATION_ROOT / run_id
+    simulation_dir = resolved_ui_exports_root / "SimulationData" / run_id
     simulation_dir.mkdir(parents=True, exist_ok=True)
 
     exported_files = []
@@ -489,28 +533,34 @@ def export_simulation_bundle(
         timestamps=timestamps,
         simulation_dir=simulation_dir,
         media_manifest=media_manifest,
+        artifacts_root=resolved_artifacts_root,
     )
     playback_path = write_json(
-        RESULTS_DIR / "ui_exports" / "playback" / f"{run_id}.json",
+        resolved_ui_exports_root / "playback" / f"{run_id}.json",
         playback_payload,
     )
     export_manifest_path = write_json(
-        RESULTS_DIR / "ui_exports" / "manifests" / f"{run_id}.json",
+        resolved_ui_exports_root / "manifests" / f"{run_id}.json",
         {
             "generated_at": utc_now_iso(),
             "run_id": run_id,
             "dataset_name": run_context["dataset_name"],
-            "simulation_dir": _relative_repo_path(simulation_dir),
-            "playback_path": _relative_repo_path(playback_path),
+            "simulation_dir": _relative_artifact_path(simulation_dir, relative_root=resolved_artifacts_root),
+            "playback_path": _relative_artifact_path(playback_path, relative_root=resolved_artifacts_root),
             "media": media_manifest,
-            "files": [_relative_repo_path(path) for path in exported_files],
+            "files": [
+                _relative_artifact_path(path, relative_root=resolved_artifacts_root)
+                for path in exported_files
+            ],
         },
     )
 
     return {
-        "simulation_dir": _relative_repo_path(simulation_dir) or str(simulation_dir),
-        "playback_path": _relative_repo_path(playback_path) or str(playback_path),
-        "export_manifest_path": _relative_repo_path(export_manifest_path)
+        "simulation_dir": _relative_artifact_path(simulation_dir, relative_root=resolved_artifacts_root)
+        or str(simulation_dir),
+        "playback_path": _relative_artifact_path(playback_path, relative_root=resolved_artifacts_root)
+        or str(playback_path),
+        "export_manifest_path": _relative_artifact_path(export_manifest_path, relative_root=resolved_artifacts_root)
         or str(export_manifest_path),
         "media": media_manifest,
     }

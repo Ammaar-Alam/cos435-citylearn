@@ -30,6 +30,8 @@ def run_rbc(
     output_root: str | Path | None = None,
     metrics_root: str | Path | None = None,
     manifests_root: str | Path | None = None,
+    ui_exports_root: str | Path | None = None,
+    artifacts_root: str | Path | None = None,
     artifact_id: str | None = None,
     job_id: str | None = None,
     job_dir: str | Path | None = None,
@@ -73,6 +75,8 @@ def run_rbc(
     capture = DashboardCapture(
         run_id=run_id,
         dataset_name=env_bundle.dataset_name,
+        ui_exports_root=ui_exports_root,
+        artifacts_root=artifacts_root,
         enabled=bool(eval_config["evaluation"].get("export_simulation_data", True)),
         capture_frames=bool(eval_config["evaluation"].get("capture_render_frames", True)),
         max_frames=int(eval_config["evaluation"].get("max_render_frames", 60)),
@@ -123,6 +127,8 @@ def run_rbc(
                 rollout_trace=playback_trace,
                 capture=capture,
                 current_step=step_index,
+                ui_exports_root=ui_exports_root,
+                artifacts_root=artifacts_root,
             )
             progress_context.update(
                 phase="rollout",
@@ -145,6 +151,8 @@ def run_rbc(
             metrics_payload=metrics_payload,
             rollout_trace=playback_trace,
             capture=capture,
+            ui_exports_root=ui_exports_root,
+            artifacts_root=artifacts_root,
         )
     manifest = {
         "generated_at": utc_now_iso(),

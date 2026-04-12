@@ -13,6 +13,8 @@ import type {
   RunnerSummary,
 } from "../types";
 
+const RUN_DETAIL_TRACE_LIMIT = 50000;
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
   const response = await fetch(path, {
@@ -48,7 +50,7 @@ export function fetchRunDetail(runId: string): Promise<RunDetail> {
 }
 
 export function fetchPlayback(runId: string): Promise<PlaybackPayload> {
-  return apiFetch(`/api/runs/${runId}/playback?offset=0&limit=1024`);
+  return apiFetch(`/api/runs/${runId}/playback?offset=0&limit=${RUN_DETAIL_TRACE_LIMIT}`);
 }
 
 export function fetchJobs(): Promise<JobSummary[]> {

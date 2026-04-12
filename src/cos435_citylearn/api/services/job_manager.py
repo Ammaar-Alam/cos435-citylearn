@@ -73,9 +73,30 @@ class JobManager:
             payload = json.loads(job_file.read_text())
             if payload["status"] in {"running", "queued"}:
                 payload["status"] = "orphaned"
+                payload["phase"] = "orphaned"
                 payload["finished_at"] = utc_now_iso()
                 payload["error_message"] = "backend restarted before the job finished"
                 self._write_job(payload["job_id"], payload)
+                previous_state = self.state_store.get(payload["job_id"]) or {}
+                self.state_store.write(
+                    payload["job_id"],
+                    {
+                        **previous_state,
+                        "job_id": payload["job_id"],
+                        "job_kind": previous_state.get("job_kind", "evaluation"),
+                        "status": "orphaned",
+                        "phase": "orphaned",
+                        "progress_current": None,
+                        "progress_total": None,
+                        "progress_label": "backend restarted before the job finished",
+                        "heartbeat_at": utc_now_iso(),
+                        "latest_run_id": previous_state.get("latest_run_id") or payload.get("run_id"),
+                        "latest_preview_path": None,
+                        "latest_checkpoint_id": previous_state.get("latest_checkpoint_id"),
+                        "latest_log_offset": previous_state.get("latest_log_offset"),
+                        "error_message": "backend restarted before the job finished",
+                    },
+                )
 
     def _running_job_count(self) -> int:
         return sum(1 for job_id in self._processes if self._processes[job_id].poll() is None)
@@ -107,6 +128,11 @@ class JobManager:
                 "job_dir": str(job_dir),
                 "result_path": str(self._job_result_path(job_id)),
                 "error_path": str(self._job_error_path(job_id)),
+                "output_root": str(self.settings.run_root),
+                "metrics_root": str(self.settings.results_root / "metrics"),
+                "manifests_root": str(self.settings.manifests_root),
+                "ui_exports_root": str(self.settings.ui_exports_root),
+                "artifacts_root": str(self.settings.artifacts_root),
             }
             write_json(self._job_request_path(job_id), request_payload)
 

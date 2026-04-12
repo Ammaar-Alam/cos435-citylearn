@@ -52,11 +52,13 @@ def test_job_api_emits_preview_and_progress_events(tmp_path: Path) -> None:
 
     deadline = time.time() + 45
     final_status = None
+    run_id = None
     while time.time() < deadline:
         job_response = client.get(f"/api/jobs/{job_id}")
         assert job_response.status_code == 200, job_response.text
         job_payload = job_response.json()
         final_status = job_payload["status"]
+        run_id = job_payload.get("run_id")
 
         events_response = client.get(f"/api/jobs/{job_id}/events")
         assert events_response.status_code == 200, events_response.text
@@ -75,3 +77,17 @@ def test_job_api_emits_preview_and_progress_events(tmp_path: Path) -> None:
     assert final_status == "succeeded"
     assert preview_seen
     assert progress_seen
+    assert run_id
+
+    runs_response = client.get("/api/runs")
+    assert runs_response.status_code == 200, runs_response.text
+    assert any(run["run_id"] == run_id for run in runs_response.json())
+
+    playback_response = client.get(f"/api/runs/{run_id}/playback?offset=0&limit=50000")
+    assert playback_response.status_code == 200, playback_response.text
+    playback_payload = playback_response.json()
+    assert playback_payload["mode"] == "full"
+    assert playback_payload["stored_steps"] >= playback_payload["total_steps"] - 1
+
+    assert (tmp_path / "runs" / run_id / "manifest.json").exists()
+    assert (tmp_path / "ui_exports" / "playback" / f"{run_id}.json").exists()
