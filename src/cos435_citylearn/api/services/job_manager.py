@@ -133,6 +133,7 @@ class JobManager:
                 "manifests_root": str(self.settings.manifests_root),
                 "ui_exports_root": str(self.settings.ui_exports_root),
                 "artifacts_root": str(self.settings.artifacts_root),
+                "imported_artifacts_root": str(self.settings.imported_artifacts_root),
             }
             write_json(self._job_request_path(job_id), request_payload)
 

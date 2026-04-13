@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import builtins
+import importlib
 import json
 from pathlib import Path
 
@@ -8,6 +10,7 @@ from fastapi.testclient import TestClient
 from cos435_citylearn.api.app import create_app
 from cos435_citylearn.api.schemas import JobSummary
 from cos435_citylearn.api.settings import ApiSettings
+from cos435_citylearn.io import write_json
 from cos435_citylearn.paths import CONFIGS_DIR, REPO_ROOT
 
 
@@ -125,3 +128,125 @@ def test_artifact_evaluate_maps_missing_split_file_to_400(tmp_path: Path) -> Non
 
     assert response.status_code == 400
     assert response.json()["detail"] == "unknown split config"
+
+
+def test_artifact_evaluate_rejects_incompatible_sac_checkpoint_before_queueing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    settings = build_test_settings(tmp_path)
+    app = create_app(settings)
+    artifact_id = "artifact_bad_sac"
+    artifact_dir = settings.imported_artifacts_root / artifact_id
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    write_json(
+        artifact_dir / "artifact.json",
+        {
+            "artifact_id": artifact_id,
+            "artifact_kind": "checkpoint",
+            "label": "bad checkpoint",
+            "source_filename": "checkpoint.pt",
+            "imported_at": "2026-04-13T00:00:00Z",
+            "algorithm": "sac",
+            "runner_id": "sac_central_baseline",
+            "status": "evaluable",
+            "file_path": "dashboard/artifacts/artifact_bad_sac/checkpoint.pt",
+            "notes": None,
+            "evaluable": True,
+            "playback_path": None,
+            "simulation_dir": None,
+        },
+    )
+
+    def fake_load_sac_checkpoint_tools():
+        def fake_resolve_imported_checkpoint_path(**_kwargs):
+            return tmp_path / "checkpoint.pt"
+
+        def fake_safe_load_checkpoint_payload(_path):
+            return {
+                "algorithm": "sac",
+                "control_mode": "shared_dtde",
+                "observation_names": [["hour", "load"]],
+                "action_names": [["battery"]],
+                "controller_state": {
+                    "controller_type": "shared_parameter_sac",
+                    "hidden_dimension": [64, 64],
+                    "discount": 0.99,
+                    "tau": 0.005,
+                    "alpha": 0.2,
+                    "lr": 0.0003,
+                    "batch_size": 16,
+                    "replay_buffer_capacity": 128,
+                    "standardize_start_time_step": 8,
+                    "end_exploration_time_step": 8,
+                    "action_scaling_coefficient": 0.5,
+                    "reward_scaling": 5.0,
+                    "update_per_time_step": 1,
+                    "normalized": False,
+                    "policy_state_dict": {},
+                    "soft_q1_state_dict": {},
+                    "soft_q2_state_dict": {},
+                    "target_soft_q1_state_dict": {},
+                    "target_soft_q2_state_dict": {},
+                    "policy_optimizer_state_dict": {},
+                    "soft_q_optimizer1_state_dict": {},
+                    "soft_q_optimizer2_state_dict": {},
+                    "norm_mean": None,
+                    "norm_std": None,
+                    "r_norm_mean": None,
+                    "r_norm_std": None,
+                    "shared_context_dimension": 4,
+                },
+            }
+
+        def fake_validate_checkpoint_env_compatibility(*_args, **_kwargs):
+            return None
+
+        from cos435_citylearn.algorithms.sac.checkpoints import validate_checkpoint_runner_compatibility
+
+        return (
+            fake_resolve_imported_checkpoint_path,
+            fake_safe_load_checkpoint_payload,
+            fake_validate_checkpoint_env_compatibility,
+            validate_checkpoint_runner_compatibility,
+        )
+
+    monkeypatch.setattr(
+        "cos435_citylearn.api.services.artifact_store._load_sac_checkpoint_tools",
+        fake_load_sac_checkpoint_tools,
+    )
+
+    client = TestClient(app)
+    response = client.post(f"/api/artifacts/{artifact_id}/evaluate", json={})
+
+    assert response.status_code == 400
+    assert "control_mode" in response.json()["detail"]
+
+
+def test_create_app_does_not_require_sac_modules_for_startup(tmp_path: Path, monkeypatch) -> None:
+    real_import = builtins.__import__
+
+    def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name in {
+            "cos435_citylearn.algorithms.sac",
+            "cos435_citylearn.env",
+        }:
+            raise ImportError(f"blocked import: {name}")
+        return real_import(name, globals, locals, fromlist, level)
+
+    import cos435_citylearn.api.app as app_module
+    import cos435_citylearn.api.services.artifact_store as artifact_store_module
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+    importlib.reload(artifact_store_module)
+    importlib.reload(app_module)
+
+    try:
+        app = app_module.create_app(build_test_settings(tmp_path))
+        client = TestClient(app)
+        response = client.get("/api/system/health")
+        assert response.status_code == 200
+    finally:
+        monkeypatch.setattr(builtins, "__import__", real_import)
+        importlib.reload(artifact_store_module)
+        importlib.reload(app_module)
