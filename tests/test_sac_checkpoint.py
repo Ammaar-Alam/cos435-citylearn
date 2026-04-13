@@ -54,6 +54,8 @@ def _minimal_central_checkpoint_payload() -> dict[str, object]:
             "policy_optimizer_state_dicts": [{}],
             "soft_q_optimizer1_state_dicts": [{}],
             "soft_q_optimizer2_state_dicts": [{}],
+            "log_alpha": [None],
+            "alpha_optimizer_state_dicts": [None],
             "norm_mean": [None],
             "norm_std": [None],
             "r_norm_mean": [None],
@@ -220,6 +222,14 @@ def test_validate_checkpoint_payload_structure_rejects_missing_shared_context_di
     del payload["controller_state"]["shared_context_dimension"]
 
     with pytest.raises(ValueError, match="shared_context_dimension"):
+        validate_checkpoint_payload_structure(payload)
+
+
+def test_validate_checkpoint_payload_structure_rejects_missing_entropy_fields() -> None:
+    payload = _minimal_central_checkpoint_payload()
+    del payload["controller_state"]["log_alpha"]
+
+    with pytest.raises(ValueError, match="log_alpha"):
         validate_checkpoint_payload_structure(payload)
 
 

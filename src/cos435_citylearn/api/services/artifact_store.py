@@ -8,14 +8,7 @@ from uuid import uuid4
 
 from fastapi import UploadFile
 
-from cos435_citylearn.algorithms.sac import (
-    resolve_imported_checkpoint_path,
-    safe_load_checkpoint_payload,
-    validate_checkpoint_env_compatibility,
-    validate_checkpoint_runner_compatibility,
-)
 from cos435_citylearn.config import load_yaml
-from cos435_citylearn.env import make_citylearn_env
 from cos435_citylearn.api.schemas import (
     ArtifactDetail,
     ArtifactKind,
@@ -26,6 +19,28 @@ from cos435_citylearn.api.services.runner_registry import get_runner
 from cos435_citylearn.api.settings import ApiSettings
 from cos435_citylearn.io import ensure_parent, write_json_atomic
 from cos435_citylearn.runtime import utc_now_iso
+
+
+def _load_sac_checkpoint_tools():
+    from cos435_citylearn.algorithms.sac import (
+        resolve_imported_checkpoint_path,
+        safe_load_checkpoint_payload,
+        validate_checkpoint_env_compatibility,
+        validate_checkpoint_runner_compatibility,
+    )
+
+    return (
+        resolve_imported_checkpoint_path,
+        safe_load_checkpoint_payload,
+        validate_checkpoint_env_compatibility,
+        validate_checkpoint_runner_compatibility,
+    )
+
+
+def _load_citylearn_env_factory():
+    from cos435_citylearn.env import make_citylearn_env
+
+    return make_citylearn_env
 
 
 @dataclass(frozen=True)
@@ -191,6 +206,13 @@ class ArtifactStore:
 
         spec = get_runner(record.runner_id)
         if spec.algorithm == "sac" and record.artifact_kind == "checkpoint":
+            (
+                resolve_imported_checkpoint_path,
+                safe_load_checkpoint_payload,
+                validate_checkpoint_env_compatibility,
+                validate_checkpoint_runner_compatibility,
+            ) = _load_sac_checkpoint_tools()
+            make_citylearn_env = _load_citylearn_env_factory()
             config = load_yaml(spec.config_path)
             if request.seed is not None:
                 config["training"]["seed"] = int(request.seed)
