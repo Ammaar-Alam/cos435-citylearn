@@ -45,6 +45,7 @@ def _minimal_central_checkpoint_payload() -> dict[str, object]:
             "action_scaling_coefficient": 0.5,
             "reward_scaling": 5.0,
             "update_per_time_step": 1,
+            "time_step": 0,
             "normalized": [False],
             "policy_state_dicts": [{}],
             "soft_q1_state_dicts": [{}],
@@ -84,6 +85,7 @@ def _minimal_shared_checkpoint_payload() -> dict[str, object]:
             "action_scaling_coefficient": 0.5,
             "reward_scaling": 5.0,
             "update_per_time_step": 1,
+            "time_step": 0,
             "normalized": False,
             "policy_state_dict": {},
             "soft_q1_state_dict": {},
@@ -233,6 +235,14 @@ def test_validate_checkpoint_payload_structure_rejects_missing_entropy_fields() 
         validate_checkpoint_payload_structure(payload)
 
 
+def test_validate_checkpoint_payload_structure_rejects_missing_time_step() -> None:
+    payload = _minimal_shared_checkpoint_payload()
+    del payload["controller_state"]["time_step"]
+
+    with pytest.raises(ValueError, match="time_step"):
+        validate_checkpoint_payload_structure(payload)
+
+
 def test_shared_controller_rejects_non_default_shared_context_width() -> None:
     require_benchmark_runtime()
     require_dataset()
@@ -299,6 +309,37 @@ def test_shared_checkpoint_roundtrip_restores_time_step(tmp_path: Path) -> None:
         f"configs/splits/{config['env']['split']}.yaml",
         seed=config["training"]["seed"],
         central_agent=False,
+        reward_function=reward_function,
+    )
+
+    reloaded_controller = _instantiate_controller_from_checkpoint(
+        eval_env_bundle.env,
+        loaded_payload,
+    )
+
+    restored_time_step = loaded_payload["controller_state"]["time_step"]
+    assert reloaded_controller.time_step == restored_time_step
+    assert reloaded_controller.time_step > reloaded_controller.end_exploration_time_step
+
+    actions = reloaded_controller.predict(observations, deterministic=False)
+
+    assert len(actions) == len(observations)
+    assert reloaded_controller.time_step == restored_time_step + 1
+
+
+def test_centralized_checkpoint_roundtrip_restores_time_step(tmp_path: Path) -> None:
+    require_benchmark_runtime()
+    require_dataset()
+    config, observations, _reference_actions, checkpoint_path = _warm_checkpoint_payload(
+        "configs/train/sac/sac_central_smoke.yaml", tmp_path
+    )
+    loaded_payload = torch.load(checkpoint_path, map_location="cpu")
+    reward_function = resolve_reward_function(config["reward"]["version"])
+    eval_env_bundle = make_citylearn_env(
+        config["env"]["base_config"],
+        f"configs/splits/{config['env']['split']}.yaml",
+        seed=config["training"]["seed"],
+        central_agent=True,
         reward_function=reward_function,
     )
 

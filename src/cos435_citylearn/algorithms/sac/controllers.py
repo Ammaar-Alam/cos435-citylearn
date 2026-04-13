@@ -41,6 +41,13 @@ def _require_checkpoint_list_length(
         )
 
 
+def _restore_time_state(controller: Any, *, restored_time_step: int) -> None:
+    controller._Environment__time_step = restored_time_step
+    controller._Agent__actions = [
+        [[] for _ in range(restored_time_step + 1)] for _ in controller.action_space
+    ]
+
+
 class CentralizedSACController(CityLearnSAC):
     def __init__(self, env, *, auto_entropy_tuning: bool = True, **kwargs: Any):
         self.auto_entropy_tuning = auto_entropy_tuning
@@ -300,6 +307,7 @@ class CentralizedSACController(CityLearnSAC):
                 expected_count=expected_count,
             )
 
+        _restore_time_state(self, restored_time_step=int(payload["time_step"]))
         self.normalized = list(payload["normalized"])
         self.norm_mean = [
             None if value is None else np.asarray(value, dtype="float32")
@@ -734,11 +742,7 @@ class SharedSACController(RLC):
         }
 
     def load_checkpoint_state(self, payload: dict[str, Any]) -> None:
-        restored_time_step = int(payload["time_step"])
-        self._Environment__time_step = restored_time_step
-        self._Agent__actions = [
-            [[] for _ in range(restored_time_step + 1)] for _ in self.action_space
-        ]
+        _restore_time_state(self, restored_time_step=int(payload["time_step"]))
         self.normalized = bool(payload["normalized"])
         self.norm_mean = (
             None if payload["norm_mean"] is None else np.asarray(payload["norm_mean"], dtype="float32")

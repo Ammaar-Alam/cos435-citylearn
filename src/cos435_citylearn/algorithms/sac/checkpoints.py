@@ -31,6 +31,7 @@ COMMON_CONTROLLER_STATE_KEYS = {
     "action_scaling_coefficient",
     "reward_scaling",
     "update_per_time_step",
+    "time_step",
     "normalized",
 }
 
