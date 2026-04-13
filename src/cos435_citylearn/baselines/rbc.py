@@ -25,6 +25,15 @@ def _import_from_path(path: str):
     return getattr(module, symbol_name)
 
 
+def _resolved_artifact_path(path_value: str, artifacts_root: str | Path | None) -> str:
+    path = Path(path_value)
+    if path.is_absolute():
+        return str(path)
+
+    root = RESULTS_DIR if artifacts_root is None else Path(artifacts_root)
+    return str((root / path).resolve())
+
+
 def run_rbc(
     config_path: str | Path = "configs/train/rbc/rbc_builtin.yaml",
     eval_config_path: str | Path = "configs/eval/default.yaml",
@@ -208,8 +217,12 @@ def run_rbc(
         "average_score": metrics_payload["average_score"],
     }
     if ui_export_payload is not None:
-        payload["simulation_dir"] = ui_export_payload["simulation_dir"]
-        payload["playback_path"] = ui_export_payload["playback_path"]
+        payload["simulation_dir"] = _resolved_artifact_path(
+            ui_export_payload["simulation_dir"], artifacts_root
+        )
+        payload["playback_path"] = _resolved_artifact_path(
+            ui_export_payload["playback_path"], artifacts_root
+        )
 
         if progress_context is not None:
             progress_context.artifact(
