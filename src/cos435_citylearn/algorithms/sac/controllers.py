@@ -28,6 +28,19 @@ def _tensor(value: np.ndarray, *, device: torch.device) -> torch.Tensor:
     return torch.as_tensor(value, dtype=torch.float32, device=device)
 
 
+def _require_checkpoint_list_length(
+    field_name: str,
+    values: Sequence[Any],
+    *,
+    expected_count: int,
+) -> None:
+    actual_count = len(values)
+    if actual_count != expected_count:
+        raise ValueError(
+            f"SAC checkpoint {field_name} count {actual_count} does not match expected controller count {expected_count}"
+        )
+
+
 class CentralizedSACController(CityLearnSAC):
     def __init__(self, env, *, auto_entropy_tuning: bool = True, **kwargs: Any):
         self.auto_entropy_tuning = auto_entropy_tuning
@@ -251,6 +264,42 @@ class CentralizedSACController(CityLearnSAC):
         }
 
     def load_checkpoint_state(self, payload: dict[str, Any]) -> None:
+        expected_count = len(self.policy_net)
+        counted_fields = (
+            "normalized",
+            "policy_state_dicts",
+            "soft_q1_state_dicts",
+            "soft_q2_state_dicts",
+            "target_soft_q1_state_dicts",
+            "target_soft_q2_state_dicts",
+            "policy_optimizer_state_dicts",
+            "soft_q_optimizer1_state_dicts",
+            "soft_q_optimizer2_state_dicts",
+            "norm_mean",
+            "norm_std",
+            "r_norm_mean",
+            "r_norm_std",
+        )
+
+        for field_name in counted_fields:
+            _require_checkpoint_list_length(
+                field_name,
+                payload[field_name],
+                expected_count=expected_count,
+            )
+
+        if self.auto_entropy_tuning:
+            _require_checkpoint_list_length(
+                "log_alpha",
+                payload["log_alpha"],
+                expected_count=expected_count,
+            )
+            _require_checkpoint_list_length(
+                "alpha_optimizer_state_dicts",
+                payload["alpha_optimizer_state_dicts"],
+                expected_count=expected_count,
+            )
+
         self.normalized = list(payload["normalized"])
         self.norm_mean = [
             None if value is None else np.asarray(value, dtype="float32")
@@ -297,7 +346,7 @@ class CentralizedSACController(CityLearnSAC):
             optimizer.load_state_dict(state_dict)
 
         if self.auto_entropy_tuning:
-            for index, value in enumerate(payload.get("log_alpha", [])):
+            for index, value in enumerate(payload["log_alpha"]):
                 if value is None:
                     continue
                 self.log_alpha[index] = torch.tensor(
@@ -307,7 +356,7 @@ class CentralizedSACController(CityLearnSAC):
                     requires_grad=True,
                 )
                 self.alpha_optimizer[index] = optim.Adam([self.log_alpha[index]], lr=self.lr)
-                state_dict = payload.get("alpha_optimizer_state_dicts", [None])[index]
+                state_dict = payload["alpha_optimizer_state_dicts"][index]
                 if state_dict is not None:
                     self.alpha_optimizer[index].load_state_dict(state_dict)
 
