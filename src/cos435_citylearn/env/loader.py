@@ -63,6 +63,7 @@ def make_citylearn_env(
     split_config_path: str | Path | None = "configs/splits/public_dev.yaml",
     seed: int | None = None,
     central_agent: bool | None = None,
+    reward_function: Any | None = None,
 ) -> EnvBundle:
     resolved_env_path, env_config, resolved_split_path, split_config = _load_configs(
         env_config_path,
@@ -104,6 +105,7 @@ def make_citylearn_env(
         episode_time_steps=episode_time_steps,
         rolling_episode_split=rolling_episode_split,
         random_episode_split=random_episode_split,
+        reward_function=reward_function,
     )
 
     return EnvBundle(

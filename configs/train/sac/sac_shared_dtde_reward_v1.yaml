@@ -4,15 +4,16 @@ env:
 
 algorithm:
   name: sac
-  control_mode: centralized
-  variant: central_baseline
+  control_mode: shared_dtde
+  variant: shared_dtde_reward_v1
   policy: gaussian_mlp
 
 reward:
-  version: reward_v0
+  version: reward_v1
 
 features:
-  version: base_central_obs
+  version: shared_district_context
+  shared_context_dimension: 4
 
 training:
   total_timesteps: 250000
@@ -39,7 +40,7 @@ evaluation:
   preview_stride: 12
 
 logging:
-  run_group: sac_baseline
+  run_group: sac_shared
   output_root: results/runs
   metrics_root: results/metrics
   manifests_root: results/manifests

@@ -39,6 +39,8 @@ class RunStore:
         metrics = self._load_json(metrics_path)
         trace_path = manifest_path.parent / "rollout_trace.json"
         playback_manifest_path = manifest_path.parent / "playback_manifest.json"
+        checkpoint_path = manifest_path.parent / "checkpoint.pt"
+        training_curve_path = manifest_path.parent / "training_curve.csv"
         simulation_dir = self._normalize_repo_path(manifest.get("simulation_dir"))
         playback_payload = (
             self._load_json(playback_manifest_path) if playback_manifest_path.exists() else {}
@@ -54,6 +56,8 @@ class RunStore:
             "metrics": True,
             "rollout_trace": trace_path.exists(),
             "trace_steps": trace_steps,
+            "checkpoint": checkpoint_path.exists() or bool(manifest.get("checkpoint_path")),
+            "training_curve": training_curve_path.exists() or bool(manifest.get("training_curve_path")),
             "playback": bool(manifest.get("playback_path")),
             "simulation_export": bool(simulation_dir),
             "gif": bool(media.get("gif_path")),
