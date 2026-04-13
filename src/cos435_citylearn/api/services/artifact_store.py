@@ -8,6 +8,14 @@ from uuid import uuid4
 
 from fastapi import UploadFile
 
+from cos435_citylearn.algorithms.sac import (
+    resolve_imported_checkpoint_path,
+    safe_load_checkpoint_payload,
+    validate_checkpoint_env_compatibility,
+    validate_checkpoint_runner_compatibility,
+)
+from cos435_citylearn.config import load_yaml
+from cos435_citylearn.env import make_citylearn_env
 from cos435_citylearn.api.schemas import (
     ArtifactDetail,
     ArtifactKind,
@@ -180,6 +188,33 @@ class ArtifactStore:
         record = self._read_record(artifact_id)
         if not record.evaluable or not record.runner_id:
             raise ValueError("artifact is not evaluable yet")
+
+        spec = get_runner(record.runner_id)
+        if spec.algorithm == "sac" and record.artifact_kind == "checkpoint":
+            config = load_yaml(spec.config_path)
+            if request.seed is not None:
+                config["training"]["seed"] = int(request.seed)
+            if request.split is not None:
+                config["env"]["split"] = request.split
+
+            checkpoint_path = resolve_imported_checkpoint_path(
+                artifact_id=artifact_id,
+                imported_artifacts_root=self.settings.imported_artifacts_root,
+                artifacts_root=self.settings.artifacts_root,
+            )
+            checkpoint_payload = safe_load_checkpoint_payload(checkpoint_path)
+            validate_checkpoint_runner_compatibility(checkpoint_payload, config)
+            env_bundle = make_citylearn_env(
+                config["env"]["base_config"],
+                f"configs/splits/{config['env']['split']}.yaml",
+                seed=config["training"]["seed"],
+                central_agent=config["algorithm"]["control_mode"] == "centralized",
+            )
+            validate_checkpoint_env_compatibility(
+                checkpoint_payload,
+                observation_names=env_bundle.env.observation_names,
+                action_names=env_bundle.env.action_names,
+            )
 
         return {
             "runner_id": record.runner_id,

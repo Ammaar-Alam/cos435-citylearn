@@ -69,7 +69,7 @@ class OfficialChallengeReward(RewardFunction):
             if outage_only and not is_outage:
                 continue
             if not outage_only and is_outage:
-                pass
+                continue
 
             indoor = float(observation.get("indoor_dry_bulb_temperature", 0.0))
             set_point = float(observation.get("indoor_dry_bulb_temperature_set_point", indoor))
