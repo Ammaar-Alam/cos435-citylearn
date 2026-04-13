@@ -176,6 +176,24 @@ def test_validate_checkpoint_env_compatibility_rejects_schema_mismatch() -> None
         )
 
 
+def test_shared_controller_rejects_non_default_shared_context_width() -> None:
+    require_benchmark_runtime()
+    require_dataset()
+    config = load_yaml("configs/train/sac/sac_shared_dtde_smoke.yaml")
+    config["features"]["shared_context_dimension"] = 5
+    reward_function = resolve_reward_function(config["reward"]["version"])
+    env_bundle = make_citylearn_env(
+        config["env"]["base_config"],
+        f"configs/splits/{config['env']['split']}.yaml",
+        seed=config["training"]["seed"],
+        central_agent=False,
+        reward_function=reward_function,
+    )
+
+    with pytest.raises(ValueError, match="shared_context_dimension"):
+        _instantiate_controller(env_bundle.env, config)
+
+
 def test_centralized_checkpoint_roundtrip(tmp_path: Path) -> None:
     require_benchmark_runtime()
     require_dataset()

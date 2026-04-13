@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from collections import deque
 from pathlib import Path
 from typing import Any
 
@@ -313,7 +314,10 @@ def _run_evaluation_loop(
     }
     decision_total = max_steps or max(int(getattr(env_bundle.env, "time_steps", 0)) - 1, 0)
     preview_stride = max(1, int(config["evaluation"].get("preview_stride", 12)))
+    trace_limit = int(config["evaluation"].get("trace_limit", 96))
+    preview_trace: deque[dict[str, Any]] = deque(maxlen=trace_limit)
     rollout_trace: list[dict[str, Any]] = []
+    playback_trace: list[dict[str, Any]] = [] if export_enabled else []
     step_index = 0
 
     if progress_context is not None:
@@ -341,7 +345,11 @@ def _run_evaluation_loop(
             "rewards": result.rewards,
             "terminated": result.terminated,
         }
-        rollout_trace.append(frame_payload)
+        preview_trace.append(frame_payload)
+        if export_enabled:
+            playback_trace.append(frame_payload)
+        if bool(config["evaluation"].get("save_rollout_trace", True)) and step_index < trace_limit:
+            rollout_trace.append(frame_payload)
         observations = result.observations
         capture.maybe_capture(env=env_bundle.env, step_index=step_index, force=result.terminated)
         step_index += 1
@@ -353,10 +361,10 @@ def _run_evaluation_loop(
                 env=env_bundle.env,
                 run_id=run_id,
                 run_context=run_context,
-                rollout_trace=rollout_trace,
+                rollout_trace=list(preview_trace),
                 capture=capture,
                 current_step=max(step_index - 1, 0),
-                history_limit=int(config["evaluation"].get("trace_limit", 96)),
+                history_limit=trace_limit,
                 ui_exports_root=ui_exports_root,
                 artifacts_root=artifacts_root,
             )
@@ -380,7 +388,7 @@ def _run_evaluation_loop(
             run_id=run_id,
             run_context=run_context,
             metrics_payload=metrics_payload,
-            rollout_trace=rollout_trace,
+            rollout_trace=playback_trace,
             capture=capture,
             ui_exports_root=ui_exports_root,
             artifacts_root=artifacts_root,

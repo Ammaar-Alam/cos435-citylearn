@@ -10,7 +10,10 @@ from citylearn.preprocessing import Encoder, RemoveFeature
 from citylearn.rl import PolicyNetwork, ReplayBuffer, SoftQNetwork
 from torch import nn, optim
 
-from cos435_citylearn.algorithms.sac.features import build_shared_context
+from cos435_citylearn.algorithms.sac.features import (
+    SHARED_CONTEXT_DIMENSION,
+    build_shared_context,
+)
 
 
 def _array_to_list(values: Any) -> Any:
@@ -335,6 +338,10 @@ class SharedSACController(RLC):
         self.soft_q_criterion = nn.SmoothL1Loss()
         self.normalized = False
         self.last_update_stats: dict[str, float] = {}
+        if self.shared_context_dimension != SHARED_CONTEXT_DIMENSION:
+            raise ValueError(
+                f"shared_context_dimension must be {SHARED_CONTEXT_DIMENSION} for the current shared SAC feature set"
+            )
         # This follows the same encoder/replay/network conventions as CityLearn's
         # native SAC, but uses one shared actor-critic pair across all buildings.
         super().__init__(

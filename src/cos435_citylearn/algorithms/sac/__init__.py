@@ -10,6 +10,7 @@ from cos435_citylearn.algorithms.sac.controllers import (
     SharedSACController,
 )
 from cos435_citylearn.algorithms.sac.features import augment_shared_observations, build_shared_context
+from cos435_citylearn.algorithms.sac.features import SHARED_CONTEXT_DIMENSION
 from cos435_citylearn.algorithms.sac.rewards import (
     OFFICIAL_CHALLENGE_WEIGHTS,
     OfficialChallengeReward,
@@ -19,6 +20,7 @@ from cos435_citylearn.algorithms.sac.rewards import (
 __all__ = [
     "CentralizedSACController",
     "SharedSACController",
+    "SHARED_CONTEXT_DIMENSION",
     "resolve_imported_checkpoint_path",
     "safe_load_checkpoint_payload",
     "validate_checkpoint_env_compatibility",
