@@ -124,8 +124,8 @@ def _instantiate_controller_from_checkpoint(
     else:
         raise ValueError(f"unknown SAC checkpoint controller type: {controller_state['controller_type']}")
 
-    controller.load_checkpoint_state(controller_state)
     controller.reset()
+    controller.load_checkpoint_state(controller_state)
     return controller
 
 

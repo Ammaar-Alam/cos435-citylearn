@@ -284,3 +284,34 @@ def test_shared_checkpoint_roundtrip(tmp_path: Path) -> None:
     require_benchmark_runtime()
     require_dataset()
     _assert_checkpoint_roundtrip("configs/train/sac/sac_shared_dtde_smoke.yaml", tmp_path)
+
+
+def test_shared_checkpoint_roundtrip_restores_time_step(tmp_path: Path) -> None:
+    require_benchmark_runtime()
+    require_dataset()
+    config, observations, _reference_actions, checkpoint_path = _warm_checkpoint_payload(
+        "configs/train/sac/sac_shared_dtde_smoke.yaml", tmp_path
+    )
+    loaded_payload = torch.load(checkpoint_path, map_location="cpu")
+    reward_function = resolve_reward_function(config["reward"]["version"])
+    eval_env_bundle = make_citylearn_env(
+        config["env"]["base_config"],
+        f"configs/splits/{config['env']['split']}.yaml",
+        seed=config["training"]["seed"],
+        central_agent=False,
+        reward_function=reward_function,
+    )
+
+    reloaded_controller = _instantiate_controller_from_checkpoint(
+        eval_env_bundle.env,
+        loaded_payload,
+    )
+
+    restored_time_step = loaded_payload["controller_state"]["time_step"]
+    assert reloaded_controller.time_step == restored_time_step
+    assert reloaded_controller.time_step > reloaded_controller.end_exploration_time_step
+
+    actions = reloaded_controller.predict(observations, deterministic=False)
+
+    assert len(actions) == len(observations)
+    assert reloaded_controller.time_step == restored_time_step + 1
