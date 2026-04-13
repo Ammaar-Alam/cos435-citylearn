@@ -47,6 +47,8 @@ CENTRALIZED_CONTROLLER_STATE_KEYS = {
     "norm_std",
     "r_norm_mean",
     "r_norm_std",
+    "log_alpha",
+    "alpha_optimizer_state_dicts",
 }
 
 SHARED_CONTROLLER_STATE_KEYS = {
