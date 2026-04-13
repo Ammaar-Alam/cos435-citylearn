@@ -127,6 +127,7 @@ def run_rbc(
                 rollout_trace=playback_trace,
                 capture=capture,
                 current_step=step_index,
+                history_limit=trace_limit,
                 ui_exports_root=ui_exports_root,
                 artifacts_root=artifacts_root,
             )

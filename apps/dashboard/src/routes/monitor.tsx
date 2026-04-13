@@ -168,20 +168,24 @@ export function MonitorPage() {
 
   const preview = previewQuery.data;
   const state = stateQuery.data;
+  const previewWindowStart = Number(preview?.payload?.window_start_step ?? 0);
+  const latestPreviewStep = preview ? previewWindowStart + Math.max(preview.stored_steps - 1, 0) : 0;
+  const previewStepIndex = preview
+    ? Math.min(Math.max(stepIndex - previewWindowStart, 0), Math.max(preview.stored_steps - 1, 0))
+    : 0;
 
   useEffect(() => {
     if (!preview) {
       return;
     }
 
-    const latestIndex = Math.max(0, preview.stored_steps - 1);
     if (autoFollow) {
-      setStepIndex(latestIndex);
+      setStepIndex(latestPreviewStep);
       return;
     }
 
-    setStepIndex((current) => Math.min(current, latestIndex));
-  }, [autoFollow, preview?.stored_steps, preview]);
+    setStepIndex((current) => Math.min(Math.max(current, previewWindowStart), latestPreviewStep));
+  }, [autoFollow, latestPreviewStep, preview, previewWindowStart]);
 
   useEffect(() => {
     const buildingCount = preview?.payload?.buildings?.length ?? preview?.building_names?.length ?? 0;
@@ -238,7 +242,7 @@ export function MonitorPage() {
           />
           {preview ? (
             <>
-              <PlaybackScene playback={preview} stepIndex={Math.min(stepIndex, Math.max(preview.stored_steps - 1, 0))} />
+              <PlaybackScene playback={preview} stepIndex={previewStepIndex} actualStep={Math.min(stepIndex, latestPreviewStep)} />
               <div className="playback-controls">
                 <label className="checkbox-row">
                   <input checked={autoFollow} onChange={(event) => setAutoFollow(event.target.checked)} type="checkbox" />
@@ -246,16 +250,16 @@ export function MonitorPage() {
                 </label>
                 <input
                   className="playback-slider"
-                  max={Math.max((preview?.stored_steps ?? 1) - 1, 0)}
-                  min={0}
+                  max={latestPreviewStep}
+                  min={previewWindowStart}
                   onChange={(event) => {
                     setAutoFollow(false);
                     setStepIndex(Number(event.target.value));
                   }}
                   type="range"
-                  value={Math.min(stepIndex, Math.max((preview?.stored_steps ?? 1) - 1, 0))}
+                  value={Math.min(Math.max(stepIndex, previewWindowStart), latestPreviewStep)}
                 />
-                <span>step {preview ? Math.min(stepIndex, Math.max(preview.stored_steps - 1, 0)) : 0}</span>
+                <span>step {preview ? Math.min(Math.max(stepIndex, previewWindowStart), latestPreviewStep) : 0}</span>
               </div>
             </>
           ) : (
@@ -317,7 +321,7 @@ export function MonitorPage() {
       {preview ? (
         <TimeseriesPanel
           playback={preview}
-          stepIndex={Math.min(stepIndex, Math.max(preview.stored_steps - 1, 0))}
+          stepIndex={previewStepIndex}
           selectedBuildingIndex={selectedBuildingIndex}
           onSelectBuilding={setSelectedBuildingIndex}
         />
@@ -362,7 +366,7 @@ export function MonitorPage() {
         {preview ? (
           <TraceTable
             frames={preview.trace_frames}
-            stepIndex={Math.min(stepIndex, Math.max(preview.stored_steps - 1, 0))}
+            stepIndex={Math.min(Math.max(stepIndex, previewWindowStart), latestPreviewStep)}
             windowSize={12}
           />
         ) : (

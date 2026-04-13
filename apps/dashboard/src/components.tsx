@@ -277,16 +277,19 @@ export function ChallengeMetricChart({ detail }: { detail: RunDetail }) {
 export function PlaybackScene({
   playback,
   stepIndex,
+  actualStep,
 }: {
   playback: PlaybackPayload;
   stepIndex: number;
+  actualStep?: number;
 }) {
   const payload = playback.payload;
   const buildings = payload.buildings ?? [];
   const media = payload.media ?? {};
+  const resolvedStep = actualStep ?? stepIndex;
   const frameStride = media.frame_stride ?? 1;
   const frameIndex = media.frames?.length
-    ? Math.min(media.frames.length - 1, Math.floor(stepIndex / Math.max(frameStride, 1)))
+    ? Math.min(media.frames.length - 1, Math.floor(resolvedStep / Math.max(frameStride, 1)))
     : null;
   const framePath = frameIndex === null ? media.poster_path : media.frames?.[frameIndex];
   const imageUrl = artifactUrl(framePath ?? media.poster_path ?? null);
@@ -313,7 +316,7 @@ export function PlaybackScene({
         <div className="scene-visual__meta">
           <span>{playback.mode === "full" ? "full capture" : "preview capture"}</span>
           <span>{buildingCards.length} buildings</span>
-          <span>step {stepIndex}</span>
+          <span>step {resolvedStep}</span>
         </div>
       </div>
       <div className="scene-schematic">

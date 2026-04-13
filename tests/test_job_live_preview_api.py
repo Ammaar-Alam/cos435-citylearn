@@ -49,6 +49,7 @@ def test_job_api_emits_preview_and_progress_events(tmp_path: Path) -> None:
 
     preview_seen = False
     progress_seen = False
+    latest_preview_payload = None
 
     deadline = time.time() + 45
     final_status = None
@@ -68,6 +69,7 @@ def test_job_api_emits_preview_and_progress_events(tmp_path: Path) -> None:
         preview_response = client.get(f"/api/jobs/{job_id}/preview")
         if preview_response.status_code == 200:
             preview_seen = True
+            latest_preview_payload = preview_response.json()
 
         if final_status in {"succeeded", "failed", "cancelled"}:
             break
@@ -78,6 +80,8 @@ def test_job_api_emits_preview_and_progress_events(tmp_path: Path) -> None:
     assert preview_seen
     assert progress_seen
     assert run_id
+    assert latest_preview_payload is not None
+    assert latest_preview_payload["stored_steps"] <= 64
 
     runs_response = client.get("/api/runs")
     assert runs_response.status_code == 200, runs_response.text

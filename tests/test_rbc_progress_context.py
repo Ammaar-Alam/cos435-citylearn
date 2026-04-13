@@ -47,8 +47,10 @@ def test_run_rbc_emits_live_preview_updates(tmp_path: Path) -> None:
     preview_payload = last_update["preview_payload"]
     assert preview_payload["run_id"] == payload["run_id"]
     assert preview_payload["trace"]
+    assert len(preview_payload["trace"]) <= 96
     assert preview_payload["episode_total_steps"] >= preview_payload["decision_steps"]
-    assert preview_payload["preview_step"] == preview_payload["decision_steps"] - 1
+    assert preview_payload["trace"][-1]["step"] == preview_payload["preview_step"]
+    assert preview_payload["window_start_step"] == preview_payload["preview_step"] + 1 - preview_payload["decision_steps"]
 
     artifact_kinds = {artifact["kind"] for artifact in progress.artifacts}
     assert {"playback", "simulation_export"} <= artifact_kinds
