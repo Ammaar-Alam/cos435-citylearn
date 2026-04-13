@@ -4,6 +4,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+import cos435_citylearn.api.app as app_module
 from cos435_citylearn.api.app import create_app
 from cos435_citylearn.api.settings import ApiSettings
 from cos435_citylearn.paths import CONFIGS_DIR, REPO_ROOT
@@ -65,3 +66,22 @@ def test_dashboard_route_returns_404_for_missing_asset_like_paths(tmp_path: Path
     response = client.get("/dashboard/assets/missing-hash.js")
 
     assert response.status_code == 404
+
+
+def test_create_app_binds_services_only_once(tmp_path: Path, monkeypatch) -> None:
+    settings = build_test_settings(tmp_path)
+    bind_count = 0
+    original_bind = app_module._bind_services
+
+    def counted_bind(app, bound_settings):
+        nonlocal bind_count
+        bind_count += 1
+        return original_bind(app, bound_settings)
+
+    monkeypatch.setattr(app_module, "_bind_services", counted_bind)
+
+    app = create_app(settings)
+    with TestClient(app):
+        pass
+
+    assert bind_count == 1

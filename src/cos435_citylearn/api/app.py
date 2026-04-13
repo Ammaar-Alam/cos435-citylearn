@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -41,12 +40,7 @@ def _safe_dashboard_file(frontend_dist: Path, path: str) -> Path | None:
 
 
 def create_app(settings: ApiSettings = SETTINGS) -> FastAPI:
-    @asynccontextmanager
-    async def lifespan(app: FastAPI):
-        _bind_services(app, settings)
-        yield
-
-    app = FastAPI(title="COS435 CityLearn Dashboard", lifespan=lifespan)
+    app = FastAPI(title="COS435 CityLearn Dashboard")
     _bind_services(app, settings)
     app.add_middleware(
         CORSMiddleware,
