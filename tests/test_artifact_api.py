@@ -78,6 +78,8 @@ def test_artifact_import_round_trips_playback_payload(tmp_path: Path) -> None:
     artifact = response.json()
     assert artifact["status"] == "inspectable"
     assert artifact["playback_path"].endswith("playback.json")
+    assert artifact["playback_path"] == artifact["file_path"]
+    assert not artifact["file_path"].startswith("/")
 
     playback_response = client.get(f"/api/artifacts/{artifact['artifact_id']}/playback")
     assert playback_response.status_code == 200, playback_response.text

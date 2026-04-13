@@ -26,10 +26,13 @@ class RunStore:
         if not path.is_absolute():
             return value
 
-        try:
-            return str(path.resolve().relative_to(self.settings.repo_root).as_posix())
-        except ValueError:
-            return value
+        for root in (self.settings.artifacts_root, self.settings.repo_root):
+            try:
+                return str(path.resolve().relative_to(root.resolve()).as_posix())
+            except ValueError:
+                continue
+
+        return value
 
     def _summary_from_paths(self, manifest_path: Path, metrics_path: Path) -> RunSummary:
         manifest = self._load_json(manifest_path)

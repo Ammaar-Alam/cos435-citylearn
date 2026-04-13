@@ -122,7 +122,27 @@ export function artifactUrl(path: string | null | undefined): string | null {
     return null;
   }
 
-  const normalized = path
+  if (/^https?:\/\//.test(path)) {
+    return path;
+  }
+
+  const unixPath = path.replace(/\\/g, "/");
+  let relativePath = unixPath;
+
+  if (unixPath.startsWith("/")) {
+    const artifactMarkers = ["/ui_exports/", "/runs/", "/dashboard/artifacts/", "/manifests/"];
+    const marker = artifactMarkers.find((candidate) => unixPath.includes(candidate));
+
+    if (marker) {
+      relativePath = unixPath.slice(unixPath.indexOf(marker) + 1);
+    } else if (unixPath.includes("/results/")) {
+      relativePath = unixPath.slice(unixPath.indexOf("/results/") + 1);
+    } else {
+      return null;
+    }
+  }
+
+  const normalized = relativePath
     .replace(/^\/+/, "")
     .replace(/^results\//, "");
 

@@ -287,9 +287,19 @@ export function PlaybackScene({
   const buildings = payload.buildings ?? [];
   const media = payload.media ?? {};
   const resolvedStep = actualStep ?? stepIndex;
-  const frameStride = media.frame_stride ?? 1;
+  const frameSteps = Array.isArray(media.frame_steps)
+    ? media.frame_steps
+        .map((step: unknown) => Number(step))
+        .filter((step: number) => Number.isFinite(step))
+    : [];
+  const frameStride = Math.max(Number(media.frame_stride ?? 1), 1);
   const frameIndex = media.frames?.length
-    ? Math.min(media.frames.length - 1, Math.floor(resolvedStep / Math.max(frameStride, 1)))
+    ? frameSteps.length === media.frames.length
+      ? Math.max(
+          0,
+          frameSteps.findLastIndex((capturedStep: number) => resolvedStep >= capturedStep),
+        )
+      : Math.min(media.frames.length - 1, Math.floor(resolvedStep / frameStride))
     : null;
   const framePath = frameIndex === null ? media.poster_path : media.frames?.[frameIndex];
   const imageUrl = artifactUrl(framePath ?? media.poster_path ?? null);

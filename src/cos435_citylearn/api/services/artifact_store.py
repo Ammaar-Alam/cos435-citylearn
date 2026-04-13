@@ -51,10 +51,12 @@ class ArtifactStore:
     def _normalize_path(self, path: Path | None) -> str | None:
         if path is None:
             return None
-        try:
-            return str(path.resolve().relative_to(self.settings.repo_root).as_posix())
-        except ValueError:
-            return str(path)
+        for root in (self.settings.artifacts_root, self.settings.repo_root):
+            try:
+                return str(path.resolve().relative_to(root.resolve()).as_posix())
+            except ValueError:
+                continue
+        return str(path)
 
     def _read_record(self, artifact_id: str) -> ImportedArtifactRecord:
         path = self._artifact_path(artifact_id)

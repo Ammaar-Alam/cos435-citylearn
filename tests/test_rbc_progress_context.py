@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import yaml
 
 from cos435_citylearn.baselines import run_rbc
+from cos435_citylearn.ui_exports.exporter import DashboardCapture
 
 
 class FakeProgressContext:
@@ -80,3 +82,32 @@ def test_run_rbc_bounds_preview_trace_when_export_disabled(tmp_path: Path) -> No
     assert last_update["window_start_step"] == last_update["preview_step"] + 1 - last_update["decision_steps"]
     assert "simulation_dir" not in payload
     assert not progress.artifacts
+
+
+class FakeRenderEnv:
+    def __init__(self, time_steps: int) -> None:
+        self.time_steps = time_steps
+
+    def render(self):
+        return np.zeros((8, 8, 3), dtype=np.uint8)
+
+
+def test_dashboard_capture_records_terminal_frame_step(tmp_path: Path) -> None:
+    capture = DashboardCapture(
+        run_id="run_capture",
+        dataset_name="citylearn",
+        ui_exports_root=tmp_path / "ui_exports",
+        artifacts_root=tmp_path,
+        capture_frames=True,
+        max_frames=4,
+    )
+    env = FakeRenderEnv(time_steps=10)
+
+    capture.configure(env)
+    for step in range(10):
+        capture.maybe_capture(env=env, step_index=step, force=step == 9)
+
+    media = capture.snapshot_media()
+
+    assert media["frame_steps"][-1] == 9
+    assert len(media["frame_steps"]) == len(media["frames"])

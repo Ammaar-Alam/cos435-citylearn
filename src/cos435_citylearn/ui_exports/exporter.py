@@ -313,6 +313,7 @@ class DashboardCapture:
         self.frame_count = 0
         self.frame_stride: int | None = None
         self.frame_paths: list[Path] = []
+        self.frame_steps: list[int] = []
         self.poster_path: Path | None = None
         self.gif_path: Path | None = None
 
@@ -345,6 +346,7 @@ class DashboardCapture:
         target = ensure_parent(self.frame_dir / f"frame_{self.frame_count:04d}.jpg")
         image.save(target, quality=85, optimize=True)
         self.frame_paths.append(target)
+        self.frame_steps.append(int(step_index))
         self.frame_count += 1
 
         if self.poster_path is None:
@@ -358,6 +360,7 @@ class DashboardCapture:
                 "poster_path": None,
                 "gif_path": None,
                 "frames": [],
+                "frame_steps": [],
             }
 
         images = [Image.open(path) for path in self.frame_paths]
@@ -382,6 +385,7 @@ class DashboardCapture:
                 _relative_artifact_path(path, relative_root=self.artifacts_root)
                 for path in self.frame_paths
             ],
+            "frame_steps": list(self.frame_steps),
         }
 
     def snapshot_media(self) -> dict[str, Any]:
@@ -394,6 +398,7 @@ class DashboardCapture:
                 _relative_artifact_path(path, relative_root=self.artifacts_root)
                 for path in self.frame_paths
             ],
+            "frame_steps": list(self.frame_steps),
         }
 
 
