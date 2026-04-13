@@ -78,5 +78,5 @@ def evaluate_artifact(
         return request.app.state.job_manager.submit(launch_request)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
+    except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from cos435_citylearn.api.app import create_app
+from cos435_citylearn.api.schemas import JobSummary
 from cos435_citylearn.api.settings import ApiSettings
 from cos435_citylearn.paths import CONFIGS_DIR, REPO_ROOT
 
@@ -102,3 +103,23 @@ def test_artifact_import_rejects_unknown_artifact_kind(tmp_path: Path) -> None:
     )
 
     assert response.status_code == 422
+
+
+def test_artifact_evaluate_maps_missing_split_file_to_400(tmp_path: Path) -> None:
+    settings = build_test_settings(tmp_path)
+    app = create_app(settings)
+
+    def build_request(_artifact_id, _payload):
+        return {"runner_id": "rbc_builtin"}
+
+    def raise_missing_file(_payload) -> JobSummary:
+        raise FileNotFoundError("unknown split config")
+
+    app.state.artifact_store.build_evaluation_request = build_request  # type: ignore[method-assign]
+    app.state.job_manager.submit = raise_missing_file  # type: ignore[method-assign]
+    client = TestClient(app)
+
+    response = client.post("/api/artifacts/artifact_123/evaluate", json={"split": "missing"})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "unknown split config"
