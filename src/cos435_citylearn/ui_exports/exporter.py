@@ -192,6 +192,7 @@ def _playback_payload(
     artifacts_root: Path | None = None,
     series_limit: int | None = None,
     series_start: int = 0,
+    trace_start_step: int = 0,
 ) -> dict[str, Any]:
     buildings = []
 
@@ -254,7 +255,8 @@ def _playback_payload(
             }
         )
 
-    trace_window = _trim(rollout_trace, series_limit, series_start)
+    trace_window_start = max(0, series_start - trace_start_step)
+    trace_window = _trim(rollout_trace, series_limit, trace_window_start)
     effective_timestamps = _trim(timestamps, series_limit, series_start)
     decision_steps = len(trace_window)
     return {
@@ -410,6 +412,7 @@ def build_live_preview_payload(
     series_end = current_step + 1
     bounded_history = series_end if history_limit is None else max(1, min(history_limit, series_end))
     window_start = max(0, series_end - bounded_history)
+    trace_start_step = int(rollout_trace[0]["step"]) if rollout_trace else 0
     total_steps = int(getattr(env, "time_steps", series_end))
     timestamps = _hourly_timestamps(total_steps)
     resolved_ui_exports_root = _resolve_ui_exports_root(ui_exports_root)
@@ -428,6 +431,7 @@ def build_live_preview_payload(
         artifacts_root=resolved_artifacts_root,
         series_limit=bounded_history,
         series_start=window_start,
+        trace_start_step=trace_start_step,
     )
     payload["ui_export"]["simulation_dir"] = _relative_artifact_path(
         simulation_dir,

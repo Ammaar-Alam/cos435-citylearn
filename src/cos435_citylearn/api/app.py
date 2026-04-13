@@ -81,6 +81,8 @@ def create_app(settings: ApiSettings = SETTINGS) -> FastAPI:
                 return FileResponse(candidate)
             if path and ".." in Path(path).parts:
                 return JSONResponse({"detail": "not found"}, status_code=404)
+            if path and Path(path).suffix:
+                return JSONResponse({"detail": "not found"}, status_code=404)
             return FileResponse(frontend_dist / "index.html")
 
     else:

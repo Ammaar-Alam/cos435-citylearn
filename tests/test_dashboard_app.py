@@ -56,3 +56,12 @@ def test_dashboard_route_rejects_path_traversal(tmp_path: Path) -> None:
     response = client.get("/dashboard/%2E%2E/%2E%2E/secret.txt")
     assert response.status_code == 404
     assert "do not leak" not in response.text
+
+
+def test_dashboard_route_returns_404_for_missing_asset_like_paths(tmp_path: Path) -> None:
+    settings = build_test_settings(tmp_path)
+    client = TestClient(create_app(settings))
+
+    response = client.get("/dashboard/assets/missing-hash.js")
+
+    assert response.status_code == 404

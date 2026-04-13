@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from importlib import import_module
 from pathlib import Path
 from typing import Any
@@ -50,6 +51,7 @@ def run_rbc(
     controller = controller_class(env_bundle.env)
     variant = config["algorithm"]["variant"]
     decision_total = max(int(getattr(env_bundle.env, "time_steps", 0)) - 1, 0)
+    export_enabled = bool(eval_config["evaluation"].get("export_simulation_data", True))
     run_id = build_run_id(
         algo=config["algorithm"]["name"],
         variant=variant,
@@ -68,10 +70,11 @@ def run_rbc(
         else Path(manifests_root)
     )
     run_dir = run_root / run_id
-    rollout_trace = []
-    playback_trace = []
-    observations = adapter.reset()
     trace_limit = int(config["evaluation"].get("trace_limit", 96))
+    rollout_trace = []
+    playback_trace: list[dict[str, Any]] = [] if export_enabled else []
+    preview_trace: deque[dict[str, Any]] = deque(maxlen=trace_limit)
+    observations = adapter.reset()
     capture = DashboardCapture(
         run_id=run_id,
         dataset_name=env_bundle.dataset_name,
@@ -112,7 +115,9 @@ def run_rbc(
             "rewards": result.rewards,
             "terminated": result.terminated,
         }
-        playback_trace.append(frame_payload)
+        preview_trace.append(frame_payload)
+        if export_enabled:
+            playback_trace.append(frame_payload)
         if config["evaluation"]["save_rollout_trace"] and step_index < trace_limit:
             rollout_trace.append(frame_payload)
         observations = result.observations
@@ -124,7 +129,7 @@ def run_rbc(
                 env=env_bundle.env,
                 run_id=run_id,
                 run_context=run_context,
-                rollout_trace=playback_trace,
+                rollout_trace=list(preview_trace),
                 capture=capture,
                 current_step=step_index,
                 history_limit=trace_limit,
@@ -144,7 +149,7 @@ def run_rbc(
     metrics_payload = build_metrics_payload(env_bundle.env, run_context)
     row = flatten_metrics_row(metrics_payload)
     ui_export_payload = None
-    if eval_config["evaluation"].get("export_simulation_data", True):
+    if export_enabled:
         ui_export_payload = export_simulation_bundle(
             env=env_bundle.env,
             run_id=run_id,
