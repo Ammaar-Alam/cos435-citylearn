@@ -4,6 +4,8 @@ from typing import Sequence
 
 import numpy as np
 
+SHARED_CONTEXT_DIMENSION = 4
+
 
 def _observation_value(
     observation: Sequence[float],
