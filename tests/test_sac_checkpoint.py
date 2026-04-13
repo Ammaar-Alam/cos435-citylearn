@@ -8,6 +8,7 @@ import torch
 
 from cos435_citylearn.algorithms.sac.checkpoints import (
     safe_load_checkpoint_payload,
+    validate_checkpoint_payload_structure,
     validate_checkpoint_env_compatibility,
     validate_checkpoint_runner_compatibility,
 )
@@ -57,6 +58,44 @@ def _minimal_central_checkpoint_payload() -> dict[str, object]:
             "norm_std": [None],
             "r_norm_mean": [None],
             "r_norm_std": [None],
+        },
+    }
+
+
+def _minimal_shared_checkpoint_payload() -> dict[str, object]:
+    return {
+        "algorithm": "sac",
+        "control_mode": "shared_dtde",
+        "observation_names": [["hour", "load"]],
+        "action_names": [["battery"]],
+        "controller_state": {
+            "controller_type": "shared_parameter_sac",
+            "hidden_dimension": [64, 64],
+            "discount": 0.99,
+            "tau": 0.005,
+            "alpha": 0.2,
+            "lr": 0.0003,
+            "batch_size": 16,
+            "replay_buffer_capacity": 128,
+            "standardize_start_time_step": 8,
+            "end_exploration_time_step": 8,
+            "action_scaling_coefficient": 0.5,
+            "reward_scaling": 5.0,
+            "update_per_time_step": 1,
+            "normalized": False,
+            "policy_state_dict": {},
+            "soft_q1_state_dict": {},
+            "soft_q2_state_dict": {},
+            "target_soft_q1_state_dict": {},
+            "target_soft_q2_state_dict": {},
+            "policy_optimizer_state_dict": {},
+            "soft_q_optimizer1_state_dict": {},
+            "soft_q_optimizer2_state_dict": {},
+            "norm_mean": None,
+            "norm_std": None,
+            "r_norm_mean": None,
+            "r_norm_std": None,
+            "shared_context_dimension": 4,
         },
     }
 
@@ -176,6 +215,14 @@ def test_validate_checkpoint_env_compatibility_rejects_schema_mismatch() -> None
         )
 
 
+def test_validate_checkpoint_payload_structure_rejects_missing_shared_context_dimension() -> None:
+    payload = _minimal_shared_checkpoint_payload()
+    del payload["controller_state"]["shared_context_dimension"]
+
+    with pytest.raises(ValueError, match="shared_context_dimension"):
+        validate_checkpoint_payload_structure(payload)
+
+
 def test_shared_controller_rejects_non_default_shared_context_width() -> None:
     require_benchmark_runtime()
     require_dataset()
@@ -192,6 +239,29 @@ def test_shared_controller_rejects_non_default_shared_context_width() -> None:
 
     with pytest.raises(ValueError, match="shared_context_dimension"):
         _instantiate_controller(env_bundle.env, config)
+
+
+def test_centralized_checkpoint_roundtrip_rejects_truncated_state_lists(tmp_path: Path) -> None:
+    require_benchmark_runtime()
+    require_dataset()
+    config, _, _, checkpoint_path = _warm_checkpoint_payload(
+        "configs/train/sac/sac_central_smoke.yaml", tmp_path
+    )
+    payload = torch.load(checkpoint_path, map_location="cpu")
+    controller_state = payload["controller_state"]
+    controller_state["policy_state_dicts"] = controller_state["policy_state_dicts"][:-1]
+
+    reward_function = resolve_reward_function(config["reward"]["version"])
+    eval_env_bundle = make_citylearn_env(
+        config["env"]["base_config"],
+        f"configs/splits/{config['env']['split']}.yaml",
+        seed=config["training"]["seed"],
+        central_agent=True,
+        reward_function=reward_function,
+    )
+
+    with pytest.raises(ValueError, match="policy_state_dicts count"):
+        _instantiate_controller_from_checkpoint(eval_env_bundle.env, payload)
 
 
 def test_centralized_checkpoint_roundtrip(tmp_path: Path) -> None:

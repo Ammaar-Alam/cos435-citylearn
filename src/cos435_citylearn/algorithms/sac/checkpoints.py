@@ -143,10 +143,6 @@ def validate_checkpoint_payload_structure(payload: Any) -> None:
         missing_specific = sorted(CENTRALIZED_CONTROLLER_STATE_KEYS - set(controller_state))
     elif controller_type == "shared_parameter_sac":
         missing_specific = sorted(SHARED_CONTROLLER_STATE_KEYS - set(controller_state))
-        if int(controller_state["shared_context_dimension"]) != SHARED_CONTEXT_DIMENSION:
-            raise ValueError(
-                f"SAC checkpoint shared_context_dimension must be {SHARED_CONTEXT_DIMENSION}"
-            )
     else:
         raise ValueError(f"unknown SAC checkpoint controller type: {controller_type}")
 
@@ -155,6 +151,17 @@ def validate_checkpoint_payload_structure(payload: Any) -> None:
             "SAC checkpoint controller_state missing required keys: "
             + ", ".join(missing_specific)
         )
+
+    if controller_type == "shared_parameter_sac":
+        try:
+            shared_context_dimension = int(controller_state["shared_context_dimension"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("SAC checkpoint shared_context_dimension must be an integer") from exc
+
+        if shared_context_dimension != SHARED_CONTEXT_DIMENSION:
+            raise ValueError(
+                f"SAC checkpoint shared_context_dimension must be {SHARED_CONTEXT_DIMENSION}"
+            )
 
 
 def validate_checkpoint_runner_compatibility(
