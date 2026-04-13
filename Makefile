@@ -1,7 +1,8 @@
 PYTHON := .venv/bin/python
 MPLCONFIGDIR := $(CURDIR)/.cache/matplotlib
+NPM_CACHE := $(CURDIR)/.npm-cache
 
-.PHONY: install install-benchmark test check env-info repo-tree download-citylearn env-schema smoke train-rbc
+.PHONY: install install-benchmark test check env-info repo-tree download-citylearn env-schema smoke train-rbc check-ui-exports dashboard-install dashboard-build dashboard-check dashboard-backend dashboard-frontend ui ui-open
 
 install:
 	bash scripts/setup/install_env.sh
@@ -16,6 +17,7 @@ check:
 	$(PYTHON) scripts/check/check_configs.py
 	$(PYTHON) -m ruff check .
 	$(PYTHON) -m pytest -q --ignore=tests/smoke
+	@if [ -d apps/dashboard/node_modules ]; then $(MAKE) dashboard-check; else echo "dashboard build skipped; run make dashboard-install first"; fi
 
 env-info:
 	$(PYTHON) scripts/setup/env_info.py
@@ -31,6 +33,30 @@ smoke:
 
 train-rbc:
 	COS435_REQUIRE_DATA=1 MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/train/run_rbc.py
+
+check-ui-exports:
+	$(PYTHON) scripts/check/validate_official_ui_exports.py
+
+dashboard-install:
+	cd apps/dashboard && npm_config_cache="$(NPM_CACHE)" npm ci
+
+dashboard-build:
+	cd apps/dashboard && npm run build
+
+dashboard-check:
+	cd apps/dashboard && npm run build
+
+dashboard-backend:
+	COS435_REQUIRE_DATA=1 MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/dashboard/run_backend.py
+
+dashboard-frontend:
+	cd apps/dashboard && npm run dev
+
+ui:
+	COS435_REQUIRE_DATA=1 MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/dashboard/run_ui.py
+
+ui-open:
+	COS435_REQUIRE_DATA=1 MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/dashboard/run_ui.py --open-browser
 
 repo-tree:
 	find . -maxdepth 3 -type f | sort

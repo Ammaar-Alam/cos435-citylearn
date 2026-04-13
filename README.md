@@ -19,6 +19,8 @@ Foundation in this repo now has:
 - observation/action schema export
 - random rollout smoke coverage
 - built-in RBC evaluation path with metric export
+- default simulation-data export for completed evaluation runs
+- local dashboard backend and frontend for launch, playback, and comparison
 - lightweight non-benchmark tests for the shared scaffold
 
 ## setup
@@ -26,6 +28,7 @@ Foundation in this repo now has:
 ### prerequisites
 
 - python 3.10
+- node 20+ with `npm`
 - `uv` is recommended because the install script can use it to provision Python 3.10 automatically
 
 If `uv` is not installed, make sure `python3.10` is already available on your machine before running the setup script.
@@ -78,6 +81,11 @@ make download-citylearn
 make env-schema
 make smoke
 make train-rbc
+make dashboard-install
+make dashboard-build
+make dashboard-backend
+make dashboard-frontend
+make ui
 make env-info
 make repo-tree
 ```
@@ -110,3 +118,71 @@ results/    generated manifests, metrics, and run artifacts stay out of git
 - a run directory under `results/runs/`
 - JSON metrics for the built-in RBC rollout
 - a flat CSV row in `results/metrics/`
+- a `SimulationData/<run_id>/` export under `results/ui_exports/`
+- a playback payload under `results/ui_exports/playback/`
+
+You can validate the exported `SimulationData/...` tree against the official CityLearn UI upload contract with:
+
+```bash
+make check-ui-exports
+```
+
+## local dashboard
+
+The dashboard is a repo-native localhost UI. It does not replace the benchmark path; it launches the same runner and reads the same run artifacts.
+
+Install the frontend once:
+
+```bash
+make dashboard-install
+```
+
+The dashboard assumes the benchmark environment is already usable locally, so make sure you have already run:
+
+```bash
+make install-benchmark
+source .venv/bin/activate
+make download-citylearn
+```
+
+For the normal dev workflow:
+
+```bash
+source .venv/bin/activate
+make ui
+```
+
+That starts:
+- the FastAPI backend on `http://127.0.0.1:8001`
+- the Vite dashboard on `http://127.0.0.1:5173`
+
+If you want the script to also open a browser window when you run it:
+
+```bash
+make ui-open
+```
+
+If you want to run the two halves separately:
+
+```bash
+make dashboard-backend
+make dashboard-frontend
+```
+
+To serve the built dashboard from the Python backend at `/dashboard`:
+
+```bash
+make dashboard-build
+make dashboard-backend
+```
+
+The dashboard currently supports:
+- launching the built-in RBC benchmark from the UI
+- watching live preview payloads and worker logs while the benchmark job runs
+- listing discovered runs from `results/runs/`
+- inspecting one run with synchronized metrics, trace playback, and render media
+- comparing multiple runs side by side
+- importing playback payloads or other artifacts into a local registry
+- inspecting imported playback payloads directly in the UI
+
+The dashboard does not pretend PPO or SAC exist yet. Those presets appear as config contracts until their runners are implemented. Imported checkpoints can be registered now, but they are not locally evaluable until a checkpoint-capable runner exists.

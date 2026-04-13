@@ -9,6 +9,10 @@ evaluation:
   save_rollout_trace: true
   save_raw_kpis: true
   save_challenge_metrics: true
+  export_simulation_data: true
+  capture_render_frames: true
+  max_render_frames: 60
+  render_frame_width: 960
 
 logging:
   metrics_root: results/metrics
