@@ -65,3 +65,19 @@ def test_reward_broadcasts_for_decentralized_mode() -> None:
 
     assert len(values) == 2
     assert values[0] == values[1]
+
+
+def test_main_comfort_term_excludes_outage_hours() -> None:
+    reward = OfficialChallengeReward({"central_agent": True}, version="reward_v1")
+
+    comfort_term = reward._comfort_excess(  # noqa: SLF001
+        [_observation(indoor=28.0, set_point=22.0, outage=1.0)],
+        outage_only=False,
+    )
+    outage_comfort_term = reward._comfort_excess(  # noqa: SLF001
+        [_observation(indoor=28.0, set_point=22.0, outage=1.0)],
+        outage_only=True,
+    )
+
+    assert comfort_term == 0.0
+    assert outage_comfort_term > 0.0

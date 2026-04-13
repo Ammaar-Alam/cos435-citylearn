@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import csv
-import json
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +9,11 @@ import torch
 from cos435_citylearn.algorithms.sac import (
     CentralizedSACController,
     SharedSACController,
+    resolve_imported_checkpoint_path,
     resolve_reward_function,
+    safe_load_checkpoint_payload,
+    validate_checkpoint_env_compatibility,
+    validate_checkpoint_runner_compatibility,
 )
 from cos435_citylearn.config import load_yaml, resolve_path
 from cos435_citylearn.env import (
@@ -20,7 +23,7 @@ from cos435_citylearn.env import (
 )
 from cos435_citylearn.eval import build_metrics_payload, flatten_metrics_row
 from cos435_citylearn.io import ensure_parent, write_csv_row, write_json
-from cos435_citylearn.paths import REPO_ROOT, RESULTS_DIR
+from cos435_citylearn.paths import RESULTS_DIR
 from cos435_citylearn.run_id import build_run_id
 from cos435_citylearn.runtime import build_environment_lock, utc_now_iso
 from cos435_citylearn.ui_exports import (
@@ -171,28 +174,17 @@ def _load_imported_checkpoint(
     artifact_id: str,
     imported_artifacts_root: str | Path | None,
     artifacts_root: str | Path | None,
-) -> Path:
+) -> tuple[Path, dict[str, Any]]:
     if imported_artifacts_root is None or artifacts_root is None:
         raise ValueError("checkpoint evaluation requires imported_artifacts_root and artifacts_root")
 
-    artifact_record_path = Path(imported_artifacts_root) / artifact_id / "artifact.json"
-    if not artifact_record_path.exists():
-        raise FileNotFoundError(f"unknown imported artifact: {artifact_id}")
-
-    artifact_record = json.loads(artifact_record_path.read_text())
-    candidate = Path(artifact_record["file_path"])
-    if candidate.is_absolute():
-        return candidate
-
-    artifacts_candidate = Path(artifacts_root) / candidate
-    if artifacts_candidate.exists():
-        return artifacts_candidate
-
-    repo_candidate = REPO_ROOT / candidate
-    if repo_candidate.exists():
-        return repo_candidate
-
-    raise FileNotFoundError(f"checkpoint file not found for artifact: {artifact_id}")
+    checkpoint_path = resolve_imported_checkpoint_path(
+        artifact_id=artifact_id,
+        imported_artifacts_root=imported_artifacts_root,
+        artifacts_root=artifacts_root,
+    )
+    checkpoint_payload = safe_load_checkpoint_payload(checkpoint_path)
+    return checkpoint_path, checkpoint_payload
 
 
 def _build_adapter(env: Any):
@@ -464,13 +456,15 @@ def run_sac(
         torch.save(checkpoint_payload, checkpoint_path)
         _write_training_curve(training_curve_path, curve_rows)
     else:
-        checkpoint_path = _load_imported_checkpoint(
+        checkpoint_path, checkpoint_payload = _load_imported_checkpoint(
             artifact_id=artifact_id,
             imported_artifacts_root=imported_artifacts_root,
             artifacts_root=artifacts_root,
         )
-        checkpoint_payload = torch.load(checkpoint_path, map_location="cpu")
+        validate_checkpoint_runner_compatibility(checkpoint_payload, config)
         _write_training_curve(training_curve_path, [])
+    if artifact_id is None:
+        checkpoint_payload = safe_load_checkpoint_payload(checkpoint_path)
 
     eval_reward_function = resolve_reward_function(config["reward"]["version"])
     eval_env_bundle = make_citylearn_env(
@@ -479,6 +473,11 @@ def run_sac(
         seed=config["training"]["seed"],
         central_agent=central_agent,
         reward_function=eval_reward_function,
+    )
+    validate_checkpoint_env_compatibility(
+        checkpoint_payload,
+        observation_names=eval_env_bundle.env.observation_names,
+        action_names=eval_env_bundle.env.action_names,
     )
     evaluation_controller = _instantiate_controller_from_checkpoint(
         eval_env_bundle.env,

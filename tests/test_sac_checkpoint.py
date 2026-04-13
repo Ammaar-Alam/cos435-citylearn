@@ -3,8 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import pytest
 import torch
 
+from cos435_citylearn.algorithms.sac.checkpoints import (
+    safe_load_checkpoint_payload,
+    validate_checkpoint_env_compatibility,
+    validate_checkpoint_runner_compatibility,
+)
 from cos435_citylearn.baselines.sac import (
     _build_adapter,
     _build_checkpoint_payload,
@@ -16,6 +22,43 @@ from cos435_citylearn.config import load_yaml
 from cos435_citylearn.env import make_citylearn_env
 from cos435_citylearn.algorithms.sac import resolve_reward_function
 from tests.smoke.helpers import require_benchmark_runtime, require_dataset
+
+
+def _minimal_central_checkpoint_payload() -> dict[str, object]:
+    return {
+        "algorithm": "sac",
+        "control_mode": "centralized",
+        "observation_names": [["hour", "load"]],
+        "action_names": [["battery"]],
+        "controller_state": {
+            "controller_type": "centralized_native",
+            "hidden_dimension": [64, 64],
+            "discount": 0.99,
+            "tau": 0.005,
+            "alpha": 0.2,
+            "lr": 0.0003,
+            "batch_size": 16,
+            "replay_buffer_capacity": 128,
+            "standardize_start_time_step": 8,
+            "end_exploration_time_step": 8,
+            "action_scaling_coefficient": 0.5,
+            "reward_scaling": 5.0,
+            "update_per_time_step": 1,
+            "normalized": [False],
+            "policy_state_dicts": [{}],
+            "soft_q1_state_dicts": [{}],
+            "soft_q2_state_dicts": [{}],
+            "target_soft_q1_state_dicts": [{}],
+            "target_soft_q2_state_dicts": [{}],
+            "policy_optimizer_state_dicts": [{}],
+            "soft_q_optimizer1_state_dicts": [{}],
+            "soft_q_optimizer2_state_dicts": [{}],
+            "norm_mean": [None],
+            "norm_std": [None],
+            "r_norm_mean": [None],
+            "r_norm_std": [None],
+        },
+    }
 
 
 def _warm_checkpoint_payload(config_path: str, tmp_path: Path):
@@ -86,6 +129,51 @@ def _assert_checkpoint_roundtrip(config_path: str, tmp_path: Path) -> None:
     assert len(restored_actions) == len(reference_actions)
     for expected, actual in zip(reference_actions, restored_actions):
         np.testing.assert_allclose(actual, expected, atol=1e-5, rtol=1e-5)
+
+
+def test_safe_load_checkpoint_payload_uses_weights_only(monkeypatch, tmp_path: Path) -> None:
+    checkpoint_path = tmp_path / "checkpoint.pt"
+    checkpoint_path.write_bytes(b"placeholder")
+    payload = _minimal_central_checkpoint_payload()
+
+    def fake_load(path, *, map_location, weights_only):
+        assert Path(path) == checkpoint_path
+        assert map_location == "cpu"
+        assert weights_only is True
+        return payload
+
+    monkeypatch.setattr(
+        "cos435_citylearn.algorithms.sac.checkpoints.torch.load",
+        fake_load,
+    )
+
+    loaded = safe_load_checkpoint_payload(checkpoint_path)
+    assert loaded == payload
+
+
+def test_validate_checkpoint_runner_compatibility_rejects_control_mode_mismatch() -> None:
+    payload = _minimal_central_checkpoint_payload()
+    payload["control_mode"] = "shared_dtde"
+    config = {
+        "algorithm": {
+            "name": "sac",
+            "control_mode": "centralized",
+        }
+    }
+
+    with pytest.raises(ValueError, match="control_mode"):
+        validate_checkpoint_runner_compatibility(payload, config)
+
+
+def test_validate_checkpoint_env_compatibility_rejects_schema_mismatch() -> None:
+    payload = _minimal_central_checkpoint_payload()
+
+    with pytest.raises(ValueError, match="observation schema"):
+        validate_checkpoint_env_compatibility(
+            payload,
+            observation_names=[["hour", "different_load"]],
+            action_names=[["battery"]],
+        )
 
 
 def test_centralized_checkpoint_roundtrip(tmp_path: Path) -> None:
