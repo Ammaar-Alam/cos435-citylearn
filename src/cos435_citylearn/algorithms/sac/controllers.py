@@ -734,6 +734,11 @@ class SharedSACController(RLC):
         }
 
     def load_checkpoint_state(self, payload: dict[str, Any]) -> None:
+        restored_time_step = int(payload["time_step"])
+        self._Environment__time_step = restored_time_step
+        self._Agent__actions = [
+            [[] for _ in range(restored_time_step + 1)] for _ in self.action_space
+        ]
         self.normalized = bool(payload["normalized"])
         self.norm_mean = (
             None if payload["norm_mean"] is None else np.asarray(payload["norm_mean"], dtype="float32")
