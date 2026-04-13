@@ -11,3 +11,8 @@ gym==0.26.2
 gymnasium==1.0.0
 matplotlib==3.10.8
 simplejson==3.20.2
+fastapi==0.115.13
+uvicorn[standard]==0.34.0
+httpx==0.28.1
+Pillow==12.2.0
+python-multipart==0.0.20

@@ -4,10 +4,15 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.npm/
+.npm-cache/
+.parcel-cache/
+.vite/
 .coverage
 htmlcov/
 build/
 dist/
+node_modules/
 *.egg-info/
 *.pyc
 *.pyo
@@ -35,3 +40,13 @@ results/figures/*
 
 results/manifests/*
 !results/manifests/.gitkeep
+
+results/ui_exports/*
+
+results/dashboard/*
+
+apps/dashboard/dist/
+apps/dashboard/node_modules/
+apps/dashboard/*.tsbuildinfo
+apps/dashboard/vite.config.js
+apps/dashboard/vite.config.d.ts
