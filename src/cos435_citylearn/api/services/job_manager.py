@@ -310,7 +310,8 @@ class JobManager:
 
         for job_id, return_code in finished:
             state = self._load_job(job_id)
-            state["finished_at"] = utc_now_iso()
+            finished_at = utc_now_iso()
+            state["finished_at"] = finished_at
             log_handle = self._log_handles.pop(job_id, None)
             if log_handle is not None:
                 log_handle.close()
@@ -318,19 +319,34 @@ class JobManager:
             self._processes.pop(job_id, None)
 
             if state["status"] == "cancelled":
-                pass
+                state["phase"] = "cancelled"
             elif return_code == 0 and self._job_result_path(job_id).exists():
                 result = json.loads(self._job_result_path(job_id).read_text())
                 state["status"] = "succeeded"
+                state["phase"] = "completed"
                 state["run_id"] = result.get("run_id")
                 state["average_score"] = result.get("average_score")
             else:
                 state["status"] = "failed"
+                state["phase"] = "failed"
                 if self._job_error_path(job_id).exists():
                     error_payload = json.loads(self._job_error_path(job_id).read_text())
                     state["error_message"] = error_payload.get("error")
 
             self._write_job(job_id, state)
+            self.state_store.write(
+                job_id,
+                {
+                    **(self.state_store.get(job_id) or {}),
+                    "job_id": job_id,
+                    "job_kind": "evaluation",
+                    "status": state["status"],
+                    "phase": state.get("phase") or state["status"],
+                    "heartbeat_at": finished_at,
+                    "latest_run_id": state.get("run_id"),
+                    "error_message": state.get("error_message"),
+                },
+            )
 
         self._drain_queue()
 

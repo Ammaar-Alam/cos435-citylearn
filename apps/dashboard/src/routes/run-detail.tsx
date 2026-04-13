@@ -39,12 +39,12 @@ export function RunDetailPage() {
   const [selectedBuildingIndex, setSelectedBuildingIndex] = useState(0);
 
   useInterval(() => {
-    if (!isPlaying || !playbackQuery.data?.payload?.time_steps) {
+    if (!isPlaying || !playbackQuery.data?.total_steps) {
       return;
     }
 
     setStepIndex((current) => {
-      const total = playbackQuery.data?.payload?.time_steps ?? 0;
+      const total = playbackQuery.data?.total_steps ?? 0;
       return current >= total - 1 ? 0 : current + 1;
     });
   }, isPlaying ? 400 : null);

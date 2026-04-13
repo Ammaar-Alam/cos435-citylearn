@@ -329,3 +329,69 @@ def test_drain_queue_marks_start_failures_failed(tmp_path: Path) -> None:
     assert state["status"] == "failed"
     assert not manager._queue
     assert any(event["event_type"] == "process_spawn_failed" for event in events)
+
+
+def test_refresh_mirrors_terminal_failure_into_state_store(tmp_path: Path) -> None:
+    class FinishedProcess:
+        def poll(self):
+            return 1
+
+    settings = build_test_settings(tmp_path)
+    manager = JobManager(settings)
+    job_id = "job_refresh_failure"
+    job_dir = settings.jobs_root / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+
+    write_json(
+        job_dir / "job.json",
+        {
+            "job_id": job_id,
+            "runner_id": "rbc_builtin",
+            "status": "running",
+            "submitted_at": "2026-04-12T00:00:00Z",
+            "started_at": "2026-04-12T00:00:10Z",
+            "finished_at": None,
+            "pid": 123,
+            "config_path": "config.yaml",
+            "eval_config_path": "eval.yaml",
+            "run_id": None,
+            "average_score": None,
+            "error_message": None,
+            "phase": "rollout",
+            "progress_current": 5,
+            "progress_total": 10,
+            "progress_label": "rollout",
+            "heartbeat_at": "2026-04-12T00:00:20Z",
+            "latest_preview_path": "preview.json",
+        },
+    )
+    manager.state_store.write(
+        job_id,
+        {
+            "job_id": job_id,
+            "job_kind": "evaluation",
+            "status": "running",
+            "phase": "rollout",
+            "progress_current": 5,
+            "progress_total": 10,
+            "progress_label": "rollout",
+            "heartbeat_at": "2026-04-12T00:00:20Z",
+            "latest_run_id": None,
+            "latest_preview_path": "preview.json",
+            "latest_checkpoint_id": None,
+            "latest_log_offset": None,
+            "error_message": None,
+        },
+    )
+    write_json(job_dir / "error.json", {"error": "worker exited early"})
+    manager._processes[job_id] = FinishedProcess()  # type: ignore[assignment]
+
+    manager.refresh()
+
+    state = manager.get_state(job_id)
+    job = manager.get_job(job_id)
+    assert job.status == "failed"
+    assert job.phase == "failed"
+    assert state["status"] == "failed"
+    assert state["phase"] == "failed"
+    assert state["error_message"] == "worker exited early"
