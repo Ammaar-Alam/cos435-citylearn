@@ -111,8 +111,8 @@ export function RunDetailPage() {
   const artifactRows = [
     { label: "poster", path: posterPath },
     { label: "gif playback", path: playback.payload?.media?.gif_path ?? getRunArtifactPath(summary, "gif") },
-    { label: "playback payload", path: getRunArtifactPath(summary, "playback") },
-    { label: "simulation export", path: getRunArtifactPath(summary, "simulation_export") },
+    { label: "playback payload", path: typeof detail.manifest.playback_path === "string" ? detail.manifest.playback_path : null },
+    { label: "simulation export", path: typeof detail.manifest.simulation_dir === "string" ? detail.manifest.simulation_dir : null },
   ]
     .filter((row): row is { label: string; path: string } => Boolean(row.path))
     .filter((row, index, array) => array.findIndex((candidate) => candidate.path === row.path) === index);
