@@ -5,11 +5,11 @@ env:
 algorithm:
   name: sac
   control_mode: centralized
-  variant: central_baseline
+  variant: central_reward_v3
   policy: gaussian_mlp
 
 reward:
-  version: reward_v0
+  version: reward_v3
 
 features:
   version: base_central_obs
@@ -39,7 +39,7 @@ evaluation:
   preview_stride: 12
 
 logging:
-  run_group: sac_baseline
+  run_group: sac_reward_sweep
   output_root: results/runs
   metrics_root: results/metrics
   manifests_root: results/manifests

@@ -2,7 +2,7 @@
 
 Generalizable RL for neighborhood battery control in CityLearn.
 
-This repository contains the shared benchmark foundation for the COS435 / ECE433 final project. The CityLearn environment, official 2023 dataset download flow, schema export, smoke path, and built-in RBC baseline are all wired here. PPO, SAC, and custom methods come later on top of this base.
+This repository contains the shared benchmark foundation for the COS435 / ECE433 final project. The CityLearn environment, official 2023 dataset download flow, schema export, smoke path, built-in RBC baseline, and repo-local SAC runners are wired here. PPO remains a config contract for later work.
 
 ## overview
 
@@ -19,6 +19,9 @@ Foundation in this repo now has:
 - observation/action schema export
 - random rollout smoke coverage
 - built-in RBC evaluation path with metric export
+- centralized native-SAC baseline with checkpoint export
+- parameter-shared decentralized SAC with shared district context
+- repo-local reward ladder for SAC (`reward_v0` through `reward_v3`)
 - default simulation-data export for completed evaluation runs
 - local dashboard backend and frontend for launch, playback, and comparison
 - lightweight non-benchmark tests for the shared scaffold
@@ -56,6 +59,8 @@ make download-citylearn
 make env-schema
 make smoke
 make train-rbc
+make train-sac
+make train-sac-shared
 ```
 
 ## benchmark target
@@ -81,6 +86,8 @@ make download-citylearn
 make env-schema
 make smoke
 make train-rbc
+make train-sac
+make train-sac-shared
 make dashboard-install
 make dashboard-build
 make dashboard-backend
@@ -109,6 +116,7 @@ results/    generated manifests, metrics, and run artifacts stay out of git
 4. `make env-schema`
 5. `make smoke`
 6. `make train-rbc`
+7. `make train-sac`
 
 `make env-schema` writes:
 - `results/manifests/environment_lock.json`
@@ -120,6 +128,14 @@ results/    generated manifests, metrics, and run artifacts stay out of git
 - a flat CSV row in `results/metrics/`
 - a `SimulationData/<run_id>/` export under `results/ui_exports/`
 - a playback payload under `results/ui_exports/playback/`
+
+`make train-sac` and `make train-sac-shared` write:
+- a run directory under `results/runs/`
+- JSON metrics plus a flat CSV row in `results/metrics/`
+- `checkpoint.pt` for later deterministic evaluation
+- `training_curve.csv` with step-level optimization stats
+- a `rollout_trace.json` preview trace
+- a `SimulationData/<run_id>/` export and playback payload for completed full evaluations
 
 You can validate the exported `SimulationData/...` tree against the official CityLearn UI upload contract with:
 
@@ -178,11 +194,14 @@ make dashboard-backend
 
 The dashboard currently supports:
 - launching the built-in RBC benchmark from the UI
+- launching the centralized SAC baseline from the UI
+- launching the shared SAC `reward_v2` runner from the UI
 - watching live preview payloads and worker logs while the benchmark job runs
 - listing discovered runs from `results/runs/`
 - inspecting one run with synchronized metrics, trace playback, and render media
 - comparing multiple runs side by side
 - importing playback payloads or other artifacts into a local registry
 - inspecting imported playback payloads directly in the UI
+- importing SAC checkpoints and evaluating them through a checkpoint-capable runner
 
-The dashboard does not pretend PPO or SAC exist yet. Those presets appear as config contracts until their runners are implemented. Imported checkpoints can be registered now, but they are not locally evaluable until a checkpoint-capable runner exists.
+PPO is still a config contract only. The dashboard intentionally exposes only the two launchable SAC runners instead of every config variant in `configs/train/sac/`.

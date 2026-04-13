@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from cos435_citylearn.api.workloads.eval_builtin_rbc import run as run_eval_builtin_rbc
+from cos435_citylearn.api.workloads.eval_sac_checkpoint import run as run_eval_sac_checkpoint
 
 WORKLOADS = {
     "eval_builtin_rbc": run_eval_builtin_rbc,
+    "eval_sac_checkpoint": run_eval_sac_checkpoint,
 }
 
 
