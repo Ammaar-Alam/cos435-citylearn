@@ -262,9 +262,32 @@ class JobManager:
             daemon=True,
         ).start()
         state["status"] = "running"
-        state["started_at"] = utc_now_iso()
+        started_at = utc_now_iso()
+        state["started_at"] = started_at
         state["pid"] = process.pid
+        state["phase"] = "starting"
+        state["progress_label"] = "starting worker"
         self._write_job(job_id, state)
+        previous_state = self.state_store.get(job_id) or {}
+        self.state_store.write(
+            job_id,
+            {
+                **previous_state,
+                "job_id": job_id,
+                "job_kind": "evaluation",
+                "status": "running",
+                "phase": "starting",
+                "progress_current": 0,
+                "progress_total": None,
+                "progress_label": "starting worker",
+                "heartbeat_at": started_at,
+                "latest_run_id": state.get("run_id"),
+                "latest_preview_path": state.get("latest_preview_path"),
+                "latest_checkpoint_id": previous_state.get("latest_checkpoint_id"),
+                "latest_log_offset": previous_state.get("latest_log_offset"),
+                "error_message": None,
+            },
+        )
         self.event_store.append(
             job_id,
             {

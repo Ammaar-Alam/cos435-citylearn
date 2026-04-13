@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -329,6 +330,92 @@ def test_drain_queue_marks_start_failures_failed(tmp_path: Path) -> None:
     assert state["status"] == "failed"
     assert not manager._queue
     assert any(event["event_type"] == "process_spawn_failed" for event in events)
+
+
+def test_start_marks_live_state_running_before_worker_progress(tmp_path: Path) -> None:
+    class DummyProcess:
+        pid = 4242
+
+        def poll(self):
+            return None
+
+        def wait(self):
+            return 0
+
+    class DummyThread:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def start(self) -> None:
+            return None
+
+    settings = build_test_settings(tmp_path)
+    manager = JobManager(settings)
+    job_id = "job_starting"
+    job_dir = settings.jobs_root / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+
+    write_json(job_dir / "request.json", {"job_id": job_id})
+    write_json(
+        job_dir / "job.json",
+        {
+            "job_id": job_id,
+            "runner_id": "rbc_builtin",
+            "status": "queued",
+            "submitted_at": "2026-04-12T00:00:00Z",
+            "started_at": None,
+            "finished_at": None,
+            "pid": None,
+            "config_path": "config.yaml",
+            "eval_config_path": "eval.yaml",
+            "run_id": None,
+            "average_score": None,
+            "error_message": None,
+            "phase": "queued",
+            "progress_current": None,
+            "progress_total": None,
+            "progress_label": None,
+            "heartbeat_at": None,
+            "latest_preview_path": None,
+        },
+    )
+    manager.state_store.write(
+        job_id,
+        {
+            "job_id": job_id,
+            "job_kind": "evaluation",
+            "status": "queued",
+            "phase": "queued",
+            "progress_current": 0,
+            "progress_total": None,
+            "progress_label": "queued",
+            "heartbeat_at": "2026-04-12T00:00:00Z",
+            "latest_run_id": None,
+            "latest_preview_path": None,
+            "latest_checkpoint_id": None,
+            "latest_log_offset": None,
+            "error_message": None,
+        },
+    )
+
+    with (
+        patch("cos435_citylearn.api.services.job_manager.subprocess.Popen", return_value=DummyProcess()),
+        patch("cos435_citylearn.api.services.job_manager.threading.Thread", DummyThread),
+    ):
+        manager._start(job_id, manager._load_job(job_id))
+
+    state = manager.get_state(job_id)
+    job = manager.get_job(job_id)
+    events = manager.get_events(job_id)
+
+    assert job.status == "running"
+    assert job.phase == "starting"
+    assert job.pid == 4242
+    assert state["status"] == "running"
+    assert state["phase"] == "starting"
+    assert state["progress_current"] == 0
+    assert state["progress_label"] == "starting worker"
+    assert any(event["event_type"] == "process_spawned" for event in events)
 
 
 def test_refresh_mirrors_terminal_failure_into_state_store(tmp_path: Path) -> None:
