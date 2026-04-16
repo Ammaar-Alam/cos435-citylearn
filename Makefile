@@ -37,6 +37,9 @@ train-rbc:
 train-sac:
 	COS435_REQUIRE_DATA=1 MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/train/run_sac.py --config configs/train/sac/sac_central_baseline.yaml --eval-config configs/eval/default.yaml
 
+train-ppo:
+	COS435_REQUIRE_DATA=1 MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/train/run_ppo.py --config configs/train/ppo/ppo_central_baseline.yaml --eval-config configs/eval/default.yaml
+
 train-sac-shared:
 	COS435_REQUIRE_DATA=1 MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/train/run_sac.py --config configs/train/sac/sac_shared_dtde_reward_v2.yaml --eval-config configs/eval/default.yaml
 
