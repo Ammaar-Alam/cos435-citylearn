@@ -4,12 +4,12 @@ env:
 
 algorithm:
   name: ppo
-  variant: ppo_central_baseline
+  variant: ppo_central_reward_v1
   control_mode: centralized
   policy: gaussian_mlp
 
 reward:
-  version: reward_v0
+  version: reward_v1
 
 features:
   version: base_central_obs
@@ -23,7 +23,9 @@ training:
 evaluation:
   deterministic: true
   eval_episodes: 1
+  save_rollout_trace: true
+  trace_limit: 96
 
 logging:
-  run_group: ppo_baseline
+  run_group: ppo_reward_v1
   output_root: results/runs
