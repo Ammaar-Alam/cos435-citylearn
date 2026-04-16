@@ -12,7 +12,7 @@
   "api_url": "https://dataverse.tdl.org/api/datasets/:persistentId/?persistentId=doi:10.18738/T8/SXFWTI",
   "dataset_doi": "doi:10.18738/T8/SXFWTI",
   "default_dataset": "citylearn_challenge_2023_phase_2_local_evaluation",
-  "download_root": "/Users/alam/GitHub/cos435-citylearn/data/external/citylearn_2023",
+  "download_root": "/Users/erikdyer/Documents/Obsidian Vault/Classes/S2026/COS435/Final Project/cos435-citylearn/data/external/citylearn_2023",
   "downloaded_datasets": [
     "citylearn_challenge_2023_phase_2_local_evaluation"
   ],
@@ -119,7 +119,7 @@
       "status": "downloaded"
     }
   ],
-  "generated_at": "2026-04-11T22:35:11.003245+00:00",
+  "generated_at": "2026-04-16T00:35:59.238057+00:00",
   "persistent_url": "https://doi.org/10.18738/T8/SXFWTI",
   "publication_date": "2024-02-03",
   "version_minor_number": 1,

@@ -4,8 +4,8 @@ env:
 
 algorithm:
   name: ppo
-  variant: ppo_central_baseline
   control_mode: centralized
+  variant: ppo_central_smoke
   policy: gaussian_mlp
 
 reward:
@@ -15,7 +15,7 @@ features:
   version: base_central_obs
 
 training:
-  total_timesteps: 250000
+  total_timesteps: 4096
   seed: 0
   rollout_steps: 2048
   learning_rate: 0.0003
@@ -25,5 +25,5 @@ evaluation:
   eval_episodes: 1
 
 logging:
-  run_group: ppo_baseline
+  run_group: ppo_smoke
   output_root: results/runs
