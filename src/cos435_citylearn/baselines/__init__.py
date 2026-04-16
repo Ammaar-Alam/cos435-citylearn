@@ -6,4 +6,10 @@ def run_sac(*args, **kwargs):
 
     return _run_sac(*args, **kwargs)
 
-__all__ = ["run_rbc", "run_sac"]
+
+def run_ppo(*args, **kwargs):
+    from cos435_citylearn.baselines.ppo import run_ppo as _run_ppo
+
+    return _run_ppo(*args, **kwargs)
+
+__all__ = ["run_rbc", "run_sac", "run_ppo"]
