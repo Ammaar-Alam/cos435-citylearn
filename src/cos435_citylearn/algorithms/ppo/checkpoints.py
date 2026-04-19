@@ -7,7 +7,10 @@ import torch
 
 from cos435_citylearn.algorithms.ppo.shared_features import SHARED_CONTEXT_V2_DIMENSION
 
+SUPPORTED_FORMAT_VERSIONS = {1}
+
 REQUIRED_CHECKPOINT_KEYS = {
+    "format_version",
     "algorithm",
     "control_mode",
     "controller_state",
@@ -26,18 +29,26 @@ COMMON_CONTROLLER_STATE_KEYS = {
     "gae_lambda",
     "ent_coef",
     "vf_coef",
+    "max_grad_norm",
     "rollout_steps",
+    "reward_scaling",
     "shared_context_dimension",
     "shared_context_version",
+    "normalize_observations",
+    "normalize_rewards",
+    "target_kl",
     "policy_state_dict",
     "value_state_dict",
     "policy_optimizer_state_dict",
     "value_optimizer_state_dict",
     "obs_rms_mean",
     "obs_rms_var",
+    "obs_rms_count",
     "reward_rms_mean",
     "reward_rms_var",
+    "reward_rms_count",
     "time_step",
+    "total_updates",
 }
 
 
@@ -59,6 +70,13 @@ def validate_ppo_checkpoint_payload_structure(payload: Any) -> None:
     if missing:
         raise ValueError(
             f"PPO checkpoint payload missing required keys: {', '.join(missing)}"
+        )
+
+    format_version = payload["format_version"]
+    if format_version not in SUPPORTED_FORMAT_VERSIONS:
+        raise ValueError(
+            f"unsupported PPO checkpoint format_version: {format_version}. "
+            f"supported versions: {sorted(SUPPORTED_FORMAT_VERSIONS)}"
         )
 
     if payload["algorithm"] != "ppo":

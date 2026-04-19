@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import json
+import sys
 from collections import deque
 from pathlib import Path
 from typing import Any
@@ -320,7 +321,7 @@ def run_ppo(
                 label=f"{variant} training",
             )
 
-        print(f"Training PPO for {total_timesteps} timesteps...")
+        print(f"Training PPO for {total_timesteps} timesteps...", file=sys.stderr)
         log_callback = TrainingLogCallback(
             progress_context=progress_context,
             total_timesteps=total_timesteps,
@@ -379,7 +380,7 @@ def run_ppo(
         imported_model_path, imported_vec_path = _resolve_artifact_paths(
             artifact_id, resolved_root
         )
-        print(f"Loading PPO artifact '{artifact_id}' from {imported_model_path}")
+        print(f"Loading PPO artifact '{artifact_id}' from {imported_model_path}", file=sys.stderr)
         model = PPO.load(str(imported_model_path))
 
         # copy artifacts into this run's dir so it's self-contained
@@ -395,7 +396,8 @@ def run_ppo(
         else:
             print(
                 f"Warning: no topology.json for artifact '{artifact_id}'; "
-                "skipping PPO preflight check"
+                "skipping PPO preflight check",
+                file=sys.stderr,
             )
 
         # write empty training curve for consistency
@@ -405,7 +407,7 @@ def run_ppo(
             writer.writeheader()
 
     # --- evaluate on a fresh env with saved normalization stats ---
-    print("Evaluating trained PPO agent...")
+    print("Evaluating trained PPO agent...", file=sys.stderr)
     eval_reward_function = resolve_reward_function(reward_version)
     eval_bundle = make_citylearn_env(
         config["env"]["base_config"],
@@ -543,7 +545,7 @@ def run_ppo(
             label="training curve",
         )
 
-    print(f"Average score: {metrics_payload['average_score']}")
+    print(f"Average score: {metrics_payload['average_score']}", file=sys.stderr)
 
     return {
         "run_dir": str(run_dir),

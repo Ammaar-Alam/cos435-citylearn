@@ -20,4 +20,7 @@ def run(request: dict[str, Any], context) -> dict[str, Any]:
         job_id=request["job_id"],
         job_dir=Path(request["job_dir"]),
         progress_context=context,
+        split_override=request.get("split_override"),
+        seed_override=request.get("seed_override"),
+        lr_override=request.get("lr_override"),
     )

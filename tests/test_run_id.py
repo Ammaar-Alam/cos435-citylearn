@@ -15,6 +15,21 @@ def test_build_run_id_matches_repo_contract() -> None:
     assert run_id == "sac__central_baseline__public_dev__seed3__20260411_231000"
 
 
+def test_build_run_id_without_lr_keeps_legacy_format() -> None:
+    # explicit lr=None must match pre-sweep format so old SAC checkpoints resolve
+    run_id = build_run_id(
+        algo="sac",
+        variant="central_baseline",
+        split="public_dev",
+        seed=3,
+        now=datetime(2026, 4, 11, 23, 10, 0),
+        lr=None,
+    )
+
+    assert "__lr" not in run_id
+    assert run_id == "sac__central_baseline__public_dev__seed3__20260411_231000"
+
+
 def test_build_run_id_includes_lr_when_provided() -> None:
     run_id = build_run_id(
         algo="ppo",

@@ -8,8 +8,9 @@
 #SBATCH --output=/u/%u/cos435-citylearn/results/sweep/rerun-%A_%a.out
 #SBATCH --error=/u/%u/cos435-citylearn/results/sweep/rerun-%A_%a.out
 
-# re-runs phase_3_{1,2,3} evals for the 20 ppo cells whose first
-# eval attempt failed because the datasets hadn't been downloaded yet.
+# re-runs phase_3_{1,2,3} evals for the 20 cells of a single algo whose
+# first eval attempt failed (e.g. because datasets weren't downloaded yet).
+# default algo is ppo; override with: sbatch --export=ALGO=sac,ALL rerun_evals.slurm
 # array decomposition:
 #   lr_idx = TASK_ID / 10   (0=1e-4, 1=3e-4)
 #   seed   = TASK_ID % 10
@@ -17,6 +18,7 @@
 set -euo pipefail
 
 ROOT_DIR="/u/${USER}/cos435-citylearn"
+ALGO="${ALGO:-ppo}"
 
 LRS=(1e-4 3e-4)
 TASK_ID=$SLURM_ARRAY_TASK_ID
@@ -24,5 +26,5 @@ LR_IDX=$(( TASK_ID / 10 ))
 SEED=$(( TASK_ID % 10 ))
 LR="${LRS[$LR_IDX]}"
 
-echo "rerun task $TASK_ID: algo=ppo lr=$LR seed=$SEED on $(hostname)"
-bash "$ROOT_DIR/scripts/cluster/rerun_eval_cell.sh" ppo "$LR" "$SEED"
+echo "rerun task $TASK_ID: algo=$ALGO lr=$LR seed=$SEED on $(hostname)"
+bash "$ROOT_DIR/scripts/cluster/rerun_eval_cell.sh" "$ALGO" "$LR" "$SEED"

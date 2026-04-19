@@ -11,6 +11,7 @@ from cos435_citylearn.algorithms.ppo.checkpoints import (
 
 def _minimal_payload() -> dict[str, object]:
     return {
+        "format_version": 1,
         "algorithm": "ppo",
         "control_mode": "shared_dtde",
         "observation_names": [["hour", "load"]] * 3,
@@ -26,18 +27,26 @@ def _minimal_payload() -> dict[str, object]:
             "gae_lambda": 0.95,
             "ent_coef": 0.0,
             "vf_coef": 0.5,
+            "max_grad_norm": 0.5,
             "rollout_steps": 32,
+            "reward_scaling": 1.0,
             "shared_context_dimension": 4,
             "shared_context_version": "v2",
+            "normalize_observations": True,
+            "normalize_rewards": True,
+            "target_kl": None,
             "policy_state_dict": {},
             "value_state_dict": {},
             "policy_optimizer_state_dict": {},
             "value_optimizer_state_dict": {},
             "obs_rms_mean": None,
             "obs_rms_var": None,
+            "obs_rms_count": 0.0,
             "reward_rms_mean": 0.0,
             "reward_rms_var": None,
+            "reward_rms_count": 0.0,
             "time_step": 0,
+            "total_updates": 0,
         },
     }
 
@@ -65,6 +74,13 @@ def test_structure_validator_rejects_v1_context() -> None:
     payload = _minimal_payload()
     payload["controller_state"]["shared_context_version"] = "v1"
     with pytest.raises(ValueError, match="v2"):
+        validate_ppo_checkpoint_payload_structure(payload)
+
+
+def test_structure_validator_rejects_unknown_format_version() -> None:
+    payload = _minimal_payload()
+    payload["format_version"] = 99
+    with pytest.raises(ValueError, match="format_version"):
         validate_ppo_checkpoint_payload_structure(payload)
 
 
