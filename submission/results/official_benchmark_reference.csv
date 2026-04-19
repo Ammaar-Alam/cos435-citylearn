@@ -1,0 +1,6 @@
+method_id,method_label,split_type,average_score,source_note
+official_rbc_public,Official RBC baseline (public),official_public,1.085,CityLearn 2023 winning paper Table 1
+official_rbc_private,Official RBC baseline (private),official_private,1.124,CityLearn 2023 winning paper Table 1
+official_chesca_public,Official CHESCA winner (public),official_public,0.562,CityLearn 2023 winning paper Table 1
+official_chesca_private,Official CHESCA winner (private),official_private,0.565,CityLearn 2023 winning paper Table 1
+official_chesca_star_private,Official CHESCA* post-deadline (private),official_private,0.548,CityLearn 2023 winning paper Table 1
