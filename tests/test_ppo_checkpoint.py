@@ -106,3 +106,27 @@ def test_env_compatibility_rejects_action_schema_mismatch() -> None:
         validate_ppo_checkpoint_env_compatibility(
             payload, observation_names=env_obs, action_names=env_act
         )
+
+
+def test_env_compatibility_rejects_non_first_building_action_drift() -> None:
+    # checkpoint buildings consistent, env building 2 differs -> must catch
+    payload = _minimal_payload()
+    payload["action_names"] = [["battery"]] * 3
+    env_obs = [["hour", "load"]] * 6
+    env_act = [["battery"], ["battery"], ["heat_pump"], ["battery"], ["battery"], ["battery"]]
+    with pytest.raises(ValueError, match="inconsistent per-building action schemas"):
+        validate_ppo_checkpoint_env_compatibility(
+            payload, observation_names=env_obs, action_names=env_act
+        )
+
+
+def test_env_compatibility_rejects_checkpoint_action_inconsistency() -> None:
+    # checkpoint itself has drift across buildings
+    payload = _minimal_payload()
+    payload["action_names"] = [["battery"], ["heat_pump"], ["battery"]]
+    env_obs = [["hour", "load"]] * 6
+    env_act = [["battery"]] * 6
+    with pytest.raises(ValueError, match="inconsistent per-building action schemas"):
+        validate_ppo_checkpoint_env_compatibility(
+            payload, observation_names=env_obs, action_names=env_act
+        )

@@ -451,6 +451,7 @@ def run_sac(
         variant=variant,
         split=config["env"]["split"],
         seed=env_bundle.seed,
+        lr=float(config["training"]["learning_rate"]),
     )
     run_root = RESULTS_DIR / "runs" if output_root is None else Path(output_root)
     metrics_dir = (

@@ -259,6 +259,7 @@ def run_ppo(
         variant=variant,
         split=config["env"]["split"],
         seed=seed,
+        lr=float(config["training"]["learning_rate"]),
     )
     run_root = RESULTS_DIR / "runs" if output_root is None else Path(output_root)
     metrics_dir = (
@@ -949,6 +950,7 @@ def _run_shared_ppo(
         variant=variant,
         split=config["env"]["split"],
         seed=env_bundle.seed,
+        lr=float(config["training"]["learning_rate"]),
     )
     run_root = RESULTS_DIR / "runs" if output_root is None else Path(output_root)
     metrics_dir = (

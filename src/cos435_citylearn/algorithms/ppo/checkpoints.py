@@ -155,8 +155,19 @@ def validate_ppo_checkpoint_env_compatibility(
             "the two datasets expose different building features."
         )
 
+    if not checkpoint_action_names or not env_action_names:
+        raise ValueError(
+            "shared PPO checkpoint requires non-empty action schema on both sides"
+        )
     ckpt_per_building_act = checkpoint_action_names[0]
     env_per_building_act = env_action_names[0]
+    if any(list(b) != ckpt_per_building_act for b in checkpoint_action_names):
+        raise ValueError("shared PPO checkpoint has inconsistent per-building action schemas")
+    if any(list(b) != env_per_building_act for b in env_action_names):
+        raise ValueError(
+            "target env has inconsistent per-building action schemas; "
+            "shared PPO requires identical buildings"
+        )
     if list(ckpt_per_building_act) != list(env_per_building_act):
         raise ValueError(
             "shared PPO checkpoint per-building action schema does not match target env."

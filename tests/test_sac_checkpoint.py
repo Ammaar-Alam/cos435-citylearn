@@ -254,6 +254,19 @@ def test_validate_checkpoint_env_compatibility_rejects_shared_per_building_misma
         )
 
 
+def test_shared_checkpoint_rejects_non_first_building_action_drift() -> None:
+    # env buildings[2] diverges -> previous code compared only [0] so would pass silently
+    payload = _minimal_shared_checkpoint_payload()
+    payload["action_names"] = [["battery"]]
+    env_obs = [["hour", "load"]] * 6
+    env_act = [["battery"], ["battery"], ["heat_pump"], ["battery"], ["battery"], ["battery"]]
+
+    with pytest.raises(ValueError, match="inconsistent per-building action schemas"):
+        validate_checkpoint_env_compatibility(
+            payload, observation_names=env_obs, action_names=env_act
+        )
+
+
 def test_validate_checkpoint_payload_structure_rejects_missing_shared_context_dimension() -> None:
     payload = _minimal_shared_checkpoint_payload()
     del payload["controller_state"]["shared_context_dimension"]

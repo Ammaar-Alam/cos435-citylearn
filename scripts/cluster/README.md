@@ -15,12 +15,14 @@ cd /u/$USER/cos435-citylearn
 bash scripts/cluster/setup_neuronic.sh
 ```
 
-By default this checks out `feat/ppo-baseline`. Override the branch
-after merge with `BRANCH=main bash scripts/cluster/setup_neuronic.sh`.
+By default this checks out `main`. Override with
+`BRANCH=<branch-name> bash scripts/cluster/setup_neuronic.sh` to run
+the sweep from a feature branch.
 
 The script installs the venv via `uv` (which downloads Python 3.10
-automatically), pulls the CityLearn 2023 dataset, and validates the
-env schema.
+automatically), pulls the CityLearn 2023 phase_2_local_evaluation
+(public_dev training) and phase_3_{1,2,3} (cross-topology eval)
+datasets, and validates the env schema.
 
 Note: we use `/u/$USER/` (NFS-shared home) instead of `/scratch/` because
 `/scratch` is node-local on Neuronic — compute nodes can't see files
@@ -63,6 +65,9 @@ When the array completes:
 python scripts/cluster/aggregate_sweep.py
 cat results/sweep/summary.csv
 ```
+
+This fails loudly if any expected cell or split is missing. To force
+a partial aggregation pass `--allow-missing`.
 
 The CSV has one row per (algo, lr, seed, split) with the
 `average_score` from that cell. Group by `(algo, lr, split)` for

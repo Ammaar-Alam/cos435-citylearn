@@ -13,3 +13,30 @@ def test_build_run_id_matches_repo_contract() -> None:
     )
 
     assert run_id == "sac__central_baseline__public_dev__seed3__20260411_231000"
+
+
+def test_build_run_id_includes_lr_when_provided() -> None:
+    run_id = build_run_id(
+        algo="ppo",
+        variant="shared_dtde_reward_v2",
+        split="public_dev",
+        seed=0,
+        now=datetime(2026, 4, 11, 23, 10, 0),
+        lr=1e-4,
+    )
+
+    assert run_id == "ppo__shared_dtde_reward_v2__public_dev__seed0__lr0p0001__20260411_231000"
+
+
+def test_build_run_id_distinguishes_sweep_lrs() -> None:
+    kwargs = dict(
+        algo="ppo",
+        variant="shared_dtde_reward_v2",
+        split="public_dev",
+        seed=0,
+        now=datetime(2026, 4, 11, 23, 10, 0),
+    )
+    a = build_run_id(lr=1e-4, **kwargs)
+    b = build_run_id(lr=3e-4, **kwargs)
+
+    assert a != b
