@@ -1,0 +1,5 @@
+variant,run_id,average_score,delta_vs_central_baseline,delta_vs_best_sac,delta_vs_local_rbc,district_cost_total,district_carbon_emissions_total,district_daily_peak_average,district_discomfort_proportion,district_one_minus_thermal_resilience_proportion
+central_reward_v2,sac__central_reward_v2__public_dev__seed0__20260419_115431,0.520719,-0.023426,0.0,-0.5019,0.815587,0.842005,0.759656,0.018059,0.277778
+central_reward_v1,sac__central_reward_v1__public_dev__seed0__20260419_085859,0.529279,-0.014866,0.00856,-0.493339,0.822227,0.84964,0.76799,0.017283,0.252381
+central_baseline,sac__central_baseline__public_dev__seed0__20260419_025928,0.544145,0.0,0.023426,-0.478474,0.894344,0.906864,0.928021,0.012442,0.184127
+shared_dtde_reward_v2,sac__shared_dtde_reward_v2__public_dev__seed0__20260419_055829,0.584087,0.039942,0.063368,-0.438532,0.808492,0.827326,0.865898,0.022725,0.346032
