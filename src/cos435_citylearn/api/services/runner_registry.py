@@ -76,6 +76,18 @@ RUNNERS: dict[str, RunnerSpec] = {
         eval_config_path="configs/eval/default.yaml",
         supports_checkpoint_eval=True,
     ),
+    "ppo_shared_dtde_reward_v2": RunnerSpec(
+        runner_id="ppo_shared_dtde_reward_v2",
+        label="Shared PPO Reward v2",
+        algorithm="ppo",
+        variant="ppo_shared_dtde_reward_v2",
+        description="Parameter-shared decentralized PPO with count-invariant district context and reward_v2",
+        callable_path="cos435_citylearn.baselines.ppo.run_ppo",
+        workload_id="eval_ppo_checkpoint",
+        config_path="configs/train/ppo/ppo_shared_dtde_reward_v2.yaml",
+        eval_config_path="configs/eval/default.yaml",
+        supports_checkpoint_eval=True,
+    ),
 }
 
 
