@@ -193,13 +193,58 @@ def validate_checkpoint_env_compatibility(
 ) -> None:
     checkpoint_observation_names = checkpoint_payload["observation_names"]
     checkpoint_action_names = checkpoint_payload["action_names"]
+    control_mode = checkpoint_payload.get("control_mode", "<unknown>")
+    env_observation_names = list(observation_names)
+    env_action_names = list(action_names)
 
-    if list(observation_names) != checkpoint_observation_names:
+    if control_mode == "shared_dtde":
+        # Shared policies are topology-invariant: the number of buildings can differ
+        # as long as the per-building observation/action schemas match.
+        if not checkpoint_observation_names or not env_observation_names:
+            raise ValueError("shared_dtde checkpoint requires non-empty observation schema on both sides")
+        ckpt_per_building = checkpoint_observation_names[0]
+        env_per_building = env_observation_names[0]
+        if any(list(b) != ckpt_per_building for b in checkpoint_observation_names):
+            raise ValueError("shared_dtde checkpoint has inconsistent per-building observation schemas")
+        if any(list(b) != env_per_building for b in env_observation_names):
+            raise ValueError("target env has inconsistent per-building observation schemas; shared_dtde requires identical buildings")
+        if list(ckpt_per_building) != list(env_per_building):
+            raise ValueError(
+                "shared_dtde checkpoint per-building observation schema does not match target env; "
+                "the two datasets expose different building features."
+            )
+        ckpt_action_per_building = checkpoint_action_names[0]
+        env_action_per_building = env_action_names[0]
+        if list(ckpt_action_per_building) != list(env_action_per_building):
+            raise ValueError(
+                "shared_dtde checkpoint per-building action schema does not match target env."
+            )
+        return
+
+    if env_observation_names != checkpoint_observation_names:
+        ckpt_n = len(checkpoint_observation_names)
+        env_n = len(env_observation_names)
+        if ckpt_n != env_n:
+            raise ValueError(
+                f"checkpoint was trained on {ckpt_n} buildings but target env has {env_n} "
+                f"(control_mode={control_mode}). centralized checkpoints cannot cross building counts; "
+                "use a sac_shared_dtde_* checkpoint for cross-topology eval."
+            )
         raise ValueError(
-            "checkpoint observation schema is incompatible with the selected runner config"
+            f"checkpoint observation schema is incompatible with the selected runner config "
+            f"(control_mode={control_mode})"
         )
 
-    if list(action_names) != checkpoint_action_names:
+    if env_action_names != checkpoint_action_names:
+        ckpt_n = len(checkpoint_action_names)
+        env_n = len(env_action_names)
+        if ckpt_n != env_n:
+            raise ValueError(
+                f"checkpoint was trained on {ckpt_n} buildings but target env has {env_n} "
+                f"(control_mode={control_mode}). centralized checkpoints cannot cross building counts; "
+                "use a sac_shared_dtde_* checkpoint for cross-topology eval."
+            )
         raise ValueError(
-            "checkpoint action schema is incompatible with the selected runner config"
+            f"checkpoint action schema is incompatible with the selected runner config "
+            f"(control_mode={control_mode})"
         )

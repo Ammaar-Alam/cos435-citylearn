@@ -219,6 +219,41 @@ def test_validate_checkpoint_env_compatibility_rejects_schema_mismatch() -> None
         )
 
 
+def test_validate_checkpoint_env_compatibility_rejects_building_count_mismatch_for_central() -> None:
+    """Central checkpoints must fail loudly when eval env has more buildings."""
+    payload = _minimal_central_checkpoint_payload()  # 1-building checkpoint
+
+    with pytest.raises(ValueError, match="trained on 1 buildings but target env has 2"):
+        validate_checkpoint_env_compatibility(
+            payload,
+            observation_names=[["hour", "load"], ["hour", "load"]],
+            action_names=[["battery"], ["battery"]],
+        )
+
+
+def test_validate_checkpoint_env_compatibility_allows_shared_building_count_change() -> None:
+    """Shared checkpoints are topology-invariant: 1->3 buildings must pass."""
+    payload = _minimal_shared_checkpoint_payload()  # 1-building checkpoint
+
+    validate_checkpoint_env_compatibility(
+        payload,
+        observation_names=[["hour", "load"], ["hour", "load"], ["hour", "load"]],
+        action_names=[["battery"], ["battery"], ["battery"]],
+    )
+
+
+def test_validate_checkpoint_env_compatibility_rejects_shared_per_building_mismatch() -> None:
+    """Shared checkpoints must still fail when per-building schemas differ."""
+    payload = _minimal_shared_checkpoint_payload()
+
+    with pytest.raises(ValueError, match="per-building observation schema"):
+        validate_checkpoint_env_compatibility(
+            payload,
+            observation_names=[["hour", "solar"]],  # different feature set
+            action_names=[["battery"]],
+        )
+
+
 def test_validate_checkpoint_payload_structure_rejects_missing_shared_context_dimension() -> None:
     payload = _minimal_shared_checkpoint_payload()
     del payload["controller_state"]["shared_context_dimension"]

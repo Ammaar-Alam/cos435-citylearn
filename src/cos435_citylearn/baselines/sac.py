@@ -16,7 +16,7 @@ from cos435_citylearn.algorithms.sac import (
     validate_checkpoint_env_compatibility,
     validate_checkpoint_runner_compatibility,
 )
-from cos435_citylearn.config import load_yaml, resolve_path
+from cos435_citylearn.config import assert_training_allowed_on_split, load_yaml, resolve_path
 from cos435_citylearn.env import (
     CentralizedEnvAdapter,
     PerBuildingEnvAdapter,
@@ -122,7 +122,8 @@ def _instantiate_controller_from_checkpoint(
             **common_kwargs,
         )
     else:
-        raise ValueError(f"unknown SAC checkpoint controller type: {controller_state['controller_type']}")
+        controller_type = controller_state["controller_type"]
+        raise ValueError(f"unknown SAC checkpoint controller type: {controller_type}")
 
     controller.reset()
     controller.load_checkpoint_state(controller_state)
@@ -176,14 +177,20 @@ def _load_imported_checkpoint(
     imported_artifacts_root: str | Path | None,
     artifacts_root: str | Path | None,
 ) -> tuple[Path, dict[str, Any]]:
-    if imported_artifacts_root is None or artifacts_root is None:
-        raise ValueError("checkpoint evaluation requires imported_artifacts_root and artifacts_root")
-
-    checkpoint_path = resolve_imported_checkpoint_path(
-        artifact_id=artifact_id,
-        imported_artifacts_root=imported_artifacts_root,
-        artifacts_root=artifacts_root,
-    )
+    if imported_artifacts_root is None and artifacts_root is None:
+        checkpoint_path = RESULTS_DIR / "runs" / artifact_id / "checkpoint.pt"
+        if not checkpoint_path.exists():
+            raise FileNotFoundError(f"SAC checkpoint not found for artifact: {checkpoint_path}")
+    else:
+        if imported_artifacts_root is None or artifacts_root is None:
+            raise ValueError(
+                "imported_artifacts_root and artifacts_root must both be set or both be None"
+            )
+        checkpoint_path = resolve_imported_checkpoint_path(
+            artifact_id=artifact_id,
+            imported_artifacts_root=imported_artifacts_root,
+            artifacts_root=artifacts_root,
+        )
     checkpoint_payload = safe_load_checkpoint_payload(checkpoint_path)
     return checkpoint_path, checkpoint_payload
 
@@ -410,9 +417,24 @@ def run_sac(
     job_id: str | None = None,
     job_dir: str | Path | None = None,
     progress_context: Any | None = None,
+    split_override: str | None = None,
+    seed_override: int | None = None,
+    lr_override: float | None = None,
 ) -> dict[str, Any]:
     config = load_yaml(config_path)
     eval_config = load_yaml(eval_config_path)
+
+    if split_override is not None:
+        config["env"]["split"] = split_override
+    if seed_override is not None:
+        config["training"]["seed"] = int(seed_override)
+    if lr_override is not None:
+        config["training"]["learning_rate"] = float(lr_override)
+
+    split_config_path = f"configs/splits/{config['env']['split']}.yaml"
+    split_config = load_yaml(split_config_path)
+    assert_training_allowed_on_split(split_config, artifact_id=artifact_id)
+
     reward_function = resolve_reward_function(config["reward"]["version"])
     central_agent = config["algorithm"]["control_mode"] == "centralized"
 
@@ -514,9 +536,14 @@ def run_sac(
         "checkpoint_path": str(checkpoint_path),
         "training_curve_path": str(training_curve_path),
         "training_total_timesteps": int(config["training"]["total_timesteps"]),
+        "split": config["env"]["split"],
+        "control_mode": config["algorithm"]["control_mode"],
     }
     if artifact_id:
         manifest["artifact_id"] = artifact_id
+        trained_on_split = checkpoint_payload.get("config", {}).get("env", {}).get("split")
+        if trained_on_split is not None:
+            manifest["trained_on_split"] = trained_on_split
     if job_id:
         manifest["job_id"] = job_id
     if job_dir is not None:
