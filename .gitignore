@@ -46,6 +46,9 @@ results/*_tmp/
 
 results/dashboard/*
 
+results/sweep/slurm-*.out
+results/sweep/rerun-*.out
+
 apps/dashboard/dist/
 apps/dashboard/node_modules/
 apps/dashboard/*.tsbuildinfo
