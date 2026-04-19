@@ -74,7 +74,7 @@ The repo is being built around the 2023 challenge setup:
 
 The benchmark stack stays separate from the default install so the repo can still be bootstrapped quickly for read-only or scaffold-only work.
 
-Official 2023 leaderboard numbers, including the RBC baseline, the winning CHESCA scores, and the public vs private gaps, are documented in [docs/benchmark-reference.md](/Users/alam/GitHub/cos435-citylearn/docs/benchmark-reference.md:1).
+Official 2023 leaderboard numbers, including the RBC baseline, the winning CHESCA scores, and the public vs private gaps, are documented in [docs/benchmark-reference.md](docs/benchmark-reference.md).
 
 ## common commands
 
