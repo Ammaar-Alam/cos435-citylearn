@@ -110,6 +110,85 @@ def test_artifact_import_rejects_unknown_artifact_kind(tmp_path: Path) -> None:
     assert response.status_code == 422
 
 
+def test_artifact_import_stores_extra_files_alongside_primary(tmp_path: Path) -> None:
+    # Codex P1 (2026-04-20): Central PPO checkpoints need ``ppo_model.zip`` and
+    # ``vec_normalize.pkl`` co-located under a single ``artifact_id``. The
+    # import endpoint's ``extra_files`` field is the only way to produce that
+    # layout in one request; without this test, a future refactor could silently
+    # drop companion uploads and re-break central-PPO evaluation.
+    settings = build_test_settings(tmp_path)
+    client = TestClient(create_app(settings))
+
+    response = client.post(
+        "/api/artifacts/import",
+        data={
+            "artifact_kind": "checkpoint",
+            "label": "central ppo bundle",
+            "runner_id": "ppo_central_baseline",
+        },
+        # httpx TestClient repeats ``files`` tuple entries as form fields, so
+        # both ``extra_files`` entries arrive at FastAPI as a list.
+        files=[
+            ("file", ("ppo_model.zip", b"fake-sb3-zip", "application/zip")),
+            ("extra_files", ("vec_normalize.pkl", b"fake-vec", "application/octet-stream")),
+        ],
+    )
+
+    assert response.status_code == 200, response.text
+    artifact = response.json()
+    artifact_id = artifact["artifact_id"]
+    artifact_dir = settings.imported_artifacts_root / artifact_id
+    assert (artifact_dir / "ppo_model.zip").exists()
+    assert (artifact_dir / "ppo_model.zip").read_bytes() == b"fake-sb3-zip"
+    # The companion file must land in the same directory, not its own UUID.
+    assert (artifact_dir / "vec_normalize.pkl").exists()
+    assert (artifact_dir / "vec_normalize.pkl").read_bytes() == b"fake-vec"
+    # ``file_path`` still points at the primary upload -- it's what the
+    # artifact record and loaders key off. Companion files are discovered by
+    # convention (sibling lookup).
+    assert artifact["source_filename"] == "ppo_model.zip"
+
+
+def test_artifact_import_single_file_still_works_without_extra_files(tmp_path: Path) -> None:
+    # Backwards-compat: SAC checkpoints, shared-PPO checkpoints, and playback
+    # JSONs all ship as a single file. Adding ``extra_files`` to the endpoint
+    # must not break the single-file path.
+    settings = build_test_settings(tmp_path)
+    client = TestClient(create_app(settings))
+
+    response = client.post(
+        "/api/artifacts/import",
+        data={"artifact_kind": "checkpoint", "label": "solo sac"},
+        files={"file": ("checkpoint.pt", b"fake-torch", "application/octet-stream")},
+    )
+
+    assert response.status_code == 200, response.text
+    artifact_dir = settings.imported_artifacts_root / response.json()["artifact_id"]
+    assert (artifact_dir / "checkpoint.pt").exists()
+    assert not (artifact_dir / "vec_normalize.pkl").exists()
+
+
+def test_artifact_import_rejects_duplicate_filenames_in_extra_files(tmp_path: Path) -> None:
+    # If a user accidentally attaches the primary filename again as an extra,
+    # the second write would silently clobber the first. Fail at 400 with a
+    # message that names the offending file, so the UI can surface it.
+    settings = build_test_settings(tmp_path)
+    client = TestClient(create_app(settings))
+
+    response = client.post(
+        "/api/artifacts/import",
+        data={"artifact_kind": "checkpoint", "label": "dupe"},
+        files=[
+            ("file", ("ppo_model.zip", b"primary", "application/zip")),
+            ("extra_files", ("ppo_model.zip", b"collision", "application/zip")),
+        ],
+    )
+
+    assert response.status_code == 400
+    assert "duplicate filename" in response.json()["detail"]
+    assert "ppo_model.zip" in response.json()["detail"]
+
+
 def test_artifact_evaluate_maps_missing_split_file_to_400(tmp_path: Path) -> None:
     settings = build_test_settings(tmp_path)
     app = create_app(settings)

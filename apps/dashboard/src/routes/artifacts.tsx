@@ -23,6 +23,11 @@ export function ArtifactsPage() {
   const [label, setLabel] = useState("");
   const [notes, setNotes] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  // Companion files that live alongside the primary upload under the same
+  // artifact_id (e.g. ``vec_normalize.pkl`` next to the centralized PPO zip).
+  // The backend saves each sibling file into the artifact directory and the
+  // loader pairs them by filename.
+  const [extraFiles, setExtraFiles] = useState<File[]>([]);
   const [selectedBuildingIndex, setSelectedBuildingIndex] = useState(0);
   const [stepIndex, setStepIndex] = useState(0);
 
@@ -72,6 +77,7 @@ export function ArtifactsPage() {
       queryClient.invalidateQueries({ queryKey: ["artifacts"] });
       setSelectedArtifactId(artifact.artifact_id);
       setSelectedFile(null);
+      setExtraFiles([]);
       setLabel("");
       setNotes("");
     },
@@ -92,13 +98,35 @@ export function ArtifactsPage() {
     },
   });
 
+  const checkpointRunners = (runnersQuery.data ?? []).filter((runner) => runner.supports_checkpoint_eval);
+  const selectedRunner = checkpointRunners.find((runner) => runner.runner_id === selectedRunnerId) ?? null;
+  // Central PPO saves SB3 weights + a separate ``vec_normalize.pkl``; both
+  // must land in the same artifact directory. We flag the upload form when
+  // the selected runner is central PPO so the user knows to attach both.
+  // Shared PPO, central SAC, and shared SAC all ship a single ``checkpoint.pt``
+  // and keep the single-file upload flow.
+  const needsVecNormalizeCompanion =
+    artifactKind === "checkpoint" &&
+    selectedRunner !== null &&
+    selectedRunner.algorithm === "ppo" &&
+    selectedRunner.variant === "central_baseline";
+
   function handleSubmit(): void {
     if (!selectedFile) {
+      return;
+    }
+    if (needsVecNormalizeCompanion && extraFiles.length === 0) {
+      // Block the upload entirely -- central PPO is non-functional without
+      // the VecNormalize companion, so producing a half-artifact would just
+      // fail on evaluate with a less-helpful message.
       return;
     }
 
     const payload = new FormData();
     payload.append("file", selectedFile);
+    for (const extra of extraFiles) {
+      payload.append("extra_files", extra);
+    }
     payload.append("artifact_kind", artifactKind);
     payload.append("label", label);
     if (notes.trim()) {
@@ -109,8 +137,6 @@ export function ArtifactsPage() {
     }
     uploadMutation.mutate(payload);
   }
-
-  const checkpointRunners = (runnersQuery.data ?? []).filter((runner) => runner.supports_checkpoint_eval);
   const playback = playbackQuery.data;
   const totalArtifacts = artifactsQuery.data?.length ?? 0;
   const playbackCount = (artifactsQuery.data ?? []).filter((artifact) => artifact.playback_path).length;
@@ -209,6 +235,19 @@ export function ArtifactsPage() {
                 </select>
               </label>
             ) : null}
+            {needsVecNormalizeCompanion ? (
+              <label className="form-grid__wide">
+                vec_normalize.pkl (required for centralized PPO)
+                <input
+                  accept=".pkl,application/octet-stream"
+                  onChange={(event) => setExtraFiles(event.target.files ? Array.from(event.target.files) : [])}
+                  type="file"
+                />
+                <span className="muted-copy">
+                  Centralized PPO also needs the VecNormalize observation stats saved next to the model; both files are packed into a single artifact record.
+                </span>
+              </label>
+            ) : null}
             <label className="form-grid__wide">
               notes
               <textarea
@@ -220,7 +259,16 @@ export function ArtifactsPage() {
             </label>
           </div>
           <div className="inline-actions">
-            <button className="primary-button" disabled={!selectedFile || uploadMutation.isPending} onClick={handleSubmit} type="button">
+            <button
+              className="primary-button"
+              disabled={
+                !selectedFile
+                || uploadMutation.isPending
+                || (needsVecNormalizeCompanion && extraFiles.length === 0)
+              }
+              onClick={handleSubmit}
+              type="button"
+            >
               {uploadMutation.isPending ? "importing…" : "register artifact"}
             </button>
             <div className="muted-copy">{readinessCopy}</div>

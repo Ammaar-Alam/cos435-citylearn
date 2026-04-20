@@ -382,7 +382,11 @@ def test_load_imported_central_ppo_artifact_raises_when_vec_normalize_missing(
         )
     message = str(excinfo.value)
     assert "vec_normalize.pkl" in message
-    assert "Upload vec_normalize.pkl" in message
+    # Remediation should tell the user the *working* workflow (multi-file
+    # upload via extra_files) rather than the old broken "upload into the
+    # same directory" phrasing, which users cannot achieve through the API.
+    assert "companion" in message
+    assert "extra_files" in message
 
 
 def test_load_imported_central_ppo_artifact_falls_back_to_local_run_layout(

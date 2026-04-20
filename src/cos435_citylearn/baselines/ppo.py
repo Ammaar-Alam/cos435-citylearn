@@ -268,10 +268,11 @@ def _load_imported_central_ppo_artifact(
     ``FileNotFoundError`` on a path that never existed.
 
     For the imported case, VecNormalize stats must be co-located with the model
-    zip (same directory). The upload API only accepts one file per call today,
-    so users import ``ppo_model.zip`` and ``vec_normalize.pkl`` as siblings via
-    two ``POST /artifacts/import`` calls pointing at the same underlying dir
-    -- or we fail loudly with a clear remediation message.
+    zip (same directory). The import endpoint (``POST /api/artifacts/import``)
+    accepts companion files via the ``extra_files`` form field, so the dashboard
+    flow is: pick ``ppo_model.zip`` as the primary upload and attach
+    ``vec_normalize.pkl`` as a companion; both land under the same
+    ``artifact_id`` on disk and the loader pairs them by filename.
     """
     if imported_artifacts_root is None:
         # Re-eval of a locally trained central PPO run: mirror the SAC flow and
@@ -294,9 +295,10 @@ def _load_imported_central_ppo_artifact(
     if not vec_normalize_path.exists():
         raise FileNotFoundError(
             "VecNormalize stats (vec_normalize.pkl) not found alongside imported "
-            f"central PPO model at {model_path.parent}. Upload vec_normalize.pkl "
-            "into the same artifact directory as the PPO zip; centralized PPO "
-            "cannot evaluate without the observation normalization stats."
+            f"central PPO model at {model_path.parent}. Re-import via the "
+            "dashboard and attach vec_normalize.pkl as a companion file on the "
+            "upload form (the 'extra_files' field); centralized PPO cannot "
+            "evaluate without the observation normalization stats."
         )
     return model_path, vec_normalize_path
 

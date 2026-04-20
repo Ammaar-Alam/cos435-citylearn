@@ -134,6 +134,16 @@ class ArtifactStore:
             return self._normalize_path(stored_path)
         return None
 
+    async def _stream_to_disk(self, file: UploadFile, dest: Path) -> None:
+        """Stream an UploadFile to ``dest`` in 1 MiB chunks and close it."""
+        with dest.open("wb") as handle:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                handle.write(chunk)
+        await file.close()
+
     async def import_upload(
         self,
         *,
@@ -143,6 +153,7 @@ class ArtifactStore:
         notes: str | None,
         runner_id: str | None,
         algorithm: str | None,
+        extra_files: list[UploadFile] | None = None,
     ) -> ArtifactDetail:
         artifact_id = f"artifact_{uuid4().hex[:10]}"
         artifact_dir = self._artifact_dir(artifact_id)
@@ -150,13 +161,27 @@ class ArtifactStore:
 
         filename = Path(file.filename or "artifact.bin").name
         stored_path = ensure_parent(artifact_dir / filename)
-        with stored_path.open("wb") as handle:
-            while True:
-                chunk = await file.read(1024 * 1024)
-                if not chunk:
-                    break
-                handle.write(chunk)
-        await file.close()
+        await self._stream_to_disk(file, stored_path)
+
+        # Companion files (e.g. ``vec_normalize.pkl`` for centralized PPO)
+        # land in the same artifact dir as siblings. We reject duplicate
+        # filenames up front because the second write would silently clobber
+        # the first, and users would ship an artifact that looks complete
+        # but is missing a required file.
+        if extra_files:
+            seen_names = {filename}
+            for extra in extra_files:
+                extra_name = Path(extra.filename or "").name
+                if not extra_name:
+                    raise ValueError("extra_files entry is missing a filename")
+                if extra_name in seen_names:
+                    raise ValueError(
+                        f"duplicate filename in upload: {extra_name!r}. "
+                        "Each file in a single import must have a unique name."
+                    )
+                seen_names.add(extra_name)
+                extra_path = ensure_parent(artifact_dir / extra_name)
+                await self._stream_to_disk(extra, extra_path)
 
         evaluable = False
         status = "validated"
