@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -29,6 +30,9 @@ def _minimal_central_checkpoint_payload() -> dict[str, object]:
     return {
         "algorithm": "sac",
         "control_mode": "centralized",
+        "variant": "centralized_baseline",
+        "reward_version": "v2",
+        "features_version": "v2",
         "observation_names": [["hour", "load"]],
         "action_names": [["battery"]],
         "controller_state": {
@@ -69,6 +73,9 @@ def _minimal_shared_checkpoint_payload() -> dict[str, object]:
     return {
         "algorithm": "sac",
         "control_mode": "shared_dtde",
+        "variant": "shared_dtde_reward_v2",
+        "reward_version": "v2",
+        "features_version": "v2",
         "observation_names": [["hour", "load"]],
         "action_names": [["battery"]],
         "controller_state": {
@@ -205,6 +212,84 @@ def test_validate_checkpoint_runner_compatibility_rejects_control_mode_mismatch(
     }
 
     with pytest.raises(ValueError, match="control_mode"):
+        validate_checkpoint_runner_compatibility(payload, config)
+
+
+def _matching_runner_config_shared() -> dict[str, object]:
+    return {
+        "algorithm": {
+            "name": "sac",
+            "control_mode": "shared_dtde",
+            "variant": "shared_dtde_reward_v2",
+        },
+        "reward": {"version": "v2"},
+        "features": {"version": "v2"},
+    }
+
+
+def test_validate_checkpoint_runner_compatibility_passes_on_matching_runtime_labels() -> None:
+    payload = _minimal_shared_checkpoint_payload()
+    config = _matching_runner_config_shared()
+    mismatches = validate_checkpoint_runner_compatibility(payload, config)
+    assert mismatches == {}
+
+
+def test_validate_checkpoint_runner_compatibility_rejects_reward_mismatch_without_flag() -> None:
+    payload = _minimal_shared_checkpoint_payload()
+    config = _matching_runner_config_shared()
+    config["reward"]["version"] = "v1"
+    with pytest.raises(ValueError, match="reward_version"):
+        validate_checkpoint_runner_compatibility(payload, config)
+
+
+def test_validate_checkpoint_runner_compatibility_allows_reward_mismatch_with_flag(caplog) -> None:
+    payload = _minimal_shared_checkpoint_payload()
+    config = _matching_runner_config_shared()
+    config["reward"]["version"] = "v1"
+    config["features"]["version"] = "v1"
+    with caplog.at_level(logging.WARNING, logger="cos435_citylearn.algorithms.sac.checkpoints"):
+        mismatches = validate_checkpoint_runner_compatibility(
+            payload, config, allow_cross_reward_eval=True
+        )
+    assert mismatches == {
+        "reward_version": ("v2", "v1"),
+        "features_version": ("v2", "v1"),
+    }
+    assert "allow_cross_reward_eval=True" in caplog.text
+
+
+def test_validate_checkpoint_runner_compatibility_falls_back_to_nested_config() -> None:
+    # pre-P1.2 SAC checkpoints only carry variant/reward_version/features_version
+    # inside the nested config snapshot. the tightened validator must still accept
+    # those as matching (otherwise the Codex fix regresses every older run).
+    payload = _minimal_shared_checkpoint_payload()
+    del payload["variant"]
+    del payload["reward_version"]
+    del payload["features_version"]
+    payload["config"] = {
+        "algorithm": {"variant": "shared_dtde_reward_v2"},
+        "reward": {"version": "v2"},
+        "features": {"version": "v2"},
+    }
+    config = _matching_runner_config_shared()
+    mismatches = validate_checkpoint_runner_compatibility(payload, config)
+    assert mismatches == {}
+
+
+def test_validate_checkpoint_runner_compatibility_detects_legacy_payload_mismatch() -> None:
+    # fallback still catches genuine label drift -- this guards against the
+    # fallback turning into a silent bypass for mismatched checkpoints.
+    payload = _minimal_shared_checkpoint_payload()
+    del payload["variant"]
+    del payload["reward_version"]
+    del payload["features_version"]
+    payload["config"] = {
+        "algorithm": {"variant": "shared_dtde_reward_v2"},
+        "reward": {"version": "v1"},
+        "features": {"version": "v2"},
+    }
+    config = _matching_runner_config_shared()  # expects reward v2
+    with pytest.raises(ValueError, match="reward_version"):
         validate_checkpoint_runner_compatibility(payload, config)
 
 

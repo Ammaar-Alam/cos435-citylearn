@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from cos435_citylearn.algorithms.ppo.controllers import assert_minibatch_fits_rollout
 from cos435_citylearn.baselines.ppo import _validate_ppo_topology
 from cos435_citylearn.config import assert_training_allowed_on_split
 from cos435_citylearn.paths import CONFIGS_DIR
@@ -75,3 +76,14 @@ def test_validate_ppo_topology_accepts_matching_topology() -> None:
     )
 
     _validate_ppo_topology(metadata, env)
+
+
+def test_minibatch_size_assertion_rejects_oversampling_config() -> None:
+    # minibatch 256 exceeds rollout_steps 32 * n_buildings 3 = 96
+    with pytest.raises(ValueError, match="minibatch_size"):
+        assert_minibatch_fits_rollout(minibatch_size=256, rollout_steps=32, n_buildings=3)
+
+
+def test_minibatch_size_assertion_allows_fitting_config() -> None:
+    # 64 <= 2048 * 3 = 6144
+    assert_minibatch_fits_rollout(minibatch_size=64, rollout_steps=2048, n_buildings=3)

@@ -68,8 +68,53 @@ def test_iter_minibatches_yields_flat_batches() -> None:
         )
     buffer.compute_gae(np.zeros(3, dtype=np.float32), gamma=0.99, gae_lambda=0.95)
     seen = 0
-    for batch in buffer.iter_minibatches(batch_size=2, shuffle=False):
+    for batch in buffer.iter_minibatches(batch_size=2, shuffle=False, normalize_advantage=False):
         seen += batch["observations"].shape[0]
         assert batch["observations"].shape[1] == 4
         assert batch["actions"].shape[1] == 2
     assert seen == 2 * 3
+
+
+def _populate_buffer_with_constant_advantages(advantages: np.ndarray) -> RolloutBuffer:
+    n_steps = advantages.shape[0]
+    buffer = RolloutBuffer(n_steps=n_steps, n_buildings=1, observation_dim=1, action_dim=1)
+    for t in range(n_steps):
+        buffer.add(
+            observations=np.zeros((1, 1), dtype=np.float32),
+            pre_tanh_actions=np.zeros((1, 1), dtype=np.float32),
+            actions=np.zeros((1, 1), dtype=np.float32),
+            log_probs=np.zeros(1, dtype=np.float32),
+            values=np.zeros(1, dtype=np.float32),
+            rewards=np.zeros(1, dtype=np.float32),
+            dones=np.zeros(1, dtype=np.float32),
+        )
+    buffer.advantages[:n_steps] = advantages
+    buffer.returns[:n_steps] = advantages
+    return buffer
+
+
+def test_iter_minibatches_normalize_advantage_true_zero_centers_unit_variance() -> None:
+    advantages = np.array([[1.0], [2.0], [3.0], [4.0]], dtype=np.float32)
+    buffer = _populate_buffer_with_constant_advantages(advantages)
+
+    batch = next(
+        iter(
+            buffer.iter_minibatches(batch_size=4, shuffle=False, normalize_advantage=True)
+        )
+    )
+    adv = batch["advantages"].cpu().numpy()
+    assert np.isclose(adv.mean(), 0.0, atol=1e-5)
+    assert np.isclose(adv.std(), 1.0, atol=1e-4)
+
+
+def test_iter_minibatches_normalize_advantage_false_preserves_raw_values() -> None:
+    advantages = np.array([[1.0], [2.0], [3.0], [4.0]], dtype=np.float32)
+    buffer = _populate_buffer_with_constant_advantages(advantages)
+
+    batch = next(
+        iter(
+            buffer.iter_minibatches(batch_size=4, shuffle=False, normalize_advantage=False)
+        )
+    )
+    adv = batch["advantages"].cpu().numpy().reshape(-1)
+    np.testing.assert_allclose(adv, advantages.reshape(-1), atol=1e-6)

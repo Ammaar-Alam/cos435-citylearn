@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-ROOT_DIR="/u/${USER}/cos435-citylearn"
+ROOT_DIR="${ROOT_DIR:-/u/${USER}/cos435-citylearn}"
 mkdir -p "$ROOT_DIR/results/sweep"
 
 ALGOS=(ppo sac)

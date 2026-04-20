@@ -16,6 +16,11 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
+from cos435_citylearn.algorithms._runtime_labels import (
+    RUNTIME_LABEL_FIELDS,
+    expected_runtime_labels,
+    trained_runtime_labels,
+)
 from cos435_citylearn.algorithms.ppo import (
     SharedPPOController,
     safe_load_ppo_checkpoint_payload,
@@ -156,6 +161,79 @@ class TrainingLogCallback(BaseCallback):
         return True
 
 
+_CENTRAL_PPO_SIDECAR_NAME = "checkpoint_metadata.json"
+_CENTRAL_PPO_SIDECAR_VERSION = 1
+
+
+def _build_central_ppo_sidecar(config: dict[str, Any]) -> dict[str, Any]:
+    # Central PPO uses SB3's PPO.save() zip + VecNormalize pkl, which have no room
+    # for the variant/reward/features labels our evaluators key off of. Drop a
+    # JSON sidecar next to the zip so the same runner-compatibility check we run
+    # on shared-PPO checkpoints applies here too.
+    return {
+        "format_version": _CENTRAL_PPO_SIDECAR_VERSION,
+        "algorithm": config["algorithm"]["name"],
+        "control_mode": config["algorithm"]["control_mode"],
+        "variant": config["algorithm"].get("variant"),
+        "reward_version": config.get("reward", {}).get("version"),
+        "features_version": config.get("features", {}).get("version"),
+        "config": config,
+    }
+
+
+def _write_central_ppo_sidecar(run_dir: Path, config: dict[str, Any]) -> Path:
+    sidecar_path = run_dir / _CENTRAL_PPO_SIDECAR_NAME
+    write_json(sidecar_path, _build_central_ppo_sidecar(config))
+    return sidecar_path
+
+
+def _validate_central_ppo_sidecar(
+    sidecar: dict[str, Any] | None,
+    config: dict[str, Any],
+    *,
+    allow_cross_reward_eval: bool,
+    artifact_id: str,
+) -> dict[str, tuple[Any, Any]]:
+    if sidecar is None:
+        if allow_cross_reward_eval:
+            print(
+                f"Warning: no {_CENTRAL_PPO_SIDECAR_NAME} for artifact '{artifact_id}'; "
+                "allow_cross_reward_eval=True so skipping runtime-label check. "
+                "Consider re-training to generate the sidecar.",
+                file=sys.stderr,
+            )
+            return {}
+        raise ValueError(
+            f"central PPO artifact '{artifact_id}' is missing "
+            f"{_CENTRAL_PPO_SIDECAR_NAME}; cannot verify variant/reward/features match "
+            "the runner config. Re-train to regenerate the sidecar, or opt into "
+            "allow_cross_reward_eval=True to bypass this check."
+        )
+
+    expected = expected_runtime_labels(config)
+    trained = trained_runtime_labels(sidecar)
+    mismatches: dict[str, tuple[Any, Any]] = {}
+    for field in RUNTIME_LABEL_FIELDS:
+        if trained.get(field) != expected.get(field):
+            mismatches[field] = (trained.get(field), expected.get(field))
+
+    if mismatches and not allow_cross_reward_eval:
+        parts = [f"{k}: sidecar={t!r} config={e!r}" for k, (t, e) in mismatches.items()]
+        raise ValueError(
+            "central PPO sidecar runtime metadata is incompatible with runner config; "
+            "pass allow_cross_reward_eval=True to opt into cross-reward evaluation. "
+            + "; ".join(parts)
+        )
+    if mismatches:
+        parts = [f"{k}: sidecar={t!r} config={e!r}" for k, (t, e) in mismatches.items()]
+        print(
+            "Warning: allow_cross_reward_eval=True; evaluating central PPO artifact "
+            f"under mismatched runtime labels: {'; '.join(parts)}",
+            file=sys.stderr,
+        )
+    return mismatches
+
+
 def _resolve_artifact_paths(
     artifact_id: str, artifacts_root: str | Path | None
 ) -> tuple[Path, Path]:
@@ -171,6 +249,13 @@ def _resolve_artifact_paths(
         raise FileNotFoundError(f"VecNormalize stats not found for artifact: {vec_normalize_path}")
 
     return model_path, vec_normalize_path
+
+
+def _load_central_ppo_sidecar(model_path: Path) -> dict[str, Any] | None:
+    sidecar_path = model_path.parent / _CENTRAL_PPO_SIDECAR_NAME
+    if not sidecar_path.exists():
+        return None
+    return json.loads(sidecar_path.read_text())
 
 
 def _validate_ppo_topology(metadata: dict[str, Any], env: Any) -> None:
@@ -212,6 +297,7 @@ def run_ppo(
     split_override: str | None = None,
     seed_override: int | None = None,
     lr_override: float | None = None,
+    allow_cross_reward_eval: bool = False,
     **kwargs,
 ) -> dict[str, Any]:
     config = load_yaml(config_path)
@@ -244,6 +330,7 @@ def run_ppo(
             job_id=job_id,
             job_dir=job_dir,
             progress_context=progress_context,
+            allow_cross_reward_eval=allow_cross_reward_eval,
         )
 
     reward_version = config["reward"]["version"]
@@ -274,6 +361,11 @@ def run_ppo(
         else Path(manifests_root)
     )
     run_dir = run_root / run_id
+    # Collision tripwire: build_run_id is supposed to guarantee uniqueness (uuid
+    # or SLURM array/restart suffix), but if the resolver ever regresses we want
+    # to fail before overwriting a sibling run's artifacts/metrics. mkdir
+    # exist_ok=False raises FileExistsError on collision.
+    run_dir.mkdir(parents=True, exist_ok=False)
     model_path = run_dir / "ppo_model.zip"
     vec_normalize_path = run_dir / "vec_normalize.pkl"
     topology_path = run_dir / "topology.json"
@@ -299,6 +391,18 @@ def run_ppo(
 
         lr = float(config["training"].get("learning_rate", 3e-4))
         rollout_steps = int(config["training"].get("rollout_steps", 2048))
+        ent_coef_config = config["training"].get("ent_coef", 0.0)
+        if isinstance(ent_coef_config, dict):
+            # P3.2 added a dict-form ent_coef schedule for shared PPO (start/end/
+            # anneal_fraction). SB3's PPO only accepts a float, so if someone
+            # copies that schedule into a central-PPO config they'd get silently
+            # ignored entropy annealing; fail loudly instead.
+            raise ValueError(
+                "central PPO does not support dict-form ent_coef schedules "
+                f"(got {ent_coef_config!r}); use a float (constant) or switch to "
+                "control_mode=shared_dtde, which honors the schedule."
+            )
+        ent_coef = float(ent_coef_config)
 
         model = PPO(
             "MlpPolicy",
@@ -310,6 +414,7 @@ def run_ppo(
             gamma=0.99,
             gae_lambda=0.95,
             clip_range=0.2,
+            ent_coef=ent_coef,
             seed=seed,
             verbose=1,
         )
@@ -356,6 +461,11 @@ def run_ppo(
         model.save(str(model_path))
         train_env.save(str(vec_normalize_path))
 
+        # sidecar captures runtime labels (variant/reward/features) that SB3's
+        # zip+pkl can't store; eval-time loads of this artifact verify against
+        # the eval config, same contract as the shared-PPO torch checkpoint.
+        _write_central_ppo_sidecar(run_dir, config)
+
         # save topology for cross-topology preflight
         write_json(topology_path, {
             "observation_names": train_bundle.env.observation_names,
@@ -380,6 +490,17 @@ def run_ppo(
         imported_model_path, imported_vec_path = _resolve_artifact_paths(
             artifact_id, resolved_root
         )
+        # validate runtime labels (variant/reward/features) *before* loading the
+        # model so a reward-mismatched artifact never gets published with the
+        # wrong labels. fails loudly unless allow_cross_reward_eval=True.
+        imported_sidecar = _load_central_ppo_sidecar(imported_model_path)
+        _validate_central_ppo_sidecar(
+            imported_sidecar,
+            config,
+            allow_cross_reward_eval=allow_cross_reward_eval,
+            artifact_id=artifact_id,
+        )
+
         print(f"Loading PPO artifact '{artifact_id}' from {imported_model_path}", file=sys.stderr)
         model = PPO.load(str(imported_model_path))
 
@@ -387,6 +508,10 @@ def run_ppo(
         ensure_parent(model_path)
         model.save(str(model_path))
         Path(vec_normalize_path).write_bytes(Path(imported_vec_path).read_bytes())
+        if imported_sidecar is not None:
+            # copy the sidecar so the new run dir stays self-describing even when
+            # the source artifact moves or gets cleaned up
+            write_json(run_dir / _CENTRAL_PPO_SIDECAR_NAME, imported_sidecar)
 
         imported_topology_path = Path(imported_model_path).parent / "topology.json"
         artifact_topology = None
@@ -584,7 +709,7 @@ def _shared_ppo_controller_kwargs(config: dict[str, Any]) -> dict[str, Any]:
         "minibatch_size": int(training.get("minibatch_size", 64)),
         "gamma": float(training.get("gamma", 0.99)),
         "gae_lambda": float(training.get("gae_lambda", 0.95)),
-        "ent_coef": float(training.get("ent_coef", 0.01)),
+        "ent_coef": training.get("ent_coef", 0.01),
         "vf_coef": float(training.get("vf_coef", 0.5)),
         "max_grad_norm": float(training.get("max_grad_norm", 0.5)),
         "rollout_steps": int(training.get("rollout_steps", 2048)),
@@ -593,6 +718,7 @@ def _shared_ppo_controller_kwargs(config: dict[str, Any]) -> dict[str, Any]:
         "shared_context_version": str(features.get("shared_context_version", "v2")),
         "normalize_observations": bool(training.get("normalize_observations", True)),
         "normalize_rewards": bool(training.get("normalize_rewards", True)),
+        "normalize_advantage": bool(training.get("normalize_advantage", True)),
         "target_kl": (
             None if training.get("target_kl") is None else float(training["target_kl"])
         ),
@@ -641,7 +767,11 @@ def _instantiate_shared_ppo_from_checkpoint(
         minibatch_size=int(controller_state["minibatch_size"]),
         gamma=float(controller_state["gamma"]),
         gae_lambda=float(controller_state["gae_lambda"]),
-        ent_coef=float(controller_state["ent_coef"]),
+        ent_coef=(
+            controller_state["ent_coef_schedule"]
+            if controller_state.get("ent_coef_schedule") is not None
+            else float(controller_state["ent_coef"])
+        ),
         vf_coef=float(controller_state["vf_coef"]),
         max_grad_norm=float(controller_state["max_grad_norm"]),
         rollout_steps=int(controller_state["rollout_steps"]),
@@ -650,6 +780,7 @@ def _instantiate_shared_ppo_from_checkpoint(
         shared_context_version=str(controller_state["shared_context_version"]),
         normalize_observations=bool(controller_state.get("normalize_observations", True)),
         normalize_rewards=bool(controller_state.get("normalize_rewards", True)),
+        normalize_advantage=bool(controller_state.get("normalize_advantage", True)),
         target_kl=(
             None
             if controller_state.get("target_kl") is None
@@ -719,6 +850,7 @@ def _run_shared_ppo_training_loop(
     episode_reward = 0.0
 
     while step < total_timesteps:
+        controller.set_training_progress(step / max(total_timesteps, 1))
         steps_this_rollout = 0
         controller.rollout_buffer.reset()
         while steps_this_rollout < rollout_steps and step < total_timesteps:
@@ -937,6 +1069,7 @@ def _run_shared_ppo(
     job_id: str | None,
     job_dir: str | Path | None,
     progress_context: Any | None,
+    allow_cross_reward_eval: bool = False,
 ) -> dict[str, Any]:
     reward_function = resolve_reward_function(config["reward"]["version"])
     env_bundle = make_citylearn_env(
@@ -966,9 +1099,14 @@ def _run_shared_ppo(
         else Path(manifests_root)
     )
     run_dir = run_root / run_id
+    # Collision tripwire: build_run_id is supposed to guarantee uniqueness; if
+    # two runs ever land on the same run_id we want FileExistsError here rather
+    # than a silent half-overwrite that corrupts both runs' metrics.
+    run_dir.mkdir(parents=True, exist_ok=False)
     checkpoint_path = run_dir / "checkpoint.pt"
     training_curve_path = run_dir / "training_curve.csv"
 
+    label_mismatches: dict[str, tuple[Any, Any]] = {}
     if artifact_id is None:
         training_controller = SharedPPOController(
             env_bundle.env,
@@ -996,7 +1134,11 @@ def _run_shared_ppo(
             imported_artifacts_root=imported_artifacts_root,
             artifacts_root=artifacts_root,
         )
-        validate_ppo_checkpoint_runner_compatibility(checkpoint_payload, config)
+        label_mismatches = validate_ppo_checkpoint_runner_compatibility(
+            checkpoint_payload,
+            config,
+            allow_cross_reward_eval=allow_cross_reward_eval,
+        )
         _write_shared_ppo_training_curve(training_curve_path, [])
 
     if artifact_id is None:
@@ -1051,6 +1193,11 @@ def _run_shared_ppo(
         trained_on_split = checkpoint_payload.get("config", {}).get("env", {}).get("split")
         if trained_on_split is not None:
             manifest["trained_on_split"] = trained_on_split
+        if label_mismatches:
+            manifest["runtime_label_mismatches"] = {
+                field: {"checkpoint": trained, "config": expected}
+                for field, (trained, expected) in label_mismatches.items()
+            }
     if job_id:
         manifest["job_id"] = job_id
     if job_dir is not None:

@@ -13,6 +13,10 @@ if [[ ! -d "$ROOT_DIR" ]]; then
   git clone "$REPO_URL" "$ROOT_DIR"
 fi
 
+# SLURM opens --output/--error paths before the job body runs, so the sink
+# must exist before any sbatch call (including on a fresh checkout).
+mkdir -p "$ROOT_DIR/results/sweep"
+
 cd "$ROOT_DIR"
 git fetch origin
 git checkout "$BRANCH"
@@ -32,4 +36,4 @@ python scripts/setup/download_citylearn_2023.py \
 make env-schema
 
 echo
-echo "setup complete. next: sbatch scripts/cluster/sweep.slurm"
+echo "setup complete. next: bash scripts/cluster/submit_sweep.sh"

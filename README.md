@@ -208,6 +208,7 @@ make dashboard-backend
 The dashboard currently supports:
 - launching the built-in RBC benchmark from the UI
 - launching the centralized SAC baseline from the UI
+- launching the centralized PPO baseline from the UI
 - launching the shared SAC `reward_v2` runner from the UI
 - launching the shared PPO `reward_v2` runner from the UI
 - watching live preview payloads and worker logs while the benchmark job runs
@@ -218,4 +219,4 @@ The dashboard currently supports:
 - inspecting imported playback payloads directly in the UI
 - importing SAC or shared PPO checkpoints and evaluating them through a checkpoint-capable runner
 
-The dashboard exposes the launchable runners (RBC, centralized SAC, shared SAC `reward_v2`, and shared PPO `reward_v2`) rather than every config variant in `configs/train/`.
+The dashboard exposes the launchable runners (RBC, centralized SAC, centralized PPO, shared SAC `reward_v2`, and shared PPO `reward_v2`) rather than every config variant in `configs/train/`.

@@ -1,11 +1,23 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any, Sequence
 
 import torch
 
+from cos435_citylearn.algorithms._runtime_labels import (
+    RUNTIME_LABEL_FIELDS as _RUNTIME_LABEL_FIELDS,
+)
+from cos435_citylearn.algorithms._runtime_labels import (
+    expected_runtime_labels as _expected_runtime_labels,
+)
+from cos435_citylearn.algorithms._runtime_labels import (
+    trained_runtime_labels as _trained_runtime_labels,
+)
 from cos435_citylearn.algorithms.ppo.shared_features import SHARED_CONTEXT_V2_DIMENSION
+
+_LOGGER = logging.getLogger(__name__)
 
 SUPPORTED_FORMAT_VERSIONS = {1}
 
@@ -124,7 +136,9 @@ def validate_ppo_checkpoint_payload_structure(payload: Any) -> None:
 def validate_ppo_checkpoint_runner_compatibility(
     checkpoint_payload: dict[str, Any],
     config: dict[str, Any],
-) -> None:
+    *,
+    allow_cross_reward_eval: bool = False,
+) -> dict[str, tuple[Any, Any]]:
     expected_algorithm = str(config["algorithm"]["name"])
     expected_control_mode = str(config["algorithm"]["control_mode"])
 
@@ -139,6 +153,32 @@ def validate_ppo_checkpoint_runner_compatibility(
             f"checkpoint control_mode '{checkpoint_payload['control_mode']}' is "
             f"incompatible with runner control_mode '{expected_control_mode}'"
         )
+
+    expected_labels = _expected_runtime_labels(config)
+    trained_labels = _trained_runtime_labels(checkpoint_payload)
+    mismatches: dict[str, tuple[Any, Any]] = {}
+    for field in _RUNTIME_LABEL_FIELDS:
+        trained = trained_labels.get(field)
+        expected = expected_labels.get(field)
+        if trained != expected:
+            mismatches[field] = (trained, expected)
+
+    if mismatches and not allow_cross_reward_eval:
+        parts = [f"{field}: checkpoint={t!r} config={e!r}" for field, (t, e) in mismatches.items()]
+        raise ValueError(
+            "PPO checkpoint runtime metadata is incompatible with runner config; "
+            "pass allow_cross_reward_eval=True to opt into cross-reward evaluation "
+            "(run_id keeps the training label, manifest records the mismatch). "
+            + "; ".join(parts)
+        )
+    if mismatches:
+        parts = [f"{field}: checkpoint={t!r} config={e!r}" for field, (t, e) in mismatches.items()]
+        _LOGGER.warning(
+            "allow_cross_reward_eval=True; evaluating checkpoint under "
+            "mismatched runtime labels: %s",
+            "; ".join(parts),
+        )
+    return mismatches
 
 
 def validate_ppo_checkpoint_env_compatibility(

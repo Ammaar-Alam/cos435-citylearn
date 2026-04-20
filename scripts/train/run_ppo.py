@@ -43,6 +43,15 @@ def main() -> None:
         default=None,
         help="override training.learning_rate from the config",
     )
+    parser.add_argument(
+        "--allow-cross-reward-eval",
+        action="store_true",
+        help=(
+            "opt into evaluating a checkpoint whose trained variant/reward/features "
+            "version does not match the eval config (mismatch is recorded in the "
+            "run manifest under runtime_label_mismatches)"
+        ),
+    )
     args = parser.parse_args()
 
     payload = run_ppo(
@@ -52,6 +61,7 @@ def main() -> None:
         split_override=args.split,
         seed_override=args.seed,
         lr_override=args.lr,
+        allow_cross_reward_eval=args.allow_cross_reward_eval,
     )
     print(json.dumps(payload, indent=2, sort_keys=True))
 

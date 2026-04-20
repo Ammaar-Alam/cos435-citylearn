@@ -10,6 +10,7 @@ from torch import nn, optim
 
 from cos435_citylearn.algorithms.ppo.networks import ActorNetwork, ValueNetwork
 from cos435_citylearn.algorithms.ppo.rollout_buffer import RolloutBuffer
+from cos435_citylearn.algorithms.ppo.schedules import parse_ent_coef
 from cos435_citylearn.algorithms.ppo.shared_features import (
     SHARED_CONTEXT_V2_DIMENSION,
     build_shared_context_v2,
@@ -24,6 +25,23 @@ def _array_to_list(values: Any) -> Any:
     return values
 
 
+def assert_minibatch_fits_rollout(
+    *, minibatch_size: int, rollout_steps: int, n_buildings: int
+) -> None:
+    rollout_batch_size = int(rollout_steps) * int(n_buildings)
+    if int(minibatch_size) > rollout_batch_size:
+        # iter_minibatches clamps batch_size via max(1, min(batch_size, n)), so
+        # an oversized minibatch is silently shrunk to the rollout batch size --
+        # the configured minibatch_size is never honored. Fail loudly instead.
+        raise ValueError(
+            f"minibatch_size ({minibatch_size}) exceeds the rollout batch size "
+            f"({rollout_batch_size} = rollout_steps {rollout_steps} * "
+            f"n_buildings {n_buildings}); iter_minibatches would silently shrink "
+            "the minibatch to the rollout batch size. "
+            "reduce minibatch_size or increase rollout_steps."
+        )
+
+
 class SharedPPOController(RLC):
     def __init__(
         self,
@@ -36,7 +54,7 @@ class SharedPPOController(RLC):
         minibatch_size: int = 64,
         gamma: float = 0.99,
         gae_lambda: float = 0.95,
-        ent_coef: float = 0.01,
+        ent_coef: float | dict[str, float] = 0.01,
         vf_coef: float = 0.5,
         max_grad_norm: float = 0.5,
         rollout_steps: int = 2048,
@@ -45,6 +63,7 @@ class SharedPPOController(RLC):
         shared_context_version: str = "v2",
         normalize_observations: bool = True,
         normalize_rewards: bool = True,
+        normalize_advantage: bool = True,
         target_kl: float | None = None,
     ) -> None:
         if shared_context_dimension != SHARED_CONTEXT_V2_DIMENSION:
@@ -66,12 +85,14 @@ class SharedPPOController(RLC):
         self.minibatch_size = int(minibatch_size)
         self.gamma = float(gamma)
         self.gae_lambda = float(gae_lambda)
-        self.ent_coef = float(ent_coef)
+        initial_ent, self._ent_coef_schedule = parse_ent_coef(ent_coef)
+        self.ent_coef = float(initial_ent)
         self.vf_coef = float(vf_coef)
         self.max_grad_norm = float(max_grad_norm)
         self.rollout_steps = int(rollout_steps)
         self.normalize_observations = bool(normalize_observations)
         self.normalize_rewards = bool(normalize_rewards)
+        self.normalize_advantage = bool(normalize_advantage)
         self.target_kl = None if target_kl is None else float(target_kl)
         self.last_update_stats: dict[str, float] = {}
         self._total_updates = 0
@@ -112,9 +133,16 @@ class SharedPPOController(RLC):
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=self.lr)
         self.value_optimizer = optim.Adam(self.value_net.parameters(), lr=self.lr)
 
+        n_buildings = len(self.action_space)
+        assert_minibatch_fits_rollout(
+            minibatch_size=self.minibatch_size,
+            rollout_steps=self.rollout_steps,
+            n_buildings=n_buildings,
+        )
+
         self.rollout_buffer = RolloutBuffer(
             n_steps=self.rollout_steps,
-            n_buildings=len(self.action_space),
+            n_buildings=n_buildings,
             observation_dim=self._observation_dimension_cached,
             action_dim=self._action_dimension_cached,
         )
@@ -130,6 +158,11 @@ class SharedPPOController(RLC):
     @property
     def controller_type(self) -> str:
         return "shared_parameter_ppo"
+
+    def set_training_progress(self, progress: float) -> None:
+        if self._ent_coef_schedule is None:
+            return
+        self.ent_coef = float(self._ent_coef_schedule.value_at(progress))
 
     def _validate_shared_spaces(self) -> None:
         reference_action_shape = tuple(self.action_space[0].shape)
@@ -350,6 +383,7 @@ class SharedPPOController(RLC):
                 batch_size=self.minibatch_size,
                 shuffle=True,
                 device=self.device,
+                normalize_advantage=self.normalize_advantage,
             ):
                 new_log_prob, entropy = self.policy_net.evaluate_actions(
                     batch["observations"],
@@ -429,6 +463,11 @@ class SharedPPOController(RLC):
             "gamma": float(self.gamma),
             "gae_lambda": float(self.gae_lambda),
             "ent_coef": float(self.ent_coef),
+            "ent_coef_schedule": (
+                self._ent_coef_schedule.as_mapping()
+                if self._ent_coef_schedule is not None
+                else None
+            ),
             "vf_coef": float(self.vf_coef),
             "max_grad_norm": float(self.max_grad_norm),
             "rollout_steps": int(self.rollout_steps),
@@ -437,6 +476,7 @@ class SharedPPOController(RLC):
             "shared_context_version": self.shared_context_version,
             "normalize_observations": bool(self.normalize_observations),
             "normalize_rewards": bool(self.normalize_rewards),
+            "normalize_advantage": bool(self.normalize_advantage),
             "target_kl": None if self.target_kl is None else float(self.target_kl),
             "time_step": int(self.time_step),
             "total_updates": int(self._total_updates),

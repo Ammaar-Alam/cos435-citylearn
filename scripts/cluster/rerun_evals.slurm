@@ -17,7 +17,8 @@
 
 set -euo pipefail
 
-ROOT_DIR="/u/${USER}/cos435-citylearn"
+ROOT_DIR="${ROOT_DIR:-/u/${USER}/cos435-citylearn}"
+mkdir -p "$ROOT_DIR/results/sweep"
 ALGO="${ALGO:-ppo}"
 
 LRS=(1e-4 3e-4)

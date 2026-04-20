@@ -50,8 +50,9 @@ results/*_tmp/
 
 results/dashboard/*
 
-results/sweep/slurm-*.out
-results/sweep/rerun-*.out
+# Per-cell sweep JSONs, summary CSVs, and SLURM stdout all live on Google Drive
+# (COS 435/erik/...) as the shared source of truth — keep the repo clean.
+results/sweep/
 
 apps/dashboard/dist/
 apps/dashboard/node_modules/
@@ -59,3 +60,6 @@ apps/dashboard/*.tsbuildinfo
 apps/dashboard/vite.config.js
 apps/dashboard/vite.config.d.ts
 !apps/dashboard/package-lock.json
+
+# local Drive upload staging (not tracked)
+drive-upload/

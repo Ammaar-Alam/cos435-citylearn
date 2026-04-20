@@ -420,6 +420,7 @@ def run_sac(
     split_override: str | None = None,
     seed_override: int | None = None,
     lr_override: float | None = None,
+    allow_cross_reward_eval: bool = False,
 ) -> dict[str, Any]:
     config = load_yaml(config_path)
     eval_config = load_yaml(eval_config_path)
@@ -465,9 +466,15 @@ def run_sac(
         else Path(manifests_root)
     )
     run_dir = run_root / run_id
+    # Collision tripwire: build_run_id should already guarantee uniqueness
+    # (uuid / SLURM array+restart suffix), but if it ever regresses we want
+    # FileExistsError here rather than two runs silently clobbering each
+    # other's checkpoints / metrics / manifests.
+    run_dir.mkdir(parents=True, exist_ok=False)
     checkpoint_path = run_dir / "checkpoint.pt"
     training_curve_path = run_dir / "training_curve.csv"
 
+    label_mismatches: dict[str, tuple[Any, Any]] = {}
     if artifact_id is None:
         training_controller = _instantiate_controller(env_bundle.env, config)
         curve_rows = _run_training_loop(
@@ -492,7 +499,11 @@ def run_sac(
             imported_artifacts_root=imported_artifacts_root,
             artifacts_root=artifacts_root,
         )
-        validate_checkpoint_runner_compatibility(checkpoint_payload, config)
+        label_mismatches = validate_checkpoint_runner_compatibility(
+            checkpoint_payload,
+            config,
+            allow_cross_reward_eval=allow_cross_reward_eval,
+        )
         _write_training_curve(training_curve_path, [])
     if artifact_id is None:
         checkpoint_payload = safe_load_checkpoint_payload(checkpoint_path)
@@ -545,6 +556,11 @@ def run_sac(
         trained_on_split = checkpoint_payload.get("config", {}).get("env", {}).get("split")
         if trained_on_split is not None:
             manifest["trained_on_split"] = trained_on_split
+        if label_mismatches:
+            manifest["runtime_label_mismatches"] = {
+                field: {"checkpoint": trained, "config": expected}
+                for field, (trained, expected) in label_mismatches.items()
+            }
     if job_id:
         manifest["job_id"] = job_id
     if job_dir is not None:

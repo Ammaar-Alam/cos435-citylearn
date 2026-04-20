@@ -225,7 +225,11 @@ class ArtifactStore:
                 artifacts_root=self.settings.artifacts_root,
             )
             checkpoint_payload = safe_load_checkpoint_payload(checkpoint_path)
-            validate_checkpoint_runner_compatibility(checkpoint_payload, config)
+            validate_checkpoint_runner_compatibility(
+                checkpoint_payload,
+                config,
+                allow_cross_reward_eval=request.allow_cross_reward_eval,
+            )
             env_bundle = make_citylearn_env(
                 config["env"]["base_config"],
                 f"configs/splits/{config['env']['split']}.yaml",
@@ -247,4 +251,5 @@ class ArtifactStore:
             "capture_render_frames": request.capture_render_frames,
             "max_render_frames": request.max_render_frames,
             "render_frame_width": request.render_frame_width,
+            "allow_cross_reward_eval": request.allow_cross_reward_eval,
         }

@@ -149,3 +149,4 @@ class EvaluateArtifactRequest(BaseModel):
     capture_render_frames: bool | None = None
     max_render_frames: int | None = Field(default=None, ge=8, le=180)
     render_frame_width: int | None = Field(default=None, ge=480, le=1600)
+    allow_cross_reward_eval: bool = False

@@ -23,4 +23,5 @@ def run(request: dict[str, Any], context) -> dict[str, Any]:
         split_override=request.get("split_override"),
         seed_override=request.get("seed_override"),
         lr_override=request.get("lr_override"),
+        allow_cross_reward_eval=bool(request.get("allow_cross_reward_eval", False)),
     )

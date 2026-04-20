@@ -110,6 +110,7 @@ class RolloutBuffer:
         batch_size: int,
         shuffle: bool = True,
         device: torch.device | None = None,
+        normalize_advantage: bool = True,
     ):
         n = self.size * self.n_buildings
         if n == 0:
@@ -130,12 +131,15 @@ class RolloutBuffer:
         batch_size = max(1, min(batch_size, n))
         for start in range(0, n, batch_size):
             batch_indices = indices[start : start + batch_size]
+            advantages = flat_advantages[batch_indices]
+            if normalize_advantage and advantages.size > 1:
+                advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
             yield {
                 "observations": torch.as_tensor(flat_observations[batch_indices], device=device),
                 "pre_tanh_actions": torch.as_tensor(flat_pre_tanh[batch_indices], device=device),
                 "actions": torch.as_tensor(flat_actions[batch_indices], device=device),
                 "log_probs": torch.as_tensor(flat_log_probs[batch_indices], device=device),
                 "values": torch.as_tensor(flat_values[batch_indices], device=device),
-                "advantages": torch.as_tensor(flat_advantages[batch_indices], device=device),
+                "advantages": torch.as_tensor(advantages, device=device),
                 "returns": torch.as_tensor(flat_returns[batch_indices], device=device),
             }

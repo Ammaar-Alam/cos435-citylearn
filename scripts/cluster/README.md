@@ -10,19 +10,36 @@ From the Neuronic login node:
 
 ```bash
 ssh neuronic
-git clone https://github.com/Ammaar-Alam/cos435-citylearn.git /u/$USER/cos435-citylearn
+bash <(curl -fsSL https://raw.githubusercontent.com/Ammaar-Alam/cos435-citylearn/main/scripts/cluster/setup_neuronic.sh)
+# or, if you already cloned:
 cd /u/$USER/cos435-citylearn
 bash scripts/cluster/setup_neuronic.sh
 ```
 
-By default this checks out `main`. Override with
-`BRANCH=<branch-name> bash scripts/cluster/setup_neuronic.sh` to run
-the sweep from a feature branch.
+`setup_neuronic.sh` clones the repo (if needed), installs the venv via
+`uv`, pulls the CityLearn 2023 phase_2_local_evaluation (public_dev
+training) and phase_3_{1,2,3} (cross-topology eval) datasets, validates
+the env schema, and — importantly — provisions `results/sweep/` before
+any `sbatch` call so SLURM's `--output`/`--error` paths resolve on a
+fresh checkout.
 
-The script installs the venv via `uv` (which downloads Python 3.10
-automatically), pulls the CityLearn 2023 phase_2_local_evaluation
-(public_dev training) and phase_3_{1,2,3} (cross-topology eval)
-datasets, and validates the env schema.
+Override branches with `BRANCH=<branch-name> bash …setup_neuronic.sh`.
+
+Override the install root with `ROOT_DIR=/some/other/path bash …`. The
+shell-level pieces (`setup_neuronic.sh`, `submit_sweep.sh`, the body of
+`sweep.slurm` / `rerun_evals.slurm`, `run_cell.sh`, `rerun_eval_cell.sh`)
+honor `${ROOT_DIR:-/u/${USER}/cos435-citylearn}`, so the checkout and
+the per-cell JSON outputs track the override.
+
+**One caveat:** `#SBATCH --output=` / `--error=` are parsed by SLURM
+*before* the job body runs, and SLURM does not expand shell variables
+there — only its own format codes (`%u`, `%A`, `%a`, `%j`). The two
+`.slurm` drivers therefore hardcode
+`/u/%u/cos435-citylearn/results/sweep/slurm-%A_%a.out` for stdout/stderr
+even when `$ROOT_DIR` points elsewhere. If you're running from a
+non-default root, either create a symlink (`ln -s $ROOT_DIR/results/sweep
+/u/$USER/cos435-citylearn/results/sweep`) or edit the `#SBATCH`
+directives to hardcode the new path.
 
 Note: we use `/u/$USER/` (NFS-shared home) instead of `/scratch/` because
 `/scratch` is node-local on Neuronic — compute nodes can't see files
@@ -32,8 +49,17 @@ staged on the login node.
 
 ```bash
 cd /u/$USER/cos435-citylearn
-sbatch scripts/cluster/sweep.slurm
+bash scripts/cluster/submit_sweep.sh
 ```
+
+The wrapper is the canonical entry point: it runs `mkdir -p
+"$ROOT_DIR/results/sweep"` (redundant with `setup_neuronic.sh` but safe
+on re-submits) and forwards to `sbatch scripts/cluster/sweep.slurm`. You
+can pass extra flags through, eg. `bash scripts/cluster/submit_sweep.sh
+--export=ALGO=sac,ALL JOB=rerun_evals`.
+
+Calling `sbatch scripts/cluster/sweep.slurm` directly still works once
+`results/sweep/` exists.
 
 The array dispatches **40 tasks** (2 algos × 2 lrs × 10 seeds), each
 requesting 4 CPUs and 8 GB RAM (no GPU — this workload is CPU-bound).
@@ -46,6 +72,10 @@ Array id decomposes as:
 Each cell trains on `public_dev` (~50 min), saves a checkpoint, then
 cross-topology evals on `phase_3_{1,2,3}`. Per-cell outputs land in
 `results/sweep/<algo>_lr<lr>_seed<n>/{train,eval_phase_3_*}.json`.
+
+`results/sweep/` is gitignored; the shared source of truth for sweep
+outputs is the `COS 435/erik/...` Google Drive folder. Mirror each run's
+JSONs and `summary.csv` there after aggregation.
 
 Total wall time should be ~50 min if enough CPUs are free
 (40 × 4 = 160 CPUs; the cluster usually has >1000 idle).
