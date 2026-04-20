@@ -2,7 +2,7 @@
 
 Generalizable RL for neighborhood battery control in CityLearn.
 
-This repository contains the shared benchmark foundation for the COS435 / ECE433 final project. The CityLearn environment, official 2023 dataset download flow, schema export, smoke path, built-in RBC baseline, and repo-local SAC runners are wired here. PPO remains a config contract for later work.
+This repository contains the shared benchmark foundation for the COS435 / ECE433 final project. The CityLearn environment, official 2023 dataset download flow, schema export, smoke path, built-in RBC baseline, a repo-local PPO baseline entrypoint, and repo-local SAC runners are wired here. The dashboard still focuses on the RBC and SAC launch paths.
 
 ## overview
 
@@ -19,6 +19,7 @@ Foundation in this repo now has:
 - observation/action schema export
 - random rollout smoke coverage
 - built-in RBC evaluation path with metric export
+- centralized PPO baseline runner with local artifact export
 - centralized native-SAC baseline with checkpoint export
 - parameter-shared decentralized SAC with shared district context
 - repo-local reward ladder for SAC (`reward_v0` through `reward_v3`)
@@ -86,6 +87,7 @@ make download-citylearn
 make env-schema
 make smoke
 make train-rbc
+make train-ppo
 make train-sac
 make train-sac-shared
 make dashboard-install
@@ -116,7 +118,8 @@ results/    generated manifests, metrics, and run artifacts stay out of git
 4. `make env-schema`
 5. `make smoke`
 6. `make train-rbc`
-7. `make train-sac`
+7. `make train-ppo`
+8. `make train-sac`
 
 `make env-schema` writes:
 - `results/manifests/environment_lock.json`
@@ -142,6 +145,17 @@ You can validate the exported `SimulationData/...` tree against the official Cit
 ```bash
 make check-ui-exports
 ```
+
+To regenerate the tracked paper-facing local summaries from the raw metrics under
+`results/`, run:
+
+```bash
+make submission-results
+```
+
+That refreshes the CSV and markdown summaries under
+[`submission/results/`](submission/results/), including the current local
+multi-seed SAC snapshot.
 
 ## local dashboard
 
