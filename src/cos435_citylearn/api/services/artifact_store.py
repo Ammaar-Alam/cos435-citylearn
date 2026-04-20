@@ -37,6 +37,38 @@ def _load_sac_checkpoint_tools():
     )
 
 
+def _load_ppo_checkpoint_tools():
+    # ``resolve_imported_checkpoint_path`` lives in the SAC package today but
+    # is algorithm-agnostic (it just reads ``artifact.json`` and resolves the
+    # ``file_path`` entry). PPO reuses it here rather than duplicating the
+    # layout logic; if it ever sprouts SAC-specific behavior, lift it to a
+    # shared module before that happens.
+    from cos435_citylearn.algorithms.ppo import (
+        safe_load_ppo_checkpoint_payload,
+        validate_ppo_checkpoint_env_compatibility,
+        validate_ppo_checkpoint_runner_compatibility,
+    )
+    from cos435_citylearn.algorithms.sac.checkpoints import (
+        resolve_imported_checkpoint_path,
+    )
+
+    return (
+        resolve_imported_checkpoint_path,
+        safe_load_ppo_checkpoint_payload,
+        validate_ppo_checkpoint_env_compatibility,
+        validate_ppo_checkpoint_runner_compatibility,
+    )
+
+
+def _load_central_ppo_sidecar_tools():
+    from cos435_citylearn.baselines.ppo import (
+        _load_central_ppo_sidecar,
+        _validate_central_ppo_sidecar,
+    )
+
+    return _load_central_ppo_sidecar, _validate_central_ppo_sidecar
+
+
 def _load_citylearn_env_factory():
     from cos435_citylearn.env import make_citylearn_env
 
@@ -241,6 +273,66 @@ class ArtifactStore:
                 observation_names=env_bundle.env.observation_names,
                 action_names=env_bundle.env.action_names,
             )
+        elif spec.algorithm == "ppo" and record.artifact_kind == "checkpoint":
+            # Mirror the SAC preflight: fail fast at the API layer with 400
+            # instead of letting the worker raise halfway through launch.
+            # Central PPO ships SB3 zip + sidecar JSON (no torch payload to
+            # load); shared PPO ships a torch .pt with embedded metadata.
+            config = load_yaml(spec.config_path)
+            if request.seed is not None:
+                config["training"]["seed"] = int(request.seed)
+            if request.split is not None:
+                config["env"]["split"] = request.split
+
+            (
+                resolve_imported_checkpoint_path,
+                safe_load_ppo_checkpoint_payload,
+                validate_ppo_checkpoint_env_compatibility,
+                validate_ppo_checkpoint_runner_compatibility,
+            ) = _load_ppo_checkpoint_tools()
+            checkpoint_path = resolve_imported_checkpoint_path(
+                artifact_id=artifact_id,
+                imported_artifacts_root=self.settings.imported_artifacts_root,
+                artifacts_root=self.settings.artifacts_root,
+            )
+
+            control_mode = config["algorithm"]["control_mode"]
+            if control_mode == "centralized":
+                # SB3 zip: validate the sidecar instead of loading the zip. The
+                # worker still checks again on load, but preflighting here
+                # surfaces a misrouted artifact (reward_v1 under reward_v2
+                # runner, wrong variant label, etc.) before the job queues.
+                (
+                    _load_central_ppo_sidecar,
+                    _validate_central_ppo_sidecar,
+                ) = _load_central_ppo_sidecar_tools()
+                sidecar = _load_central_ppo_sidecar(checkpoint_path)
+                _validate_central_ppo_sidecar(
+                    sidecar,
+                    config,
+                    allow_cross_reward_eval=request.allow_cross_reward_eval,
+                    artifact_id=artifact_id,
+                )
+            else:
+                # Shared PPO: same shape as SAC -- torch payload + env preflight.
+                make_citylearn_env = _load_citylearn_env_factory()
+                checkpoint_payload = safe_load_ppo_checkpoint_payload(checkpoint_path)
+                validate_ppo_checkpoint_runner_compatibility(
+                    checkpoint_payload,
+                    config,
+                    allow_cross_reward_eval=request.allow_cross_reward_eval,
+                )
+                env_bundle = make_citylearn_env(
+                    config["env"]["base_config"],
+                    f"configs/splits/{config['env']['split']}.yaml",
+                    seed=config["training"]["seed"],
+                    central_agent=False,
+                )
+                validate_ppo_checkpoint_env_compatibility(
+                    checkpoint_payload,
+                    observation_names=env_bundle.env.observation_names,
+                    action_names=env_bundle.env.action_names,
+                )
 
         return {
             "runner_id": record.runner_id,

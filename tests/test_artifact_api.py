@@ -223,6 +223,75 @@ def test_artifact_evaluate_rejects_incompatible_sac_checkpoint_before_queueing(
     assert "control_mode" in response.json()["detail"]
 
 
+def test_artifact_evaluate_rejects_incompatible_ppo_checkpoint_before_queueing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    # Codex P1 (2026-04-20): a central PPO artifact sidecar that advertises
+    # ``reward_v1`` must be rejected by the API preflight before the job
+    # queues, matching the SAC preflight above. Previously ``build_evaluation_request``
+    # had no PPO branch -- mismatched artifacts silently queued and blew up
+    # hours later inside the worker.
+    settings = build_test_settings(tmp_path)
+    app = create_app(settings)
+    artifact_id = "artifact_bad_ppo"
+    artifact_dir = settings.imported_artifacts_root / artifact_id
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    # The preflight resolves the file via artifact.json but we short-circuit
+    # to the sidecar loader below, so the actual zip content is irrelevant.
+    model_path = artifact_dir / "ppo_model.zip"
+    model_path.write_bytes(b"fake-sb3-zip")
+    write_json(
+        artifact_dir / "artifact.json",
+        {
+            "artifact_id": artifact_id,
+            "artifact_kind": "checkpoint",
+            "label": "bad ppo checkpoint",
+            "source_filename": "ppo_model.zip",
+            "imported_at": "2026-04-20T00:00:00Z",
+            "algorithm": "ppo",
+            "runner_id": "ppo_central_baseline",
+            "status": "evaluable",
+            "file_path": str(model_path),
+            "notes": None,
+            "evaluable": True,
+            "playback_path": None,
+            "simulation_dir": None,
+        },
+    )
+
+    def fake_load_central_ppo_sidecar_tools():
+        def fake_load_sidecar(_model_path):
+            # Sidecar reports the artifact was trained under reward_v1 /
+            # features_v1 -- the runner config (ppo_central_baseline.yaml)
+            # expects reward_v2 / features_v2. The real validator should raise.
+            return {
+                "algorithm": "ppo",
+                "control_mode": "centralized",
+                "variant": "central_baseline",
+                "reward_version": "v1",
+                "features_version": "v1",
+            }
+
+        from cos435_citylearn.baselines.ppo import _validate_central_ppo_sidecar
+
+        return fake_load_sidecar, _validate_central_ppo_sidecar
+
+    monkeypatch.setattr(
+        "cos435_citylearn.api.services.artifact_store._load_central_ppo_sidecar_tools",
+        fake_load_central_ppo_sidecar_tools,
+    )
+
+    client = TestClient(app)
+    response = client.post(f"/api/artifacts/{artifact_id}/evaluate", json={})
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    # The validator mentions the specific mismatched fields; make sure the
+    # 400 payload surfaces something actionable rather than a generic error.
+    assert "reward_version" in detail or "features_version" in detail
+
+
 def test_create_app_does_not_require_sac_modules_for_startup(tmp_path: Path, monkeypatch) -> None:
     real_import = builtins.__import__
 

@@ -251,6 +251,56 @@ def _resolve_artifact_paths(
     return model_path, vec_normalize_path
 
 
+def _load_imported_central_ppo_artifact(
+    *,
+    artifact_id: str,
+    imported_artifacts_root: str | Path | None,
+    artifacts_root: str | Path | None,
+) -> tuple[Path, Path]:
+    """Resolve the central-PPO zip + VecNormalize pkl for an imported artifact.
+
+    Imported artifacts live under ``<imported_artifacts_root>/<artifact_id>/``
+    with a sidecar ``artifact.json`` pointing at the uploaded file (whatever
+    filename the user chose). Locally trained runs live under
+    ``<artifacts_root>/runs/<artifact_id>/ppo_model.zip``. ``_resolve_artifact_paths``
+    handles only the local-run layout; when ``imported_artifacts_root`` is set we
+    have to follow ``artifact.json`` instead, otherwise the loader blows up with
+    ``FileNotFoundError`` on a path that never existed.
+
+    For the imported case, VecNormalize stats must be co-located with the model
+    zip (same directory). The upload API only accepts one file per call today,
+    so users import ``ppo_model.zip`` and ``vec_normalize.pkl`` as siblings via
+    two ``POST /artifacts/import`` calls pointing at the same underlying dir
+    -- or we fail loudly with a clear remediation message.
+    """
+    if imported_artifacts_root is None:
+        # Re-eval of a locally trained central PPO run: mirror the SAC flow and
+        # use the local-run layout under ``artifacts_root``.
+        return _resolve_artifact_paths(artifact_id, artifacts_root)
+    if artifacts_root is None:
+        raise ValueError(
+            "artifacts_root must be set when imported_artifacts_root is provided"
+        )
+    # Lazy import to match ``_load_imported_ppo_checkpoint`` below and avoid a
+    # module-top dependency on the SAC checkpoint utilities.
+    from cos435_citylearn.algorithms.sac.checkpoints import resolve_imported_checkpoint_path
+
+    model_path = resolve_imported_checkpoint_path(
+        artifact_id=artifact_id,
+        imported_artifacts_root=imported_artifacts_root,
+        artifacts_root=artifacts_root,
+    )
+    vec_normalize_path = model_path.parent / "vec_normalize.pkl"
+    if not vec_normalize_path.exists():
+        raise FileNotFoundError(
+            "VecNormalize stats (vec_normalize.pkl) not found alongside imported "
+            f"central PPO model at {model_path.parent}. Upload vec_normalize.pkl "
+            "into the same artifact directory as the PPO zip; centralized PPO "
+            "cannot evaluate without the observation normalization stats."
+        )
+    return model_path, vec_normalize_path
+
+
 def _load_central_ppo_sidecar(model_path: Path) -> dict[str, Any] | None:
     sidecar_path = model_path.parent / _CENTRAL_PPO_SIDECAR_NAME
     if not sidecar_path.exists():
@@ -492,9 +542,16 @@ def run_ppo(
         artifact_topology: dict[str, Any] | None = None
     else:
         # --- load saved artifact, skip training ---
-        resolved_root = imported_artifacts_root or artifacts_root
-        imported_model_path, imported_vec_path = _resolve_artifact_paths(
-            artifact_id, resolved_root
+        # Imported artifacts live under ``imported_artifacts_root/<id>/`` with a
+        # sidecar ``artifact.json``; locally trained runs live under
+        # ``artifacts_root/runs/<id>/``. The old unconditional call to
+        # ``_resolve_artifact_paths(artifact_id, imported_artifacts_root or ...)``
+        # assumed the local-run layout even for imported artifacts and blew up
+        # with FileNotFoundError on every dashboard-uploaded central PPO zip.
+        imported_model_path, imported_vec_path = _load_imported_central_ppo_artifact(
+            artifact_id=artifact_id,
+            imported_artifacts_root=imported_artifacts_root,
+            artifacts_root=artifacts_root,
         )
         # validate runtime labels (variant/reward/features) *before* loading the
         # model so a reward-mismatched artifact never gets published with the

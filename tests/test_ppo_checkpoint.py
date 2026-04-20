@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import logging
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -10,7 +12,10 @@ from cos435_citylearn.algorithms.ppo.checkpoints import (
     validate_ppo_checkpoint_payload_structure,
     validate_ppo_checkpoint_runner_compatibility,
 )
-from cos435_citylearn.baselines.ppo import _build_shared_ppo_checkpoint_payload
+from cos435_citylearn.baselines.ppo import (
+    _build_shared_ppo_checkpoint_payload,
+    _load_imported_central_ppo_artifact,
+)
 
 
 def _minimal_payload() -> dict[str, object]:
@@ -275,3 +280,129 @@ def test_shared_ppo_payload_carries_top_level_runtime_labels() -> None:
     assert payload["features_version"] == "v2"
     assert payload["algorithm"] == "ppo"
     assert payload["control_mode"] == "shared_dtde"
+
+
+def _write_imported_ppo_artifact(
+    *,
+    imported_root: Path,
+    artifact_id: str,
+    model_filename: str = "ppo_model.zip",
+    model_bytes: bytes = b"fake-sb3-zip",
+    include_vec_normalize: bool = True,
+    vec_normalize_bytes: bytes = b"fake-vec-normalize",
+) -> Path:
+    """Simulate what ``ArtifactStore.import_upload`` writes for a central PPO zip.
+
+    Layout on disk:
+        <imported_root>/<artifact_id>/artifact.json  -- sidecar record
+        <imported_root>/<artifact_id>/<model_filename>
+        <imported_root>/<artifact_id>/vec_normalize.pkl  (optional)
+    """
+    artifact_dir = imported_root / artifact_id
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    model_path = artifact_dir / model_filename
+    model_path.write_bytes(model_bytes)
+    if include_vec_normalize:
+        (artifact_dir / "vec_normalize.pkl").write_bytes(vec_normalize_bytes)
+    # ``resolve_imported_checkpoint_path`` reads ``artifact.json`` and follows
+    # ``file_path``; we store an absolute path so the resolver doesn't have to
+    # probe artifacts_root/repo_root/results_root lookup chains in the test.
+    (artifact_dir / "artifact.json").write_text(
+        json.dumps(
+            {
+                "artifact_id": artifact_id,
+                "artifact_kind": "checkpoint",
+                "label": "imported ppo",
+                "source_filename": model_filename,
+                "imported_at": "2026-04-20T00:00:00Z",
+                "algorithm": "ppo",
+                "runner_id": "ppo_central_baseline",
+                "status": "evaluable",
+                "file_path": str(model_path),
+                "notes": None,
+                "evaluable": True,
+                "playback_path": None,
+                "simulation_dir": None,
+            }
+        )
+    )
+    return model_path
+
+
+def test_load_imported_central_ppo_artifact_resolves_from_artifact_metadata(
+    tmp_path: Path,
+) -> None:
+    # Codex P1 (2026-04-20): dashboard-uploaded central PPO artifacts live at
+    # ``<imported_artifacts_root>/<id>/<uploaded_filename>`` with a sidecar
+    # ``artifact.json`` pointing at the file. The previous loader assumed the
+    # local-run layout (``<root>/runs/<id>/ppo_model.zip``) and blew up with
+    # FileNotFoundError for every import. This regression pins the correct
+    # resolution via ``artifact.json``.
+    imported_root = tmp_path / "imported"
+    artifacts_root = tmp_path / "artifacts"
+    artifacts_root.mkdir()
+    expected_model_path = _write_imported_ppo_artifact(
+        imported_root=imported_root,
+        artifact_id="artifact_ppo_ok",
+    )
+
+    model_path, vec_normalize_path = _load_imported_central_ppo_artifact(
+        artifact_id="artifact_ppo_ok",
+        imported_artifacts_root=imported_root,
+        artifacts_root=artifacts_root,
+    )
+
+    assert model_path == expected_model_path
+    assert vec_normalize_path == expected_model_path.parent / "vec_normalize.pkl"
+    assert vec_normalize_path.exists()
+
+
+def test_load_imported_central_ppo_artifact_raises_when_vec_normalize_missing(
+    tmp_path: Path,
+) -> None:
+    # Central PPO needs VecNormalize stats to evaluate. If the user imported
+    # the zip but forgot to also import ``vec_normalize.pkl``, fail loudly at
+    # resolve time with a message that tells them exactly what to do, instead
+    # of silently loading an unnormalized observation pipeline and producing
+    # garbage evaluation numbers.
+    imported_root = tmp_path / "imported"
+    artifacts_root = tmp_path / "artifacts"
+    artifacts_root.mkdir()
+    _write_imported_ppo_artifact(
+        imported_root=imported_root,
+        artifact_id="artifact_ppo_missing_vec",
+        include_vec_normalize=False,
+    )
+
+    with pytest.raises(FileNotFoundError) as excinfo:
+        _load_imported_central_ppo_artifact(
+            artifact_id="artifact_ppo_missing_vec",
+            imported_artifacts_root=imported_root,
+            artifacts_root=artifacts_root,
+        )
+    message = str(excinfo.value)
+    assert "vec_normalize.pkl" in message
+    assert "Upload vec_normalize.pkl" in message
+
+
+def test_load_imported_central_ppo_artifact_falls_back_to_local_run_layout(
+    tmp_path: Path,
+) -> None:
+    # Without ``imported_artifacts_root`` we're re-evaluating a locally trained
+    # run; the layout is ``<artifacts_root>/runs/<id>/ppo_model.zip``. Mirrors
+    # the SAC helper's same-shaped branch so the same helper covers dashboard
+    # imports and local re-eval workflows.
+    artifacts_root = tmp_path / "artifacts"
+    run_dir = artifacts_root / "runs" / "local_ppo_run"
+    run_dir.mkdir(parents=True)
+    (run_dir / "ppo_model.zip").write_bytes(b"local-zip")
+    (run_dir / "vec_normalize.pkl").write_bytes(b"local-vec")
+
+    model_path, vec_normalize_path = _load_imported_central_ppo_artifact(
+        artifact_id="local_ppo_run",
+        imported_artifacts_root=None,
+        artifacts_root=artifacts_root,
+    )
+
+    assert model_path == run_dir / "ppo_model.zip"
+    assert vec_normalize_path == run_dir / "vec_normalize.pkl"
