@@ -404,6 +404,12 @@ def run_ppo(
             )
         ent_coef = float(ent_coef_config)
 
+        # SB3's verbose=1 writes training tables to stdout, which corrupts the
+        # JSON payload that scripts/train/run_ppo.py emits to stdout for
+        # machine-readable consumers. Default to silent and let configs opt in
+        # for interactive runs.
+        sb3_verbose = int(config["training"].get("sb3_verbose", 0))
+
         model = PPO(
             "MlpPolicy",
             train_env,
@@ -416,7 +422,7 @@ def run_ppo(
             clip_range=0.2,
             ent_coef=ent_coef,
             seed=seed,
-            verbose=1,
+            verbose=sb3_verbose,
         )
 
         if progress_context is not None:

@@ -177,14 +177,19 @@ def _load_imported_checkpoint(
     imported_artifacts_root: str | Path | None,
     artifacts_root: str | Path | None,
 ) -> tuple[Path, dict[str, Any]]:
-    if imported_artifacts_root is None and artifacts_root is None:
-        checkpoint_path = RESULTS_DIR / "runs" / artifact_id / "checkpoint.pt"
+    if imported_artifacts_root is None:
+        # re-eval a locally trained run: look under artifacts_root (or default
+        # results dir). Matches the PPO path and lets tests / batch jobs point
+        # artifact_id at custom output roots without also setting
+        # imported_artifacts_root.
+        root = Path(artifacts_root) if artifacts_root is not None else RESULTS_DIR
+        checkpoint_path = root / "runs" / artifact_id / "checkpoint.pt"
         if not checkpoint_path.exists():
             raise FileNotFoundError(f"SAC checkpoint not found for artifact: {checkpoint_path}")
     else:
-        if imported_artifacts_root is None or artifacts_root is None:
+        if artifacts_root is None:
             raise ValueError(
-                "imported_artifacts_root and artifacts_root must both be set or both be None"
+                "artifacts_root must be set when imported_artifacts_root is provided"
             )
         checkpoint_path = resolve_imported_checkpoint_path(
             artifact_id=artifact_id,

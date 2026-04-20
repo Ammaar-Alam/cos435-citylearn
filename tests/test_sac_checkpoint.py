@@ -7,10 +7,11 @@ import numpy as np
 import pytest
 import torch
 
+from cos435_citylearn.algorithms.sac import resolve_reward_function
 from cos435_citylearn.algorithms.sac.checkpoints import (
     safe_load_checkpoint_payload,
-    validate_checkpoint_payload_structure,
     validate_checkpoint_env_compatibility,
+    validate_checkpoint_payload_structure,
     validate_checkpoint_runner_compatibility,
 )
 from cos435_citylearn.baselines.sac import (
@@ -18,11 +19,11 @@ from cos435_citylearn.baselines.sac import (
     _build_checkpoint_payload,
     _instantiate_controller,
     _instantiate_controller_from_checkpoint,
+    _load_imported_checkpoint,
     _maybe_reset_reward,
 )
 from cos435_citylearn.config import load_yaml
 from cos435_citylearn.env import make_citylearn_env
-from cos435_citylearn.algorithms.sac import resolve_reward_function
 from tests.smoke.helpers import require_benchmark_runtime, require_dataset
 
 
@@ -293,6 +294,51 @@ def test_validate_checkpoint_runner_compatibility_detects_legacy_payload_mismatc
         validate_checkpoint_runner_compatibility(payload, config)
 
 
+def test_load_imported_checkpoint_accepts_artifacts_root_only(tmp_path: Path) -> None:
+    # Codex P1 (2026-04-20): SAC eval with artifact_id + artifacts_root but no
+    # imported_artifacts_root must resolve against artifacts_root (tests / batch
+    # jobs that point artifact_id at a custom local run root). Previously this
+    # combination raised ValueError, breaking re-eval workflows that the PPO
+    # path already supported.
+    artifact_id = "sac__smoke__public_dev__seed0"
+    run_dir = tmp_path / "runs" / artifact_id
+    run_dir.mkdir(parents=True)
+    checkpoint_path = run_dir / "checkpoint.pt"
+    payload = _minimal_shared_checkpoint_payload()
+    torch.save(payload, checkpoint_path)
+
+    resolved_path, loaded_payload = _load_imported_checkpoint(
+        artifact_id=artifact_id,
+        imported_artifacts_root=None,
+        artifacts_root=tmp_path,
+    )
+
+    assert resolved_path == checkpoint_path
+    assert loaded_payload["algorithm"] == "sac"
+    assert loaded_payload["control_mode"] == "shared_dtde"
+
+
+def test_load_imported_checkpoint_requires_artifacts_root_when_importing(tmp_path: Path) -> None:
+    # With imported_artifacts_root set but artifacts_root missing we cannot
+    # resolve relative file_path entries in the artifact record -- fail loudly
+    # rather than silently assuming a results_root default.
+    with pytest.raises(ValueError, match="artifacts_root must be set"):
+        _load_imported_checkpoint(
+            artifact_id="anything",
+            imported_artifacts_root=tmp_path / "imported",
+            artifacts_root=None,
+        )
+
+
+def test_load_imported_checkpoint_reports_missing_local_checkpoint(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError, match="SAC checkpoint not found"):
+        _load_imported_checkpoint(
+            artifact_id="missing_run",
+            imported_artifacts_root=None,
+            artifacts_root=tmp_path,
+        )
+
+
 def test_validate_checkpoint_env_compatibility_rejects_schema_mismatch() -> None:
     payload = _minimal_central_checkpoint_payload()
 
@@ -304,7 +350,7 @@ def test_validate_checkpoint_env_compatibility_rejects_schema_mismatch() -> None
         )
 
 
-def test_validate_checkpoint_env_compatibility_rejects_building_count_mismatch_for_central() -> None:
+def test_validate_checkpoint_env_compatibility_rejects_building_count_mismatch_for_central():
     """Central checkpoints must fail loudly when eval env has more buildings."""
     payload = _minimal_central_checkpoint_payload()  # 1-building checkpoint
 
