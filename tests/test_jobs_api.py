@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import threading
 from pathlib import Path
 from unittest.mock import patch
@@ -7,7 +8,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from cos435_citylearn.api.app import create_app
-from cos435_citylearn.api.schemas import JobSummary
+from cos435_citylearn.api.schemas import JobSummary, LaunchJobRequest
 from cos435_citylearn.api.services.job_manager import JobManager
 from cos435_citylearn.api.settings import ApiSettings
 from cos435_citylearn.io import write_json
@@ -482,3 +483,81 @@ def test_refresh_mirrors_terminal_failure_into_state_store(tmp_path: Path) -> No
     assert state["status"] == "failed"
     assert state["phase"] == "failed"
     assert state["error_message"] == "worker exited early"
+
+
+def test_launch_job_request_accepts_allow_cross_reward_eval() -> None:
+    # Regression for the Codex P1 finding: LaunchJobRequest must declare
+    # allow_cross_reward_eval so Pydantic (extra="ignore" by default) does not
+    # silently drop it when the artifact evaluate router does
+    # ``LaunchJobRequest(**launch_payload)``. Without this field the flag
+    # passes preflight but the launched worker always sees ``False``.
+    request = LaunchJobRequest(
+        **{"runner_id": "rbc_builtin", "allow_cross_reward_eval": True}
+    )
+    assert request.allow_cross_reward_eval is True
+
+    # Default stays False so unrelated callers are unaffected.
+    default = LaunchJobRequest(runner_id="rbc_builtin")
+    assert default.allow_cross_reward_eval is False
+
+
+def test_submit_persists_allow_cross_reward_eval_to_worker_payload(tmp_path: Path) -> None:
+    # End-to-end: submitting a LaunchJobRequest with allow_cross_reward_eval=True
+    # must persist the flag to request.json, because worker_main.py passes the
+    # raw dict to eval_ppo_checkpoint / eval_sac_checkpoint which read
+    # ``request.get("allow_cross_reward_eval", False)``. If the field were
+    # dropped somewhere between the schema and request.json the worker would
+    # always fall back to False (the original Codex P1 bug).
+    class DummyProcess:
+        pid = 9999
+
+        def poll(self):
+            return None
+
+        def wait(self):
+            return 0
+
+    class DummyThread:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def start(self) -> None:
+            return None
+
+    settings = build_test_settings(tmp_path)
+    manager = JobManager(settings)
+    request = LaunchJobRequest(
+        runner_id="rbc_builtin",
+        allow_cross_reward_eval=True,
+    )
+
+    with (
+        patch(
+            "cos435_citylearn.api.services.job_manager.subprocess.Popen",
+            return_value=DummyProcess(),
+        ),
+        patch("cos435_citylearn.api.services.job_manager.threading.Thread", DummyThread),
+    ):
+        summary = manager.submit(request)
+
+    request_path = settings.jobs_root / summary.job_id / "request.json"
+    assert request_path.exists()
+    payload = json.loads(request_path.read_text())
+    assert payload["allow_cross_reward_eval"] is True
+
+    # Default-False requests must serialize with the explicit False value so
+    # downstream workers never hit KeyError-style branches.
+    default_request = LaunchJobRequest(runner_id="rbc_builtin")
+    with (
+        patch(
+            "cos435_citylearn.api.services.job_manager.subprocess.Popen",
+            return_value=DummyProcess(),
+        ),
+        patch("cos435_citylearn.api.services.job_manager.threading.Thread", DummyThread),
+    ):
+        default_summary = manager.submit(default_request)
+
+    default_payload = json.loads(
+        (settings.jobs_root / default_summary.job_id / "request.json").read_text()
+    )
+    assert default_payload["allow_cross_reward_eval"] is False

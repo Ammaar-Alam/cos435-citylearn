@@ -42,6 +42,25 @@ def assert_minibatch_fits_rollout(
         )
 
 
+def normalize_rollout_advantages(
+    advantages: np.ndarray, *, enabled: bool
+) -> np.ndarray:
+    """Zero-center and unit-variance scale a flat advantage array when enabled.
+
+    PPO additionally normalizes per-minibatch inside
+    ``RolloutBuffer.iter_minibatches`` when the same flag is set. Gating both
+    passes on ``normalize_advantage`` makes the config knob a true on/off
+    switch; ungated global normalization was a latent bug where
+    ``normalize_advantage=False`` silently still produced standardized
+    advantages because the global pass ran before the per-minibatch gate.
+    """
+    if not enabled or advantages.size <= 1:
+        return advantages
+    adv_mean = advantages.mean()
+    adv_std = advantages.std() + 1e-8
+    return (advantages - adv_mean) / adv_std
+
+
 class SharedPPOController(RLC):
     def __init__(
         self,
@@ -368,14 +387,17 @@ class SharedPPOController(RLC):
         approx_kls: list[float] = []
         clip_fractions: list[float] = []
 
+        # Gate BOTH the global pass here and the per-minibatch pass (inside
+        # iter_minibatches below) on self.normalize_advantage so the config
+        # knob is a real on/off switch. Previously the global pass ran
+        # unconditionally, making normalize_advantage=False a no-op.
         advantages_all = self.rollout_buffer.advantages[: self.rollout_buffer.size].reshape(-1)
-        if advantages_all.size > 1:
-            adv_mean = advantages_all.mean()
-            adv_std = advantages_all.std() + 1e-8
-            advantages_all = (advantages_all - adv_mean) / adv_std
-            self.rollout_buffer.advantages[: self.rollout_buffer.size] = advantages_all.reshape(
-                self.rollout_buffer.size, self.rollout_buffer.n_buildings
-            )
+        advantages_all = normalize_rollout_advantages(
+            advantages_all, enabled=self.normalize_advantage
+        )
+        self.rollout_buffer.advantages[: self.rollout_buffer.size] = advantages_all.reshape(
+            self.rollout_buffer.size, self.rollout_buffer.n_buildings
+        )
 
         for _ in range(self.n_epochs):
             epoch_kls = []
