@@ -281,7 +281,9 @@ def test_artifact_evaluate_rejects_incompatible_sac_checkpoint_before_queueing(
         def fake_validate_checkpoint_env_compatibility(*_args, **_kwargs):
             return None
 
-        from cos435_citylearn.algorithms.sac.checkpoints import validate_checkpoint_runner_compatibility
+        from cos435_citylearn.algorithms.sac.checkpoints import (
+            validate_checkpoint_runner_compatibility,
+        )
 
         return (
             fake_resolve_imported_checkpoint_path,
@@ -429,6 +431,175 @@ def test_artifact_evaluate_rejects_central_ppo_missing_vec_normalize_before_queu
     detail = response.json()["detail"]
     assert "vec_normalize.pkl" in detail
     assert "centralized PPO cannot evaluate" in detail
+
+
+def test_artifact_evaluate_rejects_central_ppo_missing_topology_before_queueing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    settings = build_test_settings(tmp_path)
+    app = create_app(settings)
+    artifact_id = "artifact_missing_topology"
+    artifact_dir = settings.imported_artifacts_root / artifact_id
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    model_path = artifact_dir / "ppo_model.zip"
+    model_path.write_bytes(b"fake-sb3-zip")
+    (artifact_dir / "vec_normalize.pkl").write_bytes(b"fake-vec")
+    write_json(
+        artifact_dir / "artifact.json",
+        {
+            "artifact_id": artifact_id,
+            "artifact_kind": "checkpoint",
+            "label": "central ppo missing topology",
+            "source_filename": "ppo_model.zip",
+            "imported_at": "2026-04-22T00:00:00Z",
+            "algorithm": "ppo",
+            "runner_id": "ppo_central_baseline",
+            "status": "evaluable",
+            "file_path": str(model_path),
+            "notes": None,
+            "evaluable": True,
+            "playback_path": None,
+            "simulation_dir": None,
+        },
+    )
+
+    def fake_load_central_ppo_sidecar_tools():
+        def fake_load_sidecar(_model_path):
+            return {
+                "algorithm": "ppo",
+                "control_mode": "centralized",
+                "variant": "central_baseline",
+                "reward_version": "reward_v0",
+                "features_version": "base_central_obs",
+            }
+
+        def fake_validate_sidecar(*_args, **_kwargs):
+            return {}
+
+        return fake_load_sidecar, fake_validate_sidecar
+
+    monkeypatch.setattr(
+        "cos435_citylearn.api.services.artifact_store._load_central_ppo_sidecar_tools",
+        fake_load_central_ppo_sidecar_tools,
+    )
+
+    client = TestClient(app)
+    response = client.post(f"/api/artifacts/{artifact_id}/evaluate", json={})
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "topology.json" in detail
+    assert "centralized PPO cannot evaluate safely" in detail
+
+
+def test_artifact_evaluate_rejects_central_ppo_topology_mismatch_before_queueing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    settings = build_test_settings(tmp_path)
+    app = create_app(settings)
+    artifact_id = "artifact_bad_topology"
+    artifact_dir = settings.imported_artifacts_root / artifact_id
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    model_path = artifact_dir / "ppo_model.zip"
+    model_path.write_bytes(b"fake-sb3-zip")
+    (artifact_dir / "vec_normalize.pkl").write_bytes(b"fake-vec")
+    write_json(
+        artifact_dir / "topology.json",
+        {
+            "observation_names": [["hour", "load"]] * 3,
+            "action_names": [["battery"]] * 3,
+        },
+    )
+    write_json(
+        artifact_dir / "artifact.json",
+        {
+            "artifact_id": artifact_id,
+            "artifact_kind": "checkpoint",
+            "label": "central ppo wrong split",
+            "source_filename": "ppo_model.zip",
+            "imported_at": "2026-04-22T00:00:00Z",
+            "algorithm": "ppo",
+            "runner_id": "ppo_central_baseline",
+            "status": "evaluable",
+            "file_path": str(model_path),
+            "notes": None,
+            "evaluable": True,
+            "playback_path": None,
+            "simulation_dir": None,
+        },
+    )
+
+    def fake_load_ppo_checkpoint_tools():
+        def fake_resolve_imported_checkpoint_path(**_kwargs):
+            return model_path
+
+        def fake_safe_load_checkpoint_payload(_path):
+            raise AssertionError("central PPO preflight should not load torch payloads")
+
+        def fake_validate_checkpoint_env_compatibility(*_args, **_kwargs):
+            raise AssertionError("central PPO preflight should use topology metadata")
+
+        def fake_validate_checkpoint_runner_compatibility(*_args, **_kwargs):
+            raise AssertionError("central PPO preflight should use sidecar validation")
+
+        return (
+            fake_resolve_imported_checkpoint_path,
+            fake_safe_load_checkpoint_payload,
+            fake_validate_checkpoint_env_compatibility,
+            fake_validate_checkpoint_runner_compatibility,
+        )
+
+    def fake_load_central_ppo_sidecar_tools():
+        def fake_load_sidecar(_model_path):
+            return {
+                "algorithm": "ppo",
+                "control_mode": "centralized",
+                "variant": "central_baseline",
+                "reward_version": "reward_v0",
+                "features_version": "base_central_obs",
+            }
+
+        def fake_validate_sidecar(*_args, **_kwargs):
+            return {}
+
+        return fake_load_sidecar, fake_validate_sidecar
+
+    def fake_make_citylearn_env(*_args, **_kwargs):
+        return type(
+            "Bundle",
+            (),
+            {
+                "env": type(
+                    "Env",
+                    (),
+                    {
+                        "observation_names": [["hour", "load"]] * 6,
+                        "action_names": [["battery"]] * 6,
+                    },
+                )(),
+            },
+        )()
+
+    monkeypatch.setattr(
+        "cos435_citylearn.api.services.artifact_store._load_ppo_checkpoint_tools",
+        fake_load_ppo_checkpoint_tools,
+    )
+    monkeypatch.setattr(
+        "cos435_citylearn.api.services.artifact_store._load_central_ppo_sidecar_tools",
+        fake_load_central_ppo_sidecar_tools,
+    )
+    monkeypatch.setattr(
+        "cos435_citylearn.api.services.artifact_store._load_citylearn_env_factory",
+        lambda: fake_make_citylearn_env,
+    )
+
+    client = TestClient(app)
+    response = client.post(f"/api/artifacts/{artifact_id}/evaluate", json={"split": "phase_3_1"})
+
+    assert response.status_code == 400
+    assert "trained on 3 buildings but target env has 6" in response.json()["detail"]
 
 
 def test_create_app_does_not_require_sac_modules_for_startup(tmp_path: Path, monkeypatch) -> None:

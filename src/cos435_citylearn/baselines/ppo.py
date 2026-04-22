@@ -303,6 +303,19 @@ def _load_imported_central_ppo_artifact(
     return model_path, vec_normalize_path
 
 
+def _load_central_ppo_topology(model_path: Path, *, artifact_id: str) -> dict[str, Any]:
+    topology_path = model_path.parent / "topology.json"
+    if not topology_path.exists():
+        raise FileNotFoundError(
+            "Topology metadata (topology.json) not found alongside imported "
+            f"central PPO model for artifact '{artifact_id}' at {model_path.parent}. "
+            "Re-import the checkpoint bundle with topology.json from the original "
+            "run directory; centralized PPO cannot evaluate safely without the "
+            "topology metadata because building-count/schema mismatches must fail fast."
+        )
+    return json.loads(topology_path.read_text())
+
+
 def _load_central_ppo_sidecar(model_path: Path) -> dict[str, Any] | None:
     sidecar_path = model_path.parent / _CENTRAL_PPO_SIDECAR_NAME
     if not sidecar_path.exists():
@@ -585,17 +598,11 @@ def run_ppo(
             # the source artifact moves or gets cleaned up
             write_json(run_dir / _CENTRAL_PPO_SIDECAR_NAME, imported_sidecar)
 
-        imported_topology_path = Path(imported_model_path).parent / "topology.json"
-        artifact_topology = None
-        if imported_topology_path.exists():
-            artifact_topology = json.loads(imported_topology_path.read_text())
-            write_json(topology_path, artifact_topology)
-        else:
-            print(
-                f"Warning: no topology.json for artifact '{artifact_id}'; "
-                "skipping PPO preflight check",
-                file=sys.stderr,
-            )
+        artifact_topology = _load_central_ppo_topology(
+            imported_model_path,
+            artifact_id=artifact_id,
+        )
+        write_json(topology_path, artifact_topology)
 
         # write empty training curve for consistency
         ensure_parent(curve_path)

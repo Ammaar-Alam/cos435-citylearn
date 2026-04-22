@@ -94,7 +94,7 @@ def main() -> None:
     }
     missing_cells = sorted(expected_cells - found_cells)
     missing_splits: list[tuple[str, str, int, str]] = []
-    for (algo, lr, seed) in sorted(found_cells):
+    for (algo, lr, seed) in sorted(expected_cells & found_cells):
         cell_dir = sweep_root / f"{algo}_lr{lr}_seed{seed}"
         if _read(cell_dir / "train.json") is None:
             missing_splits.append((algo, lr, seed, "public_dev (train.json)"))

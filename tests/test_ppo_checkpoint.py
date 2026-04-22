@@ -14,6 +14,7 @@ from cos435_citylearn.algorithms.ppo.checkpoints import (
 )
 from cos435_citylearn.baselines.ppo import (
     _build_shared_ppo_checkpoint_payload,
+    _load_central_ppo_topology,
     _load_imported_central_ppo_artifact,
 )
 
@@ -180,6 +181,14 @@ def test_runner_compatibility_detects_legacy_payload_mismatch() -> None:
     config = _matching_runner_config()  # runner wants reward v2
     with pytest.raises(ValueError, match="reward_version"):
         validate_ppo_checkpoint_runner_compatibility(payload, config)
+
+
+def test_load_central_ppo_topology_requires_topology_sidecar(tmp_path: Path) -> None:
+    model_path = tmp_path / "ppo_model.zip"
+    model_path.write_bytes(b"fake-sb3-zip")
+
+    with pytest.raises(FileNotFoundError, match="topology.json"):
+        _load_central_ppo_topology(model_path, artifact_id="artifact_missing_topology")
 
 
 def test_env_compatibility_allows_3_to_6_topology_expansion() -> None:

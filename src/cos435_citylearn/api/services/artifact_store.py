@@ -8,7 +8,6 @@ from uuid import uuid4
 
 from fastapi import UploadFile
 
-from cos435_citylearn.config import load_yaml
 from cos435_citylearn.api.schemas import (
     ArtifactDetail,
     ArtifactKind,
@@ -17,6 +16,7 @@ from cos435_citylearn.api.schemas import (
 )
 from cos435_citylearn.api.services.runner_registry import get_runner
 from cos435_citylearn.api.settings import ApiSettings
+from cos435_citylearn.config import load_yaml
 from cos435_citylearn.io import ensure_parent, write_json_atomic
 from cos435_citylearn.runtime import utc_now_iso
 
@@ -67,6 +67,15 @@ def _load_central_ppo_sidecar_tools():
     )
 
     return _load_central_ppo_sidecar, _validate_central_ppo_sidecar
+
+
+def _load_central_ppo_topology_tools():
+    from cos435_citylearn.baselines.ppo import (
+        _load_central_ppo_topology,
+        _validate_ppo_topology,
+    )
+
+    return _load_central_ppo_topology, _validate_ppo_topology
 
 
 def _load_citylearn_env_factory():
@@ -347,6 +356,22 @@ class ArtifactStore:
                     allow_cross_reward_eval=request.allow_cross_reward_eval,
                     artifact_id=artifact_id,
                 )
+                (
+                    _load_central_ppo_topology,
+                    _validate_ppo_topology,
+                ) = _load_central_ppo_topology_tools()
+                make_citylearn_env = _load_citylearn_env_factory()
+                artifact_topology = _load_central_ppo_topology(
+                    checkpoint_path,
+                    artifact_id=artifact_id,
+                )
+                env_bundle = make_citylearn_env(
+                    config["env"]["base_config"],
+                    f"configs/splits/{config['env']['split']}.yaml",
+                    seed=config["training"]["seed"],
+                    central_agent=True,
+                )
+                _validate_ppo_topology(artifact_topology, env_bundle.env)
             else:
                 # Shared PPO: same shape as SAC -- torch payload + env preflight.
                 make_citylearn_env = _load_citylearn_env_factory()
