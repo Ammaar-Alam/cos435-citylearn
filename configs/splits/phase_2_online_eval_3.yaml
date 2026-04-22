@@ -1,0 +1,8 @@
+split:
+  name: phase_2_online_eval_3
+  dataset_name: citylearn_challenge_2023_phase_2_online_evaluation_3
+  intent: released phase-2 online-evaluation dataset 3 for post-competition checkpoint validation
+  tuning_allowed: false
+  held_out: true
+  central_agent: true
+  buildings: []

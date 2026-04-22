@@ -1,0 +1,8 @@
+split:
+  name: phase_3_3
+  dataset_name: citylearn_challenge_2023_phase_3_3
+  intent: released phase-3 six-building dataset 3 for post-competition checkpoint validation
+  tuning_allowed: false
+  held_out: true
+  central_agent: true
+  buildings: []
