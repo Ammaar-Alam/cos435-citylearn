@@ -9,6 +9,8 @@ These files are the clean tracked summary of the raw outputs under `results/`.
 - `sac_seed_inventory.csv` — per-seed SAC run inventory for the local phase-2 batch
 - `released_eval_main_results.csv` — released official-eval family summaries
 - `released_eval_seed_inventory.csv` — per-seed released-eval checkpoint inventory
+- `ppo_shared_sweep_summary.csv` — per-learning-rate shared-PPO sweep summary rows
+- `ppo_shared_sweep_inventory.csv` — per-run shared-PPO sweep inventory with KPI columns
 - `official_benchmark_reference.csv` — published CityLearn 2023 reference numbers
 
 ## Local public_dev snapshot
@@ -21,6 +23,15 @@ These files are the clean tracked summary of the raw outputs under `results/`.
 - Shared DTDE SAC reward_v2: mean `0.568877`, std `0.017638`, 95% CI `0.043814`, seeds `3`
 
 Lower is better.
+
+## PPO shared sweep snapshot
+
+- centralized PPO baseline artifact: still missing locally
+- Shared DTDE PPO reward_v2 lr=`1e-4` on `public_dev`: mean `0.795652`, std `0.038388`, 95% CI `0.027461`, seeds `10`
+- Shared DTDE PPO reward_v2 lr=`3e-4` on `public_dev`: mean `0.783261`, std `0.037731`, 95% CI `0.026991`, seeds `10`
+The best shared-PPO local sweep setting is lr=`3e-4` at `0.783261` on `public_dev`.
+- Shared DTDE PPO reward_v2 lr=`1e-4` across released `phase_3_*`: mean `0.847284`, std `0.031378`, 95% CI `0.011229`, eval jobs `30`
+- Shared DTDE PPO reward_v2 lr=`3e-4` across released `phase_3_*`: mean `0.847783`, std `0.032190`, 95% CI `0.011519`, eval jobs `30`
 
 ## Local tuning headline
 
@@ -61,6 +72,6 @@ The released phase-2 winner among saved checkpoints is `central_reward_v2` at `0
 
 - these numbers are local phase-2 evaluation numbers, not official leaderboard results
 - some local SAC means are numerically below the published CHESCA references, but that is **not** enough to claim a true leaderboard win
-- there is still no saved PPO artifact in this checkout, so PPO vs SAC is not yet empirical
+- the centralized PPO baseline artifact is still missing locally, so the repo has shared-PPO sweep evidence but not the fixed-topology PPO baseline row yet
 - the released phase-2 online-eval datasets are much closer to the official evaluator-side setting than `public_dev`, but they are still reported separately from the local tuning split
-- centralized checkpoints are not portable to the released six-building `phase_3_*` datasets, so the current `phase_3` evidence is shared-DTDE-only
+- centralized checkpoints are not portable to the released six-building `phase_3_*` datasets, so the current `phase_3` evidence is shared-controller-only
