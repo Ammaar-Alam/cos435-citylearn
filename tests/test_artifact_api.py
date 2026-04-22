@@ -320,6 +320,7 @@ def test_artifact_evaluate_rejects_incompatible_ppo_checkpoint_before_queueing(
     # to the sidecar loader below, so the actual zip content is irrelevant.
     model_path = artifact_dir / "ppo_model.zip"
     model_path.write_bytes(b"fake-sb3-zip")
+    (artifact_dir / "vec_normalize.pkl").write_bytes(b"fake-vec")
     write_json(
         artifact_dir / "artifact.json",
         {
@@ -369,6 +370,65 @@ def test_artifact_evaluate_rejects_incompatible_ppo_checkpoint_before_queueing(
     # The validator mentions the specific mismatched fields; make sure the
     # 400 payload surfaces something actionable rather than a generic error.
     assert "reward_version" in detail or "features_version" in detail
+
+
+def test_artifact_evaluate_rejects_central_ppo_missing_vec_normalize_before_queueing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    settings = build_test_settings(tmp_path)
+    app = create_app(settings)
+    artifact_id = "artifact_missing_vec"
+    artifact_dir = settings.imported_artifacts_root / artifact_id
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    model_path = artifact_dir / "ppo_model.zip"
+    model_path.write_bytes(b"fake-sb3-zip")
+    write_json(
+        artifact_dir / "artifact.json",
+        {
+            "artifact_id": artifact_id,
+            "artifact_kind": "checkpoint",
+            "label": "central ppo missing vec",
+            "source_filename": "ppo_model.zip",
+            "imported_at": "2026-04-22T00:00:00Z",
+            "algorithm": "ppo",
+            "runner_id": "ppo_central_baseline",
+            "status": "evaluable",
+            "file_path": str(model_path),
+            "notes": None,
+            "evaluable": True,
+            "playback_path": None,
+            "simulation_dir": None,
+        },
+    )
+
+    def fake_load_central_ppo_sidecar_tools():
+        def fake_load_sidecar(_model_path):
+            return {
+                "algorithm": "ppo",
+                "control_mode": "centralized",
+                "variant": "central_baseline",
+                "reward_version": "reward_v0",
+                "features_version": "base_central_obs",
+            }
+
+        def fake_validate_sidecar(*_args, **_kwargs):
+            return {}
+
+        return fake_load_sidecar, fake_validate_sidecar
+
+    monkeypatch.setattr(
+        "cos435_citylearn.api.services.artifact_store._load_central_ppo_sidecar_tools",
+        fake_load_central_ppo_sidecar_tools,
+    )
+
+    client = TestClient(app)
+    response = client.post(f"/api/artifacts/{artifact_id}/evaluate", json={})
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "vec_normalize.pkl" in detail
+    assert "centralized PPO cannot evaluate" in detail
 
 
 def test_create_app_does_not_require_sac_modules_for_startup(tmp_path: Path, monkeypatch) -> None:

@@ -323,6 +323,15 @@ class ArtifactStore:
 
             control_mode = config["algorithm"]["control_mode"]
             if control_mode == "centralized":
+                vec_normalize_path = checkpoint_path.parent / "vec_normalize.pkl"
+                if not vec_normalize_path.exists():
+                    raise FileNotFoundError(
+                        "VecNormalize stats (vec_normalize.pkl) not found alongside imported "
+                        f"central PPO model at {checkpoint_path.parent}. Re-import via the "
+                        "dashboard and attach vec_normalize.pkl as a companion file on the "
+                        "upload form (the 'extra_files' field); centralized PPO cannot "
+                        "evaluate without the observation normalization stats."
+                    )
                 # SB3 zip: validate the sidecar instead of loading the zip. The
                 # worker still checks again on load, but preflighting here
                 # surfaces a misrouted artifact (reward_v1 under reward_v2
