@@ -112,7 +112,7 @@ def test_artifact_import_rejects_unknown_artifact_kind(tmp_path: Path) -> None:
 
 def test_artifact_import_stores_extra_files_alongside_primary(tmp_path: Path) -> None:
     # Codex P1 (2026-04-20): Central PPO checkpoints need ``ppo_model.zip`` and
-    # ``vec_normalize.pkl`` co-located under a single ``artifact_id``. The
+    # its companion sidecars co-located under a single ``artifact_id``. The
     # import endpoint's ``extra_files`` field is the only way to produce that
     # layout in one request; without this test, a future refactor could silently
     # drop companion uploads and re-break central-PPO evaluation.
@@ -131,6 +131,15 @@ def test_artifact_import_stores_extra_files_alongside_primary(tmp_path: Path) ->
         files=[
             ("file", ("ppo_model.zip", b"fake-sb3-zip", "application/zip")),
             ("extra_files", ("vec_normalize.pkl", b"fake-vec", "application/octet-stream")),
+            ("extra_files", ("topology.json", b"{}", "application/json")),
+            (
+                "extra_files",
+                (
+                    "checkpoint_metadata.json",
+                    b"{\"variant\":\"central_baseline\"}",
+                    "application/json",
+                ),
+            ),
         ],
     )
 
@@ -143,10 +152,37 @@ def test_artifact_import_stores_extra_files_alongside_primary(tmp_path: Path) ->
     # The companion file must land in the same directory, not its own UUID.
     assert (artifact_dir / "vec_normalize.pkl").exists()
     assert (artifact_dir / "vec_normalize.pkl").read_bytes() == b"fake-vec"
+    assert (artifact_dir / "topology.json").exists()
+    assert (artifact_dir / "checkpoint_metadata.json").exists()
     # ``file_path`` still points at the primary upload -- it's what the
     # artifact record and loaders key off. Companion files are discovered by
     # convention (sibling lookup).
     assert artifact["source_filename"] == "ppo_model.zip"
+
+
+def test_artifact_import_rejects_bound_central_ppo_missing_required_sidecars(
+    tmp_path: Path,
+) -> None:
+    settings = build_test_settings(tmp_path)
+    client = TestClient(create_app(settings))
+
+    response = client.post(
+        "/api/artifacts/import",
+        data={
+            "artifact_kind": "checkpoint",
+            "label": "central ppo missing sidecars",
+            "runner_id": "ppo_central_baseline",
+        },
+        files=[
+            ("file", ("ppo_model.zip", b"fake-sb3-zip", "application/zip")),
+            ("extra_files", ("vec_normalize.pkl", b"fake-vec", "application/octet-stream")),
+        ],
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "topology.json" in detail
+    assert "checkpoint_metadata.json" in detail
 
 
 def test_artifact_import_single_file_still_works_without_extra_files(tmp_path: Path) -> None:

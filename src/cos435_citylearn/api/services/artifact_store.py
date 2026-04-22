@@ -101,6 +101,59 @@ class ImportedArtifactRecord:
     simulation_dir: str | None = None
 
 
+_CENTRAL_PPO_REQUIRED_IMPORT_FILES = {
+    "vec_normalize.pkl",
+    "topology.json",
+    "checkpoint_metadata.json",
+}
+
+
+def _normalize_upload_filename(name: str | None, *, field_name: str) -> str:
+    normalized = Path(name or "").name
+    if not normalized:
+        raise ValueError(f"{field_name} entry is missing a filename")
+    return normalized
+
+
+def _collect_extra_upload_names(
+    primary_name: str,
+    extra_files: list[UploadFile] | None,
+) -> list[str]:
+    seen_names = {primary_name}
+    extra_names: list[str] = []
+    for extra in extra_files or []:
+        extra_name = _normalize_upload_filename(extra.filename, field_name="extra_files")
+        if extra_name in seen_names:
+            raise ValueError(
+                f"duplicate filename in upload: {extra_name!r}. "
+                "Each file in a single import must have a unique name."
+            )
+        seen_names.add(extra_name)
+        extra_names.append(extra_name)
+    return extra_names
+
+
+def _validate_runner_bound_import(
+    *,
+    artifact_kind: ArtifactKind,
+    spec: Any | None,
+    extra_names: list[str],
+) -> None:
+    if spec is None or artifact_kind != "checkpoint":
+        return
+    if spec.algorithm != "ppo" or spec.variant != "central_baseline":
+        return
+
+    missing = sorted(_CENTRAL_PPO_REQUIRED_IMPORT_FILES.difference(extra_names))
+    if missing:
+        missing_text = ", ".join(missing)
+        raise ValueError(
+            "centralized PPO dashboard imports require companion files "
+            "vec_normalize.pkl, topology.json, and checkpoint_metadata.json. "
+            f"Missing: {missing_text}."
+        )
+
+
 class ArtifactStore:
     def __init__(self, settings: ApiSettings):
         self.settings = settings
@@ -164,11 +217,19 @@ class ArtifactStore:
         algorithm: str | None,
         extra_files: list[UploadFile] | None = None,
     ) -> ArtifactDetail:
+        spec = get_runner(runner_id) if runner_id else None
+        filename = _normalize_upload_filename(file.filename or "artifact.bin", field_name="file")
+        extra_names = _collect_extra_upload_names(filename, extra_files)
+        _validate_runner_bound_import(
+            artifact_kind=artifact_kind,
+            spec=spec,
+            extra_names=extra_names,
+        )
+
         artifact_id = f"artifact_{uuid4().hex[:10]}"
         artifact_dir = self._artifact_dir(artifact_id)
         artifact_dir.mkdir(parents=True, exist_ok=True)
 
-        filename = Path(file.filename or "artifact.bin").name
         stored_path = ensure_parent(artifact_dir / filename)
         await self._stream_to_disk(file, stored_path)
 
@@ -178,25 +239,14 @@ class ArtifactStore:
         # the first, and users would ship an artifact that looks complete
         # but is missing a required file.
         if extra_files:
-            seen_names = {filename}
-            for extra in extra_files:
-                extra_name = Path(extra.filename or "").name
-                if not extra_name:
-                    raise ValueError("extra_files entry is missing a filename")
-                if extra_name in seen_names:
-                    raise ValueError(
-                        f"duplicate filename in upload: {extra_name!r}. "
-                        "Each file in a single import must have a unique name."
-                    )
-                seen_names.add(extra_name)
+            for extra, extra_name in zip(extra_files, extra_names):
                 extra_path = ensure_parent(artifact_dir / extra_name)
                 await self._stream_to_disk(extra, extra_path)
 
         evaluable = False
         status = "validated"
         effective_algorithm = algorithm or "unknown"
-        if runner_id:
-            spec = get_runner(runner_id)
+        if spec is not None:
             effective_algorithm = spec.algorithm
             evaluable = spec.supports_checkpoint_eval and artifact_kind == "checkpoint"
             status = "evaluable" if evaluable else "registered"

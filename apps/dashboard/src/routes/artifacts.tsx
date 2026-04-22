@@ -15,6 +15,12 @@ import { MetricCard, PlaybackScene, SectionHeader, TimeseriesPanel, TraceTable }
 
 type ArtifactKind = "checkpoint" | "run_bundle" | "simulation_bundle";
 
+const CENTRAL_PPO_REQUIRED_COMPANIONS = [
+  "vec_normalize.pkl",
+  "topology.json",
+  "checkpoint_metadata.json",
+] as const;
+
 export function ArtifactsPage() {
   const queryClient = useQueryClient();
   const [artifactKind, setArtifactKind] = useState<ArtifactKind>("run_bundle");
@@ -100,25 +106,27 @@ export function ArtifactsPage() {
 
   const checkpointRunners = (runnersQuery.data ?? []).filter((runner) => runner.supports_checkpoint_eval);
   const selectedRunner = checkpointRunners.find((runner) => runner.runner_id === selectedRunnerId) ?? null;
-  // Central PPO saves SB3 weights + a separate ``vec_normalize.pkl``; both
-  // must land in the same artifact directory. We flag the upload form when
-  // the selected runner is central PPO so the user knows to attach both.
-  // Shared PPO, central SAC, and shared SAC all ship a single ``checkpoint.pt``
-  // and keep the single-file upload flow.
-  const needsVecNormalizeCompanion =
+  const needsCentralPpoCompanions =
     artifactKind === "checkpoint" &&
     selectedRunner !== null &&
     selectedRunner.algorithm === "ppo" &&
     selectedRunner.variant === "central_baseline";
+  const extraFileNames = useMemo(
+    () => new Set(extraFiles.map((file) => file.name)),
+    [extraFiles],
+  );
+  const missingCentralPpoCompanions = needsCentralPpoCompanions
+    ? CENTRAL_PPO_REQUIRED_COMPANIONS.filter((name) => !extraFileNames.has(name))
+    : [];
+  const attachedCentralPpoCompanions = needsCentralPpoCompanions
+    ? CENTRAL_PPO_REQUIRED_COMPANIONS.filter((name) => extraFileNames.has(name))
+    : [];
 
   function handleSubmit(): void {
     if (!selectedFile) {
       return;
     }
-    if (needsVecNormalizeCompanion && extraFiles.length === 0) {
-      // Block the upload entirely -- central PPO is non-functional without
-      // the VecNormalize companion, so producing a half-artifact would just
-      // fail on evaluate with a less-helpful message.
+    if (needsCentralPpoCompanions && missingCentralPpoCompanions.length > 0) {
       return;
     }
 
@@ -167,7 +175,9 @@ export function ArtifactsPage() {
   }, [artifactDetailQuery.data?.file_path, selectedArtifact]);
 
   const readinessCopy =
-    artifactKind === "checkpoint"
+    needsCentralPpoCompanions
+      ? "Attach vec_normalize.pkl, topology.json, and checkpoint_metadata.json before importing."
+      : artifactKind === "checkpoint"
       ? checkpointRunners.length > 0
         ? "Bind a runner when you want to stage the next eval."
         : "Store the checkpoint now and bind it once the evaluator path lands."
@@ -235,17 +245,26 @@ export function ArtifactsPage() {
                 </select>
               </label>
             ) : null}
-            {needsVecNormalizeCompanion ? (
+            {needsCentralPpoCompanions ? (
               <label className="form-grid__wide">
-                vec_normalize.pkl (required for centralized PPO)
+                centralized PPO companion files
                 <input
-                  accept=".pkl,application/octet-stream"
+                  accept=".json,.pkl,application/json,application/octet-stream"
                   onChange={(event) => setExtraFiles(event.target.files ? Array.from(event.target.files) : [])}
                   type="file"
+                  multiple
                 />
                 <span className="muted-copy">
-                  Centralized PPO also needs the VecNormalize observation stats saved next to the model; both files are packed into a single artifact record.
+                  Attach all three sidecars so the dashboard can evaluate the imported checkpoint: vec_normalize.pkl, topology.json, and checkpoint_metadata.json.
                 </span>
+                <span className="muted-copy">
+                  attached: {attachedCentralPpoCompanions.length > 0 ? attachedCentralPpoCompanions.join(", ") : "none yet"}
+                </span>
+                {missingCentralPpoCompanions.length > 0 ? (
+                  <span style={{ color: "var(--danger)" }}>
+                    missing: {missingCentralPpoCompanions.join(", ")}
+                  </span>
+                ) : null}
               </label>
             ) : null}
             <label className="form-grid__wide">
@@ -264,7 +283,7 @@ export function ArtifactsPage() {
               disabled={
                 !selectedFile
                 || uploadMutation.isPending
-                || (needsVecNormalizeCompanion && extraFiles.length === 0)
+                || (needsCentralPpoCompanions && missingCentralPpoCompanions.length > 0)
               }
               onClick={handleSubmit}
               type="button"
