@@ -446,7 +446,11 @@ def run_sac(
 
     split_config_path = f"configs/splits/{config['env']['split']}.yaml"
     split_config = load_yaml(split_config_path)
-    assert_training_allowed_on_split(split_config, artifact_id=artifact_id)
+    assert_training_allowed_on_split(
+        split_config,
+        artifact_id=artifact_id,
+        checkpoint_path=checkpoint_path,
+    )
 
     reward_function = resolve_reward_function(config["reward"]["version"])
     central_agent = config["algorithm"]["control_mode"] == "centralized"

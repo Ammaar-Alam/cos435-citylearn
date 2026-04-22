@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import inspect
+
 import pytest
 
+from cos435_citylearn.baselines import ppo as ppo_module
 from cos435_citylearn.baselines.ppo import (
     _build_central_ppo_sidecar,
     _validate_central_ppo_sidecar,
@@ -87,6 +90,32 @@ def test_validate_missing_sidecar_warns_with_flag(capsys) -> None:
     )
     assert mismatches == {}
     assert "no checkpoint_metadata.json" in capsys.readouterr().err
+
+
+def test_run_ppo_captures_sidecar_mismatches_for_manifest() -> None:
+    # Codex P2 (2026-04-22): previously the caller at baselines/ppo.py
+    # discarded the validator's return value, so when a user opted into
+    # cross-reward eval with allow_cross_reward_eval=True, the resulting
+    # manifest.json only recorded artifact_id + trained_on_split -- never
+    # the actual (checkpoint, config) label diff. That made same-reward
+    # aggregation silently include cross-reward runs. Guard the two
+    # invariants this fix relies on:
+    #  1) the validator return is assigned to `label_mismatches`
+    #  2) the manifest block writes `runtime_label_mismatches` using the
+    #     same {checkpoint, config} schema as shared PPO and SAC
+    source = inspect.getsource(ppo_module)
+    assert "label_mismatches = _validate_central_ppo_sidecar(" in source, (
+        "central PPO must capture the sidecar validator's mismatch dict; "
+        "dropping the return re-opens the Codex P2 regression."
+    )
+    assert 'manifest["runtime_label_mismatches"]' in source, (
+        "central PPO manifest must record runtime_label_mismatches for "
+        "cross-reward eval parity with shared PPO and SAC."
+    )
+    assert '"checkpoint": trained, "config": expected' in source, (
+        "runtime_label_mismatches schema must match shared PPO / SAC "
+        "({checkpoint, config}) so downstream aggregation is uniform."
+    )
 
 
 def test_validate_uses_nested_fallback_when_top_level_missing() -> None:

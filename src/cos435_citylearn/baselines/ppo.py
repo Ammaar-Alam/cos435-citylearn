@@ -423,6 +423,13 @@ def run_ppo(
     topology_path = run_dir / "topology.json"
     curve_path = run_dir / "training_curve.csv"
 
+    # Populated when evaluating an imported artifact under a config whose
+    # reward/features/variant labels don't match the sidecar (and the caller
+    # opted into the mismatch via allow_cross_reward_eval). Persisted into the
+    # manifest below so the run is queryable for cross-reward evals, mirroring
+    # the shared-PPO and SAC paths.
+    label_mismatches: dict[str, tuple[Any, Any]] = {}
+
     if artifact_id is None:
         # --- train from scratch ---
         train_bundle = make_citylearn_env(
@@ -559,7 +566,7 @@ def run_ppo(
         # model so a reward-mismatched artifact never gets published with the
         # wrong labels. fails loudly unless allow_cross_reward_eval=True.
         imported_sidecar = _load_central_ppo_sidecar(imported_model_path)
-        _validate_central_ppo_sidecar(
+        label_mismatches = _validate_central_ppo_sidecar(
             imported_sidecar,
             config,
             allow_cross_reward_eval=allow_cross_reward_eval,
@@ -698,6 +705,16 @@ def run_ppo(
         manifest["artifact_id"] = artifact_id
         if artifact_topology is not None and "trained_on_split" in artifact_topology:
             manifest["trained_on_split"] = artifact_topology["trained_on_split"]
+        if label_mismatches:
+            # Cross-reward eval: the sidecar's variant/reward/features didn't
+            # match the runner config and the caller explicitly opted in via
+            # allow_cross_reward_eval. Record both labels so aggregate reports
+            # can filter these runs out of same-reward comparisons, matching
+            # the shared-PPO and SAC manifest schema.
+            manifest["runtime_label_mismatches"] = {
+                field: {"checkpoint": trained, "config": expected}
+                for field, (trained, expected) in label_mismatches.items()
+            }
     if job_id:
         manifest["job_id"] = job_id
     if job_dir is not None:

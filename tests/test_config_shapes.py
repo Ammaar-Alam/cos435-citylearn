@@ -45,6 +45,33 @@ def test_assert_training_allowed_on_split_allows_non_held_out() -> None:
     assert_training_allowed_on_split(split, artifact_id=None)
 
 
+def test_assert_training_allowed_on_split_allows_held_out_with_checkpoint_path() -> None:
+    # Codex P1 (2026-04-22): scripts/eval/run_sac_checkpoint.py evaluates a
+    # torch checkpoint directly from disk without an artifact_id; the guard
+    # must recognize checkpoint_path as the same "eval-only" signal.
+    split = {"split": {"name": "phase_3_3", "held_out": True, "tuning_allowed": False}}
+    assert_training_allowed_on_split(
+        split, artifact_id=None, checkpoint_path="/tmp/some_checkpoint.pt"
+    )
+
+
+def test_assert_training_allowed_on_split_allows_held_out_with_both_signals() -> None:
+    # Providing both is still eval-mode; the two XOR check lives in the
+    # caller (baselines/sac.py), not the guard itself.
+    split = {"split": {"name": "phase_3_2", "held_out": True, "tuning_allowed": False}}
+    assert_training_allowed_on_split(
+        split, artifact_id="some_run_id", checkpoint_path="/tmp/some_checkpoint.pt"
+    )
+
+
+def test_assert_training_allowed_on_split_rejects_held_out_with_no_signals() -> None:
+    # Explicit checkpoint_path=None keyword must still block training on
+    # held-out splits (regression guard for the kwarg default).
+    split = {"split": {"name": "phase_3_2", "held_out": True, "tuning_allowed": False}}
+    with pytest.raises(ValueError, match="phase_3_2"):
+        assert_training_allowed_on_split(split, artifact_id=None, checkpoint_path=None)
+
+
 class _FakeEnv:
     def __init__(self, observation_names, action_names) -> None:
         self.observation_names = observation_names
