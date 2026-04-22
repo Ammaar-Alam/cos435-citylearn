@@ -105,6 +105,26 @@ class MetricSummary:
     district_one_minus_thermal_resilience_proportion_mean: float
 
 
+@dataclass(frozen=True)
+class ReleasedSummary:
+    algorithm: str
+    variant: str
+    scope: str
+    split_names: tuple[str, ...]
+    dataset_names: tuple[str, ...]
+    rows: tuple[MetricRow, ...]
+    average_score_mean: float
+    average_score_std: float
+    average_score_ci95: float
+    best_average_score: float
+    worst_average_score: float
+    district_cost_total_mean: float
+    district_carbon_emissions_total_mean: float
+    district_daily_peak_average_mean: float
+    district_discomfort_proportion_mean: float
+    district_one_minus_thermal_resilience_proportion_mean: float
+
+
 def _read_metric_row(path: Path) -> MetricRow:
     with path.open(newline="") as handle:
         row = next(csv.DictReader(handle))
@@ -148,6 +168,28 @@ def _load_local_rows() -> tuple[MetricRow, list[MetricRow]]:
     if not sac_rows:
         raise FileNotFoundError("no sac metrics found under results/metrics")
     return rbc_row, sac_rows
+
+
+def _released_group(split: str) -> str:
+    if split.startswith("phase_2_online_eval_"):
+        return "released_phase_2_online_eval"
+    if split.startswith("phase_3_"):
+        return "released_phase_3"
+    raise ValueError(f"unsupported released split: {split}")
+
+
+def _load_released_rows() -> list[MetricRow]:
+    latest_rows: dict[tuple[str, str, int], MetricRow] = {}
+    for path in sorted(METRICS_ROOT.glob("sac__*.csv")):
+        row = _read_metric_row(path)
+        if not row.split.startswith("phase_"):
+            continue
+        latest_rows[(row.variant, row.split, row.seed)] = row
+
+    return sorted(
+        latest_rows.values(),
+        key=lambda row: (_released_group(row.split), row.variant, row.split, row.seed, row.run_id),
+    )
 
 
 def _write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, object]]) -> None:
@@ -217,6 +259,37 @@ def _summarize_rows(rows: list[MetricRow]) -> MetricSummary:
     )
 
 
+def _summarize_released_rows(scope: str, rows: list[MetricRow]) -> ReleasedSummary:
+    ordered_rows = tuple(sorted(rows, key=lambda row: (row.split, row.seed, row.run_id)))
+    scores = [row.average_score for row in ordered_rows]
+    costs = [row.district_cost_total for row in ordered_rows]
+    carbons = [row.district_carbon_emissions_total for row in ordered_rows]
+    peaks = [row.district_daily_peak_average for row in ordered_rows]
+    discomforts = [row.district_discomfort_proportion for row in ordered_rows]
+    resiliences = [
+        row.district_one_minus_thermal_resilience_proportion for row in ordered_rows
+    ]
+
+    return ReleasedSummary(
+        algorithm=ordered_rows[0].algorithm,
+        variant=ordered_rows[0].variant,
+        scope=scope,
+        split_names=tuple(sorted({row.split for row in ordered_rows})),
+        dataset_names=tuple(sorted({row.dataset_name for row in ordered_rows})),
+        rows=ordered_rows,
+        average_score_mean=_mean(scores),
+        average_score_std=_std(scores),
+        average_score_ci95=_ci95(scores),
+        best_average_score=min(scores),
+        worst_average_score=max(scores),
+        district_cost_total_mean=_mean(costs),
+        district_carbon_emissions_total_mean=_mean(carbons),
+        district_daily_peak_average_mean=_mean(peaks),
+        district_discomfort_proportion_mean=_mean(discomforts),
+        district_one_minus_thermal_resilience_proportion_mean=_mean(resiliences),
+    )
+
+
 def _build_sac_summaries(sac_rows: list[MetricRow]) -> list[MetricSummary]:
     grouped: dict[tuple[str, str], list[MetricRow]] = {}
     for row in sac_rows:
@@ -225,6 +298,28 @@ def _build_sac_summaries(sac_rows: list[MetricRow]) -> list[MetricSummary]:
     return sorted(
         (_summarize_rows(rows) for rows in grouped.values()),
         key=lambda summary: (summary.average_score_mean, summary.variant),
+    )
+
+
+def _build_released_group_summaries(rows: list[MetricRow]) -> list[ReleasedSummary]:
+    grouped: dict[tuple[str, str], list[MetricRow]] = {}
+    for row in rows:
+        grouped.setdefault((row.variant, _released_group(row.split)), []).append(row)
+
+    return sorted(
+        (_summarize_released_rows(scope, grouped_rows) for (_, scope), grouped_rows in grouped.items()),
+        key=lambda summary: (summary.scope, summary.average_score_mean, summary.variant),
+    )
+
+
+def _build_released_split_summaries(rows: list[MetricRow]) -> list[ReleasedSummary]:
+    grouped: dict[tuple[str, str], list[MetricRow]] = {}
+    for row in rows:
+        grouped.setdefault((row.variant, row.split), []).append(row)
+
+    return sorted(
+        (_summarize_released_rows(scope, grouped_rows) for (_, scope), grouped_rows in grouped.items()),
+        key=lambda summary: (summary.scope, summary.average_score_mean, summary.variant),
     )
 
 
@@ -424,6 +519,108 @@ def _build_seed_inventory_rows(sac_rows: list[MetricRow]) -> list[dict[str, obje
     return rows
 
 
+def _build_released_main_rows(
+    released_group_summaries: list[ReleasedSummary],
+) -> list[dict[str, object]]:
+    phase_2_summaries = [
+        summary
+        for summary in released_group_summaries
+        if summary.scope == "released_phase_2_online_eval"
+    ]
+    phase_2_winner = (
+        min(phase_2_summaries, key=lambda summary: summary.average_score_mean)
+        if phase_2_summaries
+        else None
+    )
+
+    rows: list[dict[str, object]] = []
+    for summary in released_group_summaries:
+        delta_vs_phase_2_winner = ""
+        if phase_2_winner is not None and summary.scope == "released_phase_2_online_eval":
+            delta_vs_phase_2_winner = round(
+                summary.average_score_mean - phase_2_winner.average_score_mean, 6
+            )
+
+        if summary.scope == "released_phase_2_online_eval":
+            if phase_2_winner is not None and summary.variant == phase_2_winner.variant:
+                note = "best released phase_2 result among saved checkpoints"
+            else:
+                note = "released phase_2 checkpoint evaluation summary"
+        else:
+            note = "released phase_3 checkpoint evaluation summary"
+
+        rows.append(
+            {
+                "method_id": f"sac_{summary.variant}_{summary.scope}",
+                "method_label": _variant_label(summary.variant),
+                "algorithm": summary.algorithm,
+                "variant": summary.variant,
+                "eval_group": summary.scope,
+                "split_count": len(summary.split_names),
+                "eval_job_count": len(summary.rows),
+                "seed_count": len({row.seed for row in summary.rows}),
+                "average_score_mean": round(summary.average_score_mean, 6),
+                "average_score_std": round(summary.average_score_std, 6),
+                "average_score_ci95": round(summary.average_score_ci95, 6),
+                "best_average_score": round(summary.best_average_score, 6),
+                "worst_average_score": round(summary.worst_average_score, 6),
+                "delta_vs_released_phase2_winner_mean": delta_vs_phase_2_winner,
+                "district_cost_total_mean": round(summary.district_cost_total_mean, 6),
+                "district_carbon_emissions_total_mean": round(
+                    summary.district_carbon_emissions_total_mean, 6
+                ),
+                "district_daily_peak_average_mean": round(
+                    summary.district_daily_peak_average_mean, 6
+                ),
+                "district_discomfort_proportion_mean": round(
+                    summary.district_discomfort_proportion_mean, 6
+                ),
+                "district_one_minus_thermal_resilience_proportion_mean": round(
+                    summary.district_one_minus_thermal_resilience_proportion_mean, 6
+                ),
+                "notes": note,
+            }
+        )
+
+    return rows
+
+
+def _build_released_seed_inventory_rows(
+    released_rows: list[MetricRow],
+) -> list[dict[str, object]]:
+    rows = []
+    for row in sorted(
+        released_rows, key=lambda item: (item.variant, item.split, item.seed, item.run_id)
+    ):
+        rows.append(
+            {
+                "run_id": row.run_id,
+                "file_name": row.file_name,
+                "algorithm": row.algorithm,
+                "variant": row.variant,
+                "split": row.split,
+                "eval_group": _released_group(row.split),
+                "seed": row.seed,
+                "dataset_name": row.dataset_name,
+                "average_score": round(row.average_score, 6),
+                "district_cost_total": round(row.district_cost_total, 6),
+                "district_carbon_emissions_total": round(
+                    row.district_carbon_emissions_total, 6
+                ),
+                "district_daily_peak_average": round(
+                    row.district_daily_peak_average, 6
+                ),
+                "district_discomfort_proportion": round(
+                    row.district_discomfort_proportion, 6
+                ),
+                "district_one_minus_thermal_resilience_proportion": round(
+                    row.district_one_minus_thermal_resilience_proportion, 6
+                ),
+            }
+        )
+    return rows
+
+
 def _build_reference_rows() -> list[dict[str, object]]:
     return [
         {
@@ -438,7 +635,10 @@ def _build_reference_rows() -> list[dict[str, object]]:
 
 
 def _write_status_markdown(
-    rbc_row: MetricRow, sac_summaries: list[MetricSummary]
+    rbc_row: MetricRow,
+    sac_summaries: list[MetricSummary],
+    released_group_summaries: list[ReleasedSummary],
+    released_split_summaries: list[ReleasedSummary],
 ) -> None:
     by_variant = {summary.variant: summary for summary in sac_summaries}
     best_summary = min(sac_summaries, key=lambda summary: summary.average_score_mean)
@@ -449,6 +649,40 @@ def _write_status_markdown(
     rbc_score = rbc_row.average_score
     best_claim_delta = rbc_score - best_claim_summary.average_score_mean
     best_claim_pct = best_claim_delta / rbc_score * 100.0
+    reward_v1 = by_variant["central_reward_v1"]
+    reward_v2 = by_variant["central_reward_v2"]
+    released_by_key = {
+        (summary.variant, summary.scope): summary for summary in released_group_summaries
+    }
+    released_split_by_key = {
+        (summary.variant, summary.scope): summary for summary in released_split_summaries
+    }
+    released_phase_2 = [
+        summary
+        for summary in released_group_summaries
+        if summary.scope == "released_phase_2_online_eval"
+    ]
+    released_phase_2_winner = (
+        min(released_phase_2, key=lambda summary: summary.average_score_mean)
+        if released_phase_2
+        else None
+    )
+    shared_phase_2 = released_by_key.get(
+        ("shared_dtde_reward_v2", "released_phase_2_online_eval")
+    )
+    shared_phase_3 = released_by_key.get(("shared_dtde_reward_v2", "released_phase_3"))
+
+    if len(best_summary.rows) >= 5:
+        headline_intro = (
+            f"The best current mean is `{best_summary.variant}` at "
+            f"`{best_summary.average_score_mean:.6f}` across `{len(best_summary.rows)}` seeds."
+        )
+    else:
+        headline_intro = (
+            f"The best pilot mean right now is `{best_summary.variant}` at "
+            f"`{best_summary.average_score_mean:.6f}`, but that result only has "
+            f"`{len(best_summary.rows)}` seeds."
+        )
 
     def line(summary: MetricSummary) -> str:
         return (
@@ -457,7 +691,47 @@ def _write_status_markdown(
             f"seeds `{len(summary.rows)}`"
         )
 
-    text = f"""# Current Local Results Snapshot
+    def released_line(summary: ReleasedSummary) -> str:
+        return (
+            f"- {_variant_label(summary.variant)} on `{summary.scope}`: mean "
+            f"`{summary.average_score_mean:.6f}`, std `{summary.average_score_std:.6f}`, "
+            f"95% CI `{summary.average_score_ci95:.6f}`, eval jobs `{len(summary.rows)}`, "
+            f"seeds `{len({row.seed for row in summary.rows})}`"
+        )
+
+    released_phase_2_text = ""
+    if released_phase_2:
+        released_phase_2_text = "\n".join(released_line(summary) for summary in released_phase_2)
+
+    released_split_lines: list[str] = []
+    for split in ("phase_2_online_eval_1", "phase_2_online_eval_2", "phase_2_online_eval_3"):
+        central = released_split_by_key.get(("central_reward_v2", split))
+        shared = released_split_by_key.get(("shared_dtde_reward_v2", split))
+        if central is None or shared is None:
+            continue
+        released_split_lines.append(
+            f"- `{split}`: central `reward_v2` `{central.average_score_mean:.6f}` vs "
+            f"shared `reward_v2` `{shared.average_score_mean:.6f}`"
+        )
+
+    released_headline = ""
+    if released_phase_2_winner is not None:
+        released_headline = (
+            f"The released phase-2 winner among saved checkpoints is "
+            f"`{released_phase_2_winner.variant}` at "
+            f"`{released_phase_2_winner.average_score_mean:.6f}` across "
+            f"`{len(released_phase_2_winner.rows)}` eval jobs."
+        )
+
+    shared_phase_3_text = ""
+    if shared_phase_3 is not None:
+        shared_phase_3_text = (
+            f"The shared DTDE checkpoint family also completed the released `phase_3_*` "
+            f"six-building sweep at `{shared_phase_3.average_score_mean:.6f}` across "
+            f"`{len(shared_phase_3.rows)}` eval jobs."
+        )
+
+    text = f"""# Current Results Snapshot
 
 These files are the clean tracked summary of the raw outputs under `results/`.
 
@@ -466,9 +740,11 @@ These files are the clean tracked summary of the raw outputs under `results/`.
 - `local_main_results.csv` — tracked method-level summary rows
 - `sac_ablation_summary.csv` — SAC-only variant comparison with seed-aware means and CIs
 - `sac_seed_inventory.csv` — per-seed SAC run inventory for the local phase-2 batch
+- `released_eval_main_results.csv` — released official-eval family summaries
+- `released_eval_seed_inventory.csv` — per-seed released-eval checkpoint inventory
 - `official_benchmark_reference.csv` — published CityLearn 2023 reference numbers
 
-## What is currently measured
+## Local public_dev snapshot
 
 - local RBC baseline: `{rbc_score:.6f}`
 - PPO baseline artifact: missing locally
@@ -479,29 +755,43 @@ These files are the clean tracked summary of the raw outputs under `results/`.
 
 Lower is better.
 
-## Current headline
+## Local tuning headline
 
-The best pilot mean right now is `{best_summary.variant}` at `{best_summary.average_score_mean:.6f}`,
-but that result only has `{len(best_summary.rows)}` seeds.
+{headline_intro}
 
 The strongest improved SAC result with a full 5-seed comparison is
 `{best_claim_summary.variant}` at `{best_claim_summary.average_score_mean:.6f}`.
 That is `{best_claim_delta:.6f}` lower than the local RBC baseline, a
 `{best_claim_pct:.2f}%` improvement on the local phase-2 evaluation dataset.
 
-## What the overnight SAC batch says
+## Released official-eval snapshot
+
+{released_phase_2_text}
+- {shared_phase_3_text if shared_phase_3_text else 'released phase_3 shared-checkpoint results are not available yet'}
+
+Lower is better.
+
+## Current headline
+
+{released_headline}
+
+## What the full SAC evidence says
 
 - every measured SAC variant beats the local RBC baseline by a large margin
-- the central SAC baseline and central `reward_v2` now have claim-quality 5-seed local comparisons
-- central `reward_v1` has the best current pilot mean, but only on 3 seeds
-- shared / decentralized `reward_v2` did not beat the best centralized SAC result in this batch
+- the central SAC baseline, central `reward_v1`, and central `reward_v2` now all have claim-quality 5-seed local comparisons
+- `central_reward_v1` currently beats `central_reward_v2` on mean total score (`{reward_v1.average_score_mean:.6f}` vs `{reward_v2.average_score_mean:.6f}`)
+- `central_reward_v2` is the best saved fixed-topology checkpoint family on the released phase-2 online-eval datasets
+- shared / decentralized `reward_v2` did not beat the released phase-2 central winner
+{chr(10).join(released_split_lines) if released_split_lines else ''}
+- none of the saved checkpoints currently beat the published CHESCA references
 
 ## Important caveats
 
 - these numbers are local phase-2 evaluation numbers, not official leaderboard results
 - some local SAC means are numerically below the published CHESCA references, but that is **not** enough to claim a true leaderboard win
 - there is still no saved PPO artifact in this checkout, so PPO vs SAC is not yet empirical
-- held-out evaluation is still missing, so the final paper claim is not complete yet
+- the released phase-2 online-eval datasets are much closer to the official evaluator-side setting than `public_dev`, but they are still reported separately from the local tuning split
+- centralized checkpoints are not portable to the released six-building `phase_3_*` datasets, so the current `phase_3` evidence is shared-DTDE-only
 """
     (OUTPUT_ROOT / "README.md").write_text(text)
 
@@ -509,11 +799,16 @@ That is `{best_claim_delta:.6f}` lower than the local RBC baseline, a
 def main() -> None:
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     rbc_row, sac_rows = _load_local_rows()
+    released_rows = _load_released_rows()
     sac_summaries = _build_sac_summaries(sac_rows)
+    released_group_summaries = _build_released_group_summaries(released_rows)
+    released_split_summaries = _build_released_split_summaries(released_rows)
 
     local_rows = _build_local_results_rows(rbc_row, sac_summaries)
     ablation_rows = _build_sac_ablation_rows(rbc_row, sac_summaries)
     seed_rows = _build_seed_inventory_rows(sac_rows)
+    released_main_rows = _build_released_main_rows(released_group_summaries)
+    released_seed_rows = _build_released_seed_inventory_rows(released_rows)
     reference_rows = _build_reference_rows()
 
     _write_csv(
@@ -588,11 +883,59 @@ def main() -> None:
         seed_rows,
     )
     _write_csv(
+        OUTPUT_ROOT / "released_eval_main_results.csv",
+        [
+            "method_id",
+            "method_label",
+            "algorithm",
+            "variant",
+            "eval_group",
+            "split_count",
+            "eval_job_count",
+            "seed_count",
+            "average_score_mean",
+            "average_score_std",
+            "average_score_ci95",
+            "best_average_score",
+            "worst_average_score",
+            "delta_vs_released_phase2_winner_mean",
+            "district_cost_total_mean",
+            "district_carbon_emissions_total_mean",
+            "district_daily_peak_average_mean",
+            "district_discomfort_proportion_mean",
+            "district_one_minus_thermal_resilience_proportion_mean",
+            "notes",
+        ],
+        released_main_rows,
+    )
+    _write_csv(
+        OUTPUT_ROOT / "released_eval_seed_inventory.csv",
+        [
+            "run_id",
+            "file_name",
+            "algorithm",
+            "variant",
+            "split",
+            "eval_group",
+            "seed",
+            "dataset_name",
+            "average_score",
+            "district_cost_total",
+            "district_carbon_emissions_total",
+            "district_daily_peak_average",
+            "district_discomfort_proportion",
+            "district_one_minus_thermal_resilience_proportion",
+        ],
+        released_seed_rows,
+    )
+    _write_csv(
         OUTPUT_ROOT / "official_benchmark_reference.csv",
         ["method_id", "method_label", "split_type", "average_score", "source_note"],
         reference_rows,
     )
-    _write_status_markdown(rbc_row, sac_summaries)
+    _write_status_markdown(
+        rbc_row, sac_summaries, released_group_summaries, released_split_summaries
+    )
 
 
 if __name__ == "__main__":

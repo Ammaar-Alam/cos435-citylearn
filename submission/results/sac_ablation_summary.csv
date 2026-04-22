@@ -1,5 +1,5 @@
 variant,method_label,seed_count,evidence_level,average_score_mean,average_score_std,average_score_ci95,best_average_score,worst_average_score,delta_vs_central_baseline_mean,pct_improvement_vs_central_baseline_mean,delta_vs_local_rbc_mean,district_cost_total_mean,district_carbon_emissions_total_mean,district_daily_peak_average_mean,district_discomfort_proportion_mean,district_one_minus_thermal_resilience_proportion_mean
-central_reward_v1,Centralized SAC reward_v1,3,pilot,0.525948,0.01301,0.03232,0.511595,0.536968,0.028016,5.06,0.496671,0.821924,0.847247,0.764844,0.018031,0.267725
+central_reward_v1,Centralized SAC reward_v1,5,claim_run,0.527309,0.011312,0.014046,0.511595,0.53828,0.026655,4.81,0.49531,0.822538,0.847813,0.763053,0.018727,0.290159
 central_reward_v2,Centralized SAC reward_v2,5,claim_run,0.535651,0.015883,0.019722,0.516576,0.551165,0.018313,3.31,0.486967,0.811412,0.835537,0.774039,0.01977,0.309524
 central_baseline,Centralized SAC baseline,5,claim_run,0.553964,0.00917,0.011386,0.544145,0.566632,0.0,0.0,0.468655,0.887797,0.903986,0.928241,0.012291,0.165714
 shared_dtde_reward_v2,Shared DTDE SAC reward_v2,3,pilot,0.568877,0.017638,0.043814,0.549543,0.584087,-0.014913,-2.69,0.453742,0.809223,0.8288,0.845731,0.022518,0.338095
