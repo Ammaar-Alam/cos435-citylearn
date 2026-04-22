@@ -188,6 +188,12 @@ def _load_imported_checkpoint(
     return checkpoint_path, checkpoint_payload
 
 
+def _load_local_checkpoint(*, checkpoint_path: str | Path) -> tuple[Path, dict[str, Any]]:
+    resolved_checkpoint_path = resolve_path(checkpoint_path)
+    checkpoint_payload = safe_load_checkpoint_payload(resolved_checkpoint_path)
+    return resolved_checkpoint_path, checkpoint_payload
+
+
 def _build_adapter(env: Any):
     if env.central_agent:
         return CentralizedEnvAdapter(env)
@@ -407,6 +413,7 @@ def run_sac(
     artifacts_root: str | Path | None = None,
     imported_artifacts_root: str | Path | None = None,
     artifact_id: str | None = None,
+    checkpoint_path: str | Path | None = None,
     job_id: str | None = None,
     job_dir: str | Path | None = None,
     progress_context: Any | None = None,
@@ -441,11 +448,15 @@ def run_sac(
         if manifests_root is None
         else Path(manifests_root)
     )
+    requested_checkpoint_path = checkpoint_path
     run_dir = run_root / run_id
-    checkpoint_path = run_dir / "checkpoint.pt"
+    run_checkpoint_path = run_dir / "checkpoint.pt"
     training_curve_path = run_dir / "training_curve.csv"
 
-    if artifact_id is None:
+    if artifact_id is not None and requested_checkpoint_path is not None:
+        raise ValueError("checkpoint evaluation accepts either artifact_id or checkpoint_path, not both")
+
+    if artifact_id is None and requested_checkpoint_path is None:
         training_controller = _instantiate_controller(env_bundle.env, config)
         curve_rows = _run_training_loop(
             controller=training_controller,
@@ -460,19 +471,26 @@ def run_sac(
             controller=training_controller,
             training_step=int(config["training"]["total_timesteps"]),
         )
-        ensure_parent(checkpoint_path)
-        torch.save(checkpoint_payload, checkpoint_path)
+        ensure_parent(run_checkpoint_path)
+        torch.save(checkpoint_payload, run_checkpoint_path)
         _write_training_curve(training_curve_path, curve_rows)
+        resolved_checkpoint_path = run_checkpoint_path
+    elif requested_checkpoint_path is not None:
+        resolved_checkpoint_path, checkpoint_payload = _load_local_checkpoint(
+            checkpoint_path=requested_checkpoint_path
+        )
+        validate_checkpoint_runner_compatibility(checkpoint_payload, config)
+        _write_training_curve(training_curve_path, [])
     else:
-        checkpoint_path, checkpoint_payload = _load_imported_checkpoint(
+        resolved_checkpoint_path, checkpoint_payload = _load_imported_checkpoint(
             artifact_id=artifact_id,
             imported_artifacts_root=imported_artifacts_root,
             artifacts_root=artifacts_root,
         )
         validate_checkpoint_runner_compatibility(checkpoint_payload, config)
         _write_training_curve(training_curve_path, [])
-    if artifact_id is None:
-        checkpoint_payload = safe_load_checkpoint_payload(checkpoint_path)
+    if artifact_id is None and requested_checkpoint_path is None:
+        checkpoint_payload = safe_load_checkpoint_payload(resolved_checkpoint_path)
 
     eval_reward_function = resolve_reward_function(config["reward"]["version"])
     eval_env_bundle = make_citylearn_env(
@@ -511,7 +529,7 @@ def run_sac(
         "dataset_name": eval_env_bundle.dataset_name,
         "seed": eval_env_bundle.seed,
         "step_count": step_count,
-        "checkpoint_path": str(checkpoint_path),
+        "checkpoint_path": str(resolved_checkpoint_path),
         "training_curve_path": str(training_curve_path),
         "training_total_timesteps": int(config["training"]["total_timesteps"]),
     }
@@ -551,7 +569,7 @@ def run_sac(
         "csv_path": str(metrics_dir / f"{run_id}.csv"),
         "run_id": run_id,
         "average_score": metrics_payload["average_score"],
-        "checkpoint_path": str(checkpoint_path),
+        "checkpoint_path": str(resolved_checkpoint_path),
         "training_curve_path": str(training_curve_path),
     }
 
@@ -566,7 +584,7 @@ def run_sac(
     if progress_context is not None:
         progress_context.artifact(
             kind="checkpoint",
-            path=str(checkpoint_path),
+            path=str(resolved_checkpoint_path),
             label="SAC checkpoint",
         )
         progress_context.artifact(

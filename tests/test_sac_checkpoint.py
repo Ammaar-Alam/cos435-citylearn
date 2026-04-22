@@ -219,6 +219,16 @@ def test_validate_checkpoint_env_compatibility_rejects_schema_mismatch() -> None
         )
 
 
+def test_validate_shared_checkpoint_env_compatibility_allows_more_buildings_with_matching_schema() -> None:
+    payload = _minimal_shared_checkpoint_payload()
+
+    validate_checkpoint_env_compatibility(
+        payload,
+        observation_names=[["hour", "load"]] * 6,
+        action_names=[["battery"]] * 6,
+    )
+
+
 def test_validate_checkpoint_payload_structure_rejects_missing_shared_context_dimension() -> None:
     payload = _minimal_shared_checkpoint_payload()
     del payload["controller_state"]["shared_context_dimension"]

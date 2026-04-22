@@ -191,15 +191,37 @@ def validate_checkpoint_env_compatibility(
     observation_names: Sequence[Sequence[str]],
     action_names: Sequence[Sequence[str]],
 ) -> None:
-    checkpoint_observation_names = checkpoint_payload["observation_names"]
-    checkpoint_action_names = checkpoint_payload["action_names"]
+    checkpoint_observation_names = [list(names) for names in checkpoint_payload["observation_names"]]
+    checkpoint_action_names = [list(names) for names in checkpoint_payload["action_names"]]
+    current_observation_names = [list(names) for names in observation_names]
+    current_action_names = [list(names) for names in action_names]
 
-    if list(observation_names) != checkpoint_observation_names:
+    if checkpoint_payload["control_mode"] == "shared_dtde":
+        reference_observation_names = checkpoint_observation_names[0]
+        reference_action_names = checkpoint_action_names[0]
+
+        if any(names != reference_observation_names for names in checkpoint_observation_names):
+            raise ValueError("shared SAC checkpoint observation schema is internally inconsistent")
+
+        if any(names != reference_action_names for names in checkpoint_action_names):
+            raise ValueError("shared SAC checkpoint action schema is internally inconsistent")
+
+        if any(names != reference_observation_names for names in current_observation_names):
+            raise ValueError(
+                "checkpoint observation schema is incompatible with the selected runner config"
+            )
+
+        if any(names != reference_action_names for names in current_action_names):
+            raise ValueError("checkpoint action schema is incompatible with the selected runner config")
+
+        return
+
+    if current_observation_names != checkpoint_observation_names:
         raise ValueError(
             "checkpoint observation schema is incompatible with the selected runner config"
         )
 
-    if list(action_names) != checkpoint_action_names:
+    if current_action_names != checkpoint_action_names:
         raise ValueError(
             "checkpoint action schema is incompatible with the selected runner config"
         )
