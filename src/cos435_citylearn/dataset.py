@@ -166,12 +166,17 @@ def download_citylearn_2023(
         file_entries = list(pool.map(lambda item: _download_file(item, destination), remote_files))
 
     file_entries = sorted(file_entries, key=lambda entry: entry["relative_path"])
+    try:
+        download_root = str(destination.relative_to(DATA_DIR.parent))
+    except ValueError:
+        download_root = str(destination)
+
     manifest = {
         "generated_at": utc_now_iso(),
         "dataset_doi": CITYLEARN_2023_DOI,
         "persistent_url": CITYLEARN_2023_PERSISTENT_URL,
         "api_url": CITYLEARN_2023_API_URL,
-        "download_root": str(destination),
+        "download_root": download_root,
         "downloaded_datasets": selected,
         "default_dataset": DEFAULT_DATASET_NAME,
         "all_available_datasets": available_dataset_names(metadata),

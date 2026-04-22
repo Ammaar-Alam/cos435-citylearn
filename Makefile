@@ -2,7 +2,7 @@ PYTHON := .venv/bin/python
 MPLCONFIGDIR := $(CURDIR)/.cache/matplotlib
 NPM_CACHE := $(CURDIR)/.npm-cache
 
-.PHONY: install install-benchmark test check env-info repo-tree download-citylearn env-schema smoke train-rbc train-sac train-sac-shared train-ppo train-ppo-shared submission-results check-ui-exports dashboard-install dashboard-build dashboard-check dashboard-backend dashboard-frontend ui ui-open
+.PHONY: install install-benchmark test check env-info repo-tree download-citylearn download-citylearn-all env-schema smoke train-rbc train-sac train-sac-shared train-ppo train-ppo-shared submission-results check-ui-exports dashboard-install dashboard-build dashboard-check dashboard-backend dashboard-frontend ui ui-open
 
 install:
 	bash scripts/setup/install_env.sh
@@ -24,6 +24,9 @@ env-info:
 
 download-citylearn:
 	bash scripts/setup/download_citylearn_2023.sh
+
+download-citylearn-all:
+	bash scripts/setup/download_citylearn_2023.sh --all
 
 env-schema:
 	MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/inspect/write_env_schema.py

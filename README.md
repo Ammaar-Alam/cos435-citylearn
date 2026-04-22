@@ -15,6 +15,7 @@ The project is scoped around the 2023 CityLearn challenge and the comparison bet
 Foundation in this repo now has:
 - pinned Python 3.10 benchmark install
 - official 2023 dataset download script
+- released post-competition phase-2 online-eval and phase-3 dataset support
 - canonical CityLearn loader and thin env adapters
 - observation/action schema export
 - random rollout smoke coverage
@@ -79,6 +80,10 @@ Official 2023 leaderboard numbers, including the RBC baseline, the winning CHESC
 
 ## held-out eval and benchmark submission
 
+The repo split and dataset policy, including the difference between `public_dev`,
+the released phase-2 online-eval datasets, and the released phase-3 six-building
+datasets, is documented in [docs/evaluation-splits.md](docs/evaluation-splits.md).
+
 The 2023 challenge trains on 3 buildings (phase-2 local_evaluation ≈ `public_dev`) and evaluates on all 6 buildings in phase 3. That 3 → 6 topology jump means a policy can only be evaluated on `phase_3_{1,2,3}` if its architecture is topology-invariant.
 
 - `sac_shared_dtde_*` — shared-parameter per-building SAC. One actor-critic is called once per building. Eligible for phase-3 held-out evaluation and AICrowd submission.
@@ -97,6 +102,7 @@ make test
 make check
 make install-benchmark
 make download-citylearn
+make download-citylearn-all
 make env-schema
 make smoke
 make train-rbc
@@ -134,6 +140,13 @@ results/    generated manifests, metrics, and run artifacts stay out of git
 7. `make train-ppo`
 8. `make train-sac`
 
+If you want the full released 2023 dataset family instead of just the default
+local-evaluation package, run:
+
+```bash
+make download-citylearn-all
+```
+
 `make env-schema` writes:
 - `results/manifests/environment_lock.json`
 - `results/manifests/observation_action_schema.json`
@@ -152,6 +165,26 @@ results/    generated manifests, metrics, and run artifacts stay out of git
 - `training_curve.csv` with step-level optimization stats
 - a `rollout_trace.json` preview trace
 - a `SimulationData/<run_id>/` export and playback payload for completed full evaluations
+
+To re-evaluate a saved SAC checkpoint on one of the released official
+post-competition datasets without retraining, use:
+
+```bash
+COS435_REQUIRE_DATA=1 MPLCONFIGDIR="$(pwd)/.cache/matplotlib" .venv/bin/python \
+  scripts/eval/run_sac_checkpoint.py \
+  --config configs/train/sac/sac_central_reward_v1.yaml \
+  --eval-config configs/eval/official_released.yaml \
+  --checkpoint-path results/runs/sac__central_reward_v1__public_dev__seed2__20260420_133020/checkpoint.pt \
+  --split phase_2_online_eval_1 \
+  --seed 2
+```
+
+That path is evaluation-only. It loads the existing checkpoint, skips training,
+and writes a fresh run directory and metric row for the requested split.
+
+Raw datasets under `data/external/` stay out of git. The tracked metadata file
+[`data/manifests/citylearn_2023_manifest.json`](data/manifests/citylearn_2023_manifest.json)
+records the released dataset inventory and checksums instead.
 
 You can validate the exported `SimulationData/...` tree against the official CityLearn UI upload contract with:
 

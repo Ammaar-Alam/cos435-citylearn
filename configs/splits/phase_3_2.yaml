@@ -1,7 +1,7 @@
 split:
   name: phase_3_2
   dataset_name: citylearn_challenge_2023_phase_3_2
-  intent: official 2023 competition held-out split 2 (6 buildings, 92 days)
+  intent: released phase-3 six-building dataset 2 for post-competition checkpoint validation (official 2023 competition held-out split)
   tuning_allowed: false
   held_out: true
   central_agent: true

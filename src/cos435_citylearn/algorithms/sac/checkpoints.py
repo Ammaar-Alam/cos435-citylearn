@@ -231,42 +231,54 @@ def validate_checkpoint_env_compatibility(
     observation_names: Sequence[Sequence[str]],
     action_names: Sequence[Sequence[str]],
 ) -> None:
-    checkpoint_observation_names = checkpoint_payload["observation_names"]
-    checkpoint_action_names = checkpoint_payload["action_names"]
+    checkpoint_observation_names = [
+        list(names) for names in checkpoint_payload["observation_names"]
+    ]
+    checkpoint_action_names = [list(names) for names in checkpoint_payload["action_names"]]
+    env_observation_names = [list(names) for names in observation_names]
+    env_action_names = [list(names) for names in action_names]
     control_mode = checkpoint_payload.get("control_mode", "<unknown>")
-    env_observation_names = list(observation_names)
-    env_action_names = list(action_names)
 
     if control_mode == "shared_dtde":
         # Shared policies are topology-invariant: the number of buildings can differ
         # as long as the per-building observation/action schemas match.
         if not checkpoint_observation_names or not env_observation_names:
-            raise ValueError("shared_dtde checkpoint requires non-empty observation schema on both sides")
-        ckpt_per_building = checkpoint_observation_names[0]
-        env_per_building = env_observation_names[0]
-        if any(list(b) != ckpt_per_building for b in checkpoint_observation_names):
-            raise ValueError("shared_dtde checkpoint has inconsistent per-building observation schemas")
-        if any(list(b) != env_per_building for b in env_observation_names):
-            raise ValueError("target env has inconsistent per-building observation schemas; shared_dtde requires identical buildings")
-        if list(ckpt_per_building) != list(env_per_building):
             raise ValueError(
-                "shared_dtde checkpoint per-building observation schema does not match target env; "
-                "the two datasets expose different building features."
+                "shared_dtde checkpoint requires non-empty observation schema on both sides"
             )
         if not checkpoint_action_names or not env_action_names:
             raise ValueError(
                 "shared_dtde checkpoint requires non-empty action schema on both sides"
             )
-        ckpt_action_per_building = checkpoint_action_names[0]
-        env_action_per_building = env_action_names[0]
-        if any(list(b) != ckpt_action_per_building for b in checkpoint_action_names):
-            raise ValueError("shared_dtde checkpoint has inconsistent per-building action schemas")
-        if any(list(b) != env_action_per_building for b in env_action_names):
+        reference_observation_names = checkpoint_observation_names[0]
+        reference_action_names = checkpoint_action_names[0]
+
+        if any(names != reference_observation_names for names in checkpoint_observation_names):
+            raise ValueError(
+                "shared SAC checkpoint observation schema is internally inconsistent"
+            )
+        if any(names != reference_action_names for names in checkpoint_action_names):
+            raise ValueError(
+                "shared SAC checkpoint action schema is internally inconsistent"
+            )
+        env_reference_observation = env_observation_names[0]
+        env_reference_action = env_action_names[0]
+        if any(names != env_reference_observation for names in env_observation_names):
+            raise ValueError(
+                "target env has inconsistent per-building observation schemas; "
+                "shared_dtde requires identical buildings"
+            )
+        if any(names != env_reference_action for names in env_action_names):
             raise ValueError(
                 "target env has inconsistent per-building action schemas; "
                 "shared_dtde requires identical buildings"
             )
-        if list(ckpt_action_per_building) != list(env_action_per_building):
+        if reference_observation_names != env_reference_observation:
+            raise ValueError(
+                "shared_dtde checkpoint per-building observation schema does not match target env; "
+                "the two datasets expose different building features."
+            )
+        if reference_action_names != env_reference_action:
             raise ValueError(
                 "shared_dtde checkpoint per-building action schema does not match target env."
             )
@@ -278,8 +290,8 @@ def validate_checkpoint_env_compatibility(
         if ckpt_n != env_n:
             raise ValueError(
                 f"checkpoint was trained on {ckpt_n} buildings but target env has {env_n} "
-                f"(control_mode={control_mode}). centralized checkpoints cannot cross building counts; "
-                "use a sac_shared_dtde_* checkpoint for cross-topology eval."
+                f"(control_mode={control_mode}). centralized checkpoints cannot cross "
+                "building counts; use a sac_shared_dtde_* checkpoint for cross-topology eval."
             )
         raise ValueError(
             f"checkpoint observation schema is incompatible with the selected runner config "
@@ -292,8 +304,8 @@ def validate_checkpoint_env_compatibility(
         if ckpt_n != env_n:
             raise ValueError(
                 f"checkpoint was trained on {ckpt_n} buildings but target env has {env_n} "
-                f"(control_mode={control_mode}). centralized checkpoints cannot cross building counts; "
-                "use a sac_shared_dtde_* checkpoint for cross-topology eval."
+                f"(control_mode={control_mode}). centralized checkpoints cannot cross "
+                "building counts; use a sac_shared_dtde_* checkpoint for cross-topology eval."
             )
         raise ValueError(
             f"checkpoint action schema is incompatible with the selected runner config "
