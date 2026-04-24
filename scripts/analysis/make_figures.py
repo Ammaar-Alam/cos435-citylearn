@@ -16,7 +16,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 RUNS_ROOT = REPO_ROOT / "results" / "grace" / "runs"
 FIGURES_OUT = REPO_ROOT / "results" / "grace" / "figures"
 TABLES_OUT = REPO_ROOT / "results" / "grace" / "tables"
+SUBMISSION_FIGURES = REPO_ROOT / "submission" / "figures"
 SUBMISSION_RESULTS = REPO_ROOT / "submission" / "results" / "local_main_results.csv"
+CROSS_SPLIT_CSV = REPO_ROOT / "submission" / "results" / "cross_split_scores.csv"
 
 STYLE = {
     "figure.dpi": 150,
@@ -190,6 +192,115 @@ def plot_kpi_breakdown(rows: dict[str, dict]) -> None:
     print(f"  wrote {out}")
 
 
+PER_SPLIT_METHOD_ORDER = [
+    ("RBC",          "#aaaaaa"),
+    ("PPO Central",  "#4C72B0"),
+    ("PPO DTDE",     "#2196F3"),
+    ("SAC Central",  "#DD8452"),
+    ("SAC rv1",      "#55A868"),
+    ("SAC rv2",      "#C44E52"),
+    ("SAC DTDE",     "#8172B2"),
+]
+
+# Columns in cross_split_scores.csv that drive the per-split figure.
+PHASE2_SPLITS = ["p2_eval1", "p2_eval2", "p2_eval3"]
+PHASE3_SPLITS = ["p3_1", "p3_2", "p3_3"]
+PER_SPLIT_X_LABELS = ["p2-eval1", "p2-eval2", "p2-eval3", "p3-1", "p3-2", "p3-3"]
+
+
+def _load_cross_split_rows() -> dict[str, dict[str, float | None]]:
+    """Return {method_label: {split_col: score_or_None}} from cross_split_scores.csv."""
+    if not CROSS_SPLIT_CSV.exists():
+        return {}
+    out: dict[str, dict[str, float | None]] = {}
+    with CROSS_SPLIT_CSV.open(newline="") as f:
+        for row in csv.DictReader(f):
+            name = row["method"].strip()
+            out[name] = {
+                k: (float(v) if v not in (None, "", "nan") else None)
+                for k, v in row.items()
+                if k != "method"
+            }
+    return out
+
+
+def plot_per_split_scores() -> None:
+    """Held-out per-split comparison: phase_2 (3-building) on the left,
+    phase_3 (6-building) on the right with shaded background and a
+    'centralized models not portable' annotation. CHESCA's 0.562 public
+    leaderboard score is overlaid as a dashed reference line.
+    Reads cross_split_scores.csv and writes both the grace/figures tree
+    and submission/figures/per_split_scores.png (tracked).
+    """
+    rows = _load_cross_split_rows()
+    if not rows:
+        print("  skip per_split_scores: cross_split_scores.csv not found")
+        return
+
+    split_cols = PHASE2_SPLITS + PHASE3_SPLITS
+    x = np.arange(len(split_cols))
+
+    with plt.rc_context(STYLE):
+        fig, ax = plt.subplots(figsize=(11.5, 5.6))
+
+        # Phase-3 shaded region
+        phase2_end = len(PHASE2_SPLITS) - 0.5
+        ax.axvspan(phase2_end, x[-1] + 0.5, color="#000000", alpha=0.04, zorder=0)
+        ax.axvline(phase2_end, color="#999999", linestyle=":", linewidth=1.2, zorder=1)
+        ax.text(
+            phase2_end - 0.05, 1.075, "phase_2 ←",
+            ha="right", va="bottom", fontsize=9, color="#666666",
+            transform=ax.get_xaxis_transform(),
+        )
+        ax.text(
+            phase2_end + 0.05, 1.075, "→ phase_3",
+            ha="left", va="bottom", fontsize=9, color="#666666",
+            transform=ax.get_xaxis_transform(),
+        )
+
+        for method, color in PER_SPLIT_METHOD_ORDER:
+            if method not in rows:
+                continue
+            ys = [rows[method].get(c) for c in split_cols]
+            xs_drawn = [xi for xi, y in zip(x, ys) if y is not None]
+            ys_drawn = [y for y in ys if y is not None]
+            if not ys_drawn:
+                continue
+            ax.plot(
+                xs_drawn, ys_drawn, marker="o", color=color,
+                linewidth=2.0, markersize=6, label=method, zorder=4,
+            )
+
+        ax.axhline(
+            CHESCA_SCORE, color="#e53935", linewidth=1.6, linestyle="--",
+            label=f"CHESCA ({CHESCA_SCORE:.3f})", zorder=3,
+        )
+
+        ax.text(
+            (phase2_end + x[-1] + 0.5) / 2, 0.82,
+            "centralized models\nnot portable",
+            ha="center", va="center", fontsize=10, color="#888888",
+            style="italic", transform=ax.get_xaxis_transform(), zorder=2,
+        )
+
+        ax.set_xticks(x)
+        ax.set_xticklabels(PER_SPLIT_X_LABELS, fontsize=10)
+        ax.set_ylabel("Average score (lower is better)")
+        ax.set_title("Per-Split Scores — Released Evaluation Datasets")
+        ax.set_xlim(-0.5, x[-1] + 0.5)
+
+        ax.legend(loc="upper left", framealpha=0.95, fontsize=9, ncol=1)
+        fig.tight_layout()
+
+        FIGURES_OUT.mkdir(parents=True, exist_ok=True)
+        SUBMISSION_FIGURES.mkdir(parents=True, exist_ok=True)
+        for out in (FIGURES_OUT / "per_split_scores.png",
+                    SUBMISSION_FIGURES / "per_split_scores.png"):
+            fig.savefig(out, bbox_inches="tight", dpi=200)
+            print(f"  wrote {out}")
+        plt.close(fig)
+
+
 def write_comparison_table(rows: dict[str, dict]) -> None:
     available = [m for m in METHOD_ORDER if m in rows]
     fieldnames = [
@@ -229,6 +340,9 @@ def main() -> None:
 
     print("KPI breakdown chart...")
     plot_kpi_breakdown(rows)
+
+    print("Per-split scores (held-out)...")
+    plot_per_split_scores()
 
     print("Comparison table...")
     write_comparison_table(rows)

@@ -224,13 +224,14 @@ def _add_results_numbers_block(slide) -> None:
         ("phase_2 (3 buildings, held-out)", [
             ("RBC", "1.087"),
             ("PPO central", "0.873"),
+            ("PPO DTDE", "0.793"),
             ("SAC central reward_v2", "0.653", True),
             ("SAC DTDE", "0.677"),
             ("CHESCA public ref", "0.562", False, True),
         ]),
         ("phase_3 (6 buildings, held-out — portable only)", [
             ("RBC", "1.114"),
-            ("PPO DTDE", "0.843"),
+            ("PPO DTDE", "0.848"),
             ("SAC DTDE", "0.774", True),
         ]),
     ]
