@@ -341,7 +341,7 @@ def _write_imported_ppo_artifact(
 def test_load_imported_central_ppo_artifact_resolves_from_artifact_metadata(
     tmp_path: Path,
 ) -> None:
-    # Codex P1 (2026-04-20): dashboard-uploaded central PPO artifacts live at
+    # Regression: dashboard-uploaded central PPO artifacts live at
     # ``<imported_artifacts_root>/<id>/<uploaded_filename>`` with a sidecar
     # ``artifact.json`` pointing at the file. The previous loader assumed the
     # local-run layout (``<root>/runs/<id>/ppo_model.zip``) and blew up with

@@ -76,5 +76,3 @@ izing research in multi-agent reinforcement learning for demand response and urb
 management. arXiv preprint arXiv: _2012_. _10504_.
 
 ### 2
-
-

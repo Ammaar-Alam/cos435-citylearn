@@ -486,7 +486,7 @@ def test_refresh_mirrors_terminal_failure_into_state_store(tmp_path: Path) -> No
 
 
 def test_launch_job_request_accepts_allow_cross_reward_eval() -> None:
-    # Regression for the Codex P1 finding: LaunchJobRequest must declare
+    # Regression: LaunchJobRequest must declare
     # allow_cross_reward_eval so Pydantic (extra="ignore" by default) does not
     # silently drop it when the artifact evaluate router does
     # ``LaunchJobRequest(**launch_payload)``. Without this field the flag
@@ -507,7 +507,7 @@ def test_submit_persists_allow_cross_reward_eval_to_worker_payload(tmp_path: Pat
     # raw dict to eval_ppo_checkpoint / eval_sac_checkpoint which read
     # ``request.get("allow_cross_reward_eval", False)``. If the field were
     # dropped somewhere between the schema and request.json the worker would
-    # always fall back to False (the original Codex P1 bug).
+    # always fall back to False.
     class DummyProcess:
         pid = 9999
 

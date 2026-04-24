@@ -15,7 +15,7 @@ def test_global_normalize_advantages_enabled_zero_centers_unit_variance() -> Non
 
 
 def test_global_normalize_advantages_disabled_preserves_raw_values() -> None:
-    # Regression for the Codex P2 finding: previously the global pass ran
+    # Regression: previously the global pass ran
     # unconditionally, so normalize_advantage=False silently still produced
     # standardized advantages. The helper must now be a real off-switch.
     advantages = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)

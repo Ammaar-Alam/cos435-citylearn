@@ -46,7 +46,7 @@ def test_assert_training_allowed_on_split_allows_non_held_out() -> None:
 
 
 def test_assert_training_allowed_on_split_allows_held_out_with_checkpoint_path() -> None:
-    # Codex P1 (2026-04-22): scripts/eval/run_sac_checkpoint.py evaluates a
+    # Regression: scripts/eval/run_sac_checkpoint.py evaluates a
     # torch checkpoint directly from disk without an artifact_id; the guard
     # must recognize checkpoint_path as the same "eval-only" signal.
     split = {"split": {"name": "phase_3_3", "held_out": True, "tuning_allowed": False}}

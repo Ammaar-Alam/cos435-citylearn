@@ -262,7 +262,7 @@ def test_validate_checkpoint_runner_compatibility_allows_reward_mismatch_with_fl
 def test_validate_checkpoint_runner_compatibility_falls_back_to_nested_config() -> None:
     # pre-P1.2 SAC checkpoints only carry variant/reward_version/features_version
     # inside the nested config snapshot. the tightened validator must still accept
-    # those as matching (otherwise the Codex fix regresses every older run).
+    # those as matching (otherwise the compatibility fix regresses older runs).
     payload = _minimal_shared_checkpoint_payload()
     del payload["variant"]
     del payload["reward_version"]
@@ -295,7 +295,7 @@ def test_validate_checkpoint_runner_compatibility_detects_legacy_payload_mismatc
 
 
 def test_load_imported_checkpoint_accepts_artifacts_root_only(tmp_path: Path) -> None:
-    # Codex P1 (2026-04-20): SAC eval with artifact_id + artifacts_root but no
+    # Regression: SAC eval with artifact_id + artifacts_root but no
     # imported_artifacts_root must resolve against artifacts_root (tests / batch
     # jobs that point artifact_id at a custom local run root). Previously this
     # combination raised ValueError, breaking re-eval workflows that the PPO

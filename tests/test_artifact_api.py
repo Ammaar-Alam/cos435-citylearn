@@ -111,7 +111,7 @@ def test_artifact_import_rejects_unknown_artifact_kind(tmp_path: Path) -> None:
 
 
 def test_artifact_import_stores_extra_files_alongside_primary(tmp_path: Path) -> None:
-    # Codex P1 (2026-04-20): Central PPO checkpoints need ``ppo_model.zip`` and
+    # Regression: Central PPO checkpoints need ``ppo_model.zip`` and
     # its companion sidecars co-located under a single ``artifact_id``. The
     # import endpoint's ``extra_files`` field is the only way to produce that
     # layout in one request; without this test, a future refactor could silently
@@ -344,7 +344,7 @@ def test_artifact_evaluate_rejects_incompatible_ppo_checkpoint_before_queueing(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    # Codex P1 (2026-04-20): a central PPO artifact sidecar that advertises
+    # Regression: a central PPO artifact sidecar that advertises
     # ``reward_v1`` must be rejected by the API preflight before the job
     # queues, matching the SAC preflight above. Previously ``build_evaluation_request``
     # had no PPO branch -- mismatched artifacts silently queued and blew up

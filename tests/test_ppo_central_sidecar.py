@@ -93,7 +93,7 @@ def test_validate_missing_sidecar_warns_with_flag(capsys) -> None:
 
 
 def test_run_ppo_captures_sidecar_mismatches_for_manifest() -> None:
-    # Codex P2 (2026-04-22): previously the caller at baselines/ppo.py
+    # Regression: previously the caller at baselines/ppo.py
     # discarded the validator's return value, so when a user opted into
     # cross-reward eval with allow_cross_reward_eval=True, the resulting
     # manifest.json only recorded artifact_id + trained_on_split -- never
@@ -106,7 +106,7 @@ def test_run_ppo_captures_sidecar_mismatches_for_manifest() -> None:
     source = inspect.getsource(ppo_module)
     assert "label_mismatches = _validate_central_ppo_sidecar(" in source, (
         "central PPO must capture the sidecar validator's mismatch dict; "
-        "dropping the return re-opens the Codex P2 regression."
+        "dropping the return re-opens the regression."
     )
     assert 'manifest["runtime_label_mismatches"]' in source, (
         "central PPO manifest must record runtime_label_mismatches for "
