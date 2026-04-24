@@ -50,6 +50,7 @@ Lower is better.
 - RBC baseline on `released_phase_2_online_eval`: mean `1.087092`, std `0.020621`, 95% CI `0.051225`, eval jobs `3`, seeds `1`
 - RBC baseline on `released_phase_3`: mean `1.113710`, std `0.012142`, 95% CI `0.030161`, eval jobs `3`, seeds `1`
 - PPO centralized baseline on `released_phase_2_online_eval`: mean `0.872718`, std `0.006820`, 95% CI `0.016942`, eval jobs `3`, seeds `1`
+- PPO shared DTDE reward_v2 on `released_phase_2_online_eval`: mean `0.793176`, std `0.054182`, 95% CI `0.019389`, eval jobs `30`, seeds `10`
 - PPO shared DTDE reward_v2 on `released_phase_3`: mean `0.843221`, std `0.030263`, 95% CI `0.010829`, eval jobs `30`, seeds `10`
 - Centralized SAC reward_v2 on `released_phase_2_online_eval`: mean `0.652703`, std `0.042913`, 95% CI `0.021717`, eval jobs `15`, seeds `5`
 - Centralized SAC baseline on `released_phase_2_online_eval`: mean `0.662064`, std `0.036729`, 95% CI `0.018588`, eval jobs `15`, seeds `5`

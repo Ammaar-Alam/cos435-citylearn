@@ -19,6 +19,7 @@ TABLES_OUT = REPO_ROOT / "results" / "grace" / "tables"
 SUBMISSION_FIGURES = REPO_ROOT / "submission" / "figures"
 SUBMISSION_RESULTS = REPO_ROOT / "submission" / "results" / "local_main_results.csv"
 CROSS_SPLIT_CSV = REPO_ROOT / "submission" / "results" / "cross_split_scores.csv"
+RELEASED_MAIN_CSV = REPO_ROOT / "submission" / "results" / "released_eval_main_results.csv"
 
 STYLE = {
     "figure.dpi": 150,
@@ -301,6 +302,147 @@ def plot_per_split_scores() -> None:
         plt.close(fig)
 
 
+# Canonical method display order shared between cross_split_comparison and
+# generalization_gap. (method_label in released_eval_main_results.csv) -> (short label, color, local_main_results method_id)
+CROSS_SPLIT_METHODS = [
+    ("RBC baseline",                "RBC",         COLORS["local_rbc"],                            "local_rbc"),
+    ("PPO centralized baseline",    "PPO\nCentral",COLORS["ppo_central_baseline_public_dev"],      "ppo_central_baseline_public_dev"),
+    ("PPO shared DTDE reward_v2",   "PPO\nDTDE",   COLORS["ppo_shared_dtde_reward_v2_public_dev"], "ppo_shared_dtde_reward_v2_public_dev"),
+    ("Centralized SAC baseline",    "SAC\nCentral",COLORS["sac_central_baseline_public_dev"],      "sac_central_baseline_public_dev"),
+    ("Centralized SAC reward_v1",   "SAC\nrv1",    COLORS["sac_central_reward_v1_public_dev"],     "sac_central_reward_v1_public_dev"),
+    ("Centralized SAC reward_v2",   "SAC\nrv2",    COLORS["sac_central_reward_v2_public_dev"],     "sac_central_reward_v2_public_dev"),
+    ("Shared DTDE SAC reward_v2",   "SAC\nDTDE",   COLORS["sac_shared_dtde_reward_v2_public_dev"], "sac_shared_dtde_reward_v2_public_dev"),
+]
+
+
+def _load_released_phase2_rows() -> dict[str, dict[str, str]]:
+    """Return {method_label: row_dict} from released_eval_main_results.csv,
+    filtered to eval_group == released_phase_2_online_eval."""
+    out: dict[str, dict[str, str]] = {}
+    if not RELEASED_MAIN_CSV.exists():
+        return out
+    with RELEASED_MAIN_CSV.open(newline="") as f:
+        for row in csv.DictReader(f):
+            if row.get("eval_group") == "released_phase_2_online_eval":
+                out[row["method_label"].strip()] = row
+    return out
+
+
+def plot_cross_split_comparison() -> None:
+    """Bar chart of released phase_2 online-eval means with 95% CI error bars,
+    one bar per method. Adds a dashed CHESCA reference line as benchmark context.
+    Writes to both FIGURES_OUT and SUBMISSION_FIGURES (dpi=200).
+    """
+    released = _load_released_phase2_rows()
+    if not released:
+        print("  skip cross_split_comparison: released_eval_main_results.csv not found")
+        return
+
+    methods = [m for m in CROSS_SPLIT_METHODS if m[0] in released]
+    labels = [m[1] for m in methods]
+    colors = [m[2] for m in methods]
+    means = [float(released[m[0]]["average_score_mean"]) for m in methods]
+    ci95s = [float(released[m[0]]["average_score_ci95"]) for m in methods]
+
+    x = np.arange(len(methods))
+    with plt.rc_context(STYLE):
+        fig, ax = plt.subplots(figsize=(10, 5))
+        bars = ax.bar(
+            x, means, yerr=ci95s, capsize=4, color=colors,
+            error_kw={"elinewidth": 1.2, "ecolor": "#444"}, width=0.65, zorder=3,
+        )
+        ax.axhline(
+            CHESCA_SCORE, color="#e53935", linewidth=1.5, linestyle="--",
+            label="CHESCA public reference (not same eval)", zorder=4,
+        )
+        for bar, mean in zip(bars, means):
+            ax.text(
+                bar.get_x() + bar.get_width() / 2, mean + 0.015,
+                f"{mean:.3f}", ha="center", va="bottom", fontsize=9,
+            )
+
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels, fontsize=10)
+        ax.set_ylabel("Average score (lower is better)")
+        ax.set_title("Released Phase-2 Online Evaluation — 3 splits")
+        ax.set_ylim(0, max(means) * 1.18)
+        ax.legend(loc="upper right", framealpha=0.95, fontsize=9)
+        fig.text(
+            0.01, -0.01,
+            "Published CHESCA is benchmark context; compare local/released runs within their own split group.",
+            ha="left", fontsize=8, color="#666666",
+        )
+        fig.tight_layout()
+
+        FIGURES_OUT.mkdir(parents=True, exist_ok=True)
+        SUBMISSION_FIGURES.mkdir(parents=True, exist_ok=True)
+        for out in (FIGURES_OUT / "cross_split_comparison.png",
+                    SUBMISSION_FIGURES / "cross_split_comparison.png"):
+            fig.savefig(out, bbox_inches="tight", dpi=200)
+            print(f"  wrote {out}")
+        plt.close(fig)
+
+
+def plot_generalization_gap(rows: dict[str, dict]) -> None:
+    """Paired bars showing local public_dev (light) vs released phase_2
+    (solid, with std error bars) for each method. Exposes the train→held-out
+    generalization gap in a single panel.
+    """
+    released = _load_released_phase2_rows()
+    if not released:
+        print("  skip generalization_gap: released_eval_main_results.csv not found")
+        return
+
+    methods = [
+        m for m in CROSS_SPLIT_METHODS
+        if m[0] in released and m[3] in rows
+    ]
+    labels = [m[1] for m in methods]
+    colors = [m[2] for m in methods]
+    public_means = [float(rows[m[3]]["average_score_mean"]) for m in methods]
+    released_means = [float(released[m[0]]["average_score_mean"]) for m in methods]
+    released_stds = [float(released[m[0]]["average_score_std"]) for m in methods]
+
+    x = np.arange(len(methods))
+    width = 0.38
+
+    with plt.rc_context(STYLE):
+        fig, ax = plt.subplots(figsize=(11, 5))
+        # Lighter shade for public_dev bar (alpha=0.45).
+        ax.bar(
+            x - width / 2, public_means, width=width, color=colors,
+            alpha=0.45, edgecolor="none", zorder=3,
+            label="public_dev (tuning split)",
+        )
+        ax.bar(
+            x + width / 2, released_means, width=width, color=colors,
+            yerr=released_stds, capsize=3, edgecolor="none",
+            error_kw={"elinewidth": 1.0, "ecolor": "#333"}, zorder=3,
+            label="phase_2_online_eval (mean ± std, 3 splits)",
+        )
+        ax.axhline(
+            CHESCA_SCORE, color="#e53935", linewidth=1.5, linestyle="--",
+            label=f"CHESCA winner ({CHESCA_SCORE:.3f})", zorder=4,
+        )
+
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels, fontsize=10)
+        ax.set_ylabel("Average score (lower is better)")
+        ax.set_title("Generalization Gap — public_dev vs Released Phase-2 Online Evaluation")
+        ymax = max(max(public_means), max(released_means)) * 1.15
+        ax.set_ylim(0, ymax)
+        ax.legend(loc="upper right", framealpha=0.95, fontsize=9)
+        fig.tight_layout()
+
+        FIGURES_OUT.mkdir(parents=True, exist_ok=True)
+        SUBMISSION_FIGURES.mkdir(parents=True, exist_ok=True)
+        for out in (FIGURES_OUT / "generalization_gap.png",
+                    SUBMISSION_FIGURES / "generalization_gap.png"):
+            fig.savefig(out, bbox_inches="tight", dpi=200)
+            print(f"  wrote {out}")
+        plt.close(fig)
+
+
 def write_comparison_table(rows: dict[str, dict]) -> None:
     available = [m for m in METHOD_ORDER if m in rows]
     fieldnames = [
@@ -343,6 +485,12 @@ def main() -> None:
 
     print("Per-split scores (held-out)...")
     plot_per_split_scores()
+
+    print("Cross-split comparison (released phase_2 bars)...")
+    plot_cross_split_comparison()
+
+    print("Generalization gap (public_dev vs phase_2)...")
+    plot_generalization_gap(rows)
 
     print("Comparison table...")
     write_comparison_table(rows)
