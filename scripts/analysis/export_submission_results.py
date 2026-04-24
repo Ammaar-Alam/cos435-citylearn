@@ -6,7 +6,6 @@ import statistics as st
 from dataclasses import dataclass
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 METRICS_ROOT = REPO_ROOT / "results" / "metrics"
 OUTPUT_ROOT = REPO_ROOT / "submission" / "results"
@@ -28,6 +27,8 @@ VARIANT_LABELS = {
     "central_reward_v1": "Centralized SAC reward_v1",
     "central_reward_v2": "Centralized SAC reward_v2",
     "shared_dtde_reward_v2": "Shared DTDE SAC reward_v2",
+    "ppo_central_baseline": "Centralized PPO baseline",
+    "ppo_shared_dtde_reward_v2": "Shared DTDE PPO reward_v2",
 }
 
 OFFICIAL_REFERENCES = [
@@ -125,6 +126,12 @@ class ReleasedSummary:
     district_one_minus_thermal_resilience_proportion_mean: float
 
 
+@dataclass(frozen=True)
+class PpoSweepRow:
+    lr: str
+    metric: MetricRow
+
+
 def _read_metric_row(path: Path) -> MetricRow:
     with path.open(newline="") as handle:
         row = next(csv.DictReader(handle))
@@ -157,12 +164,14 @@ def _latest_metric(pattern: str) -> MetricRow:
 
 def _load_local_rows() -> tuple[MetricRow, list[MetricRow]]:
     rbc_row = _latest_metric("rbc__basic_rbc__public_dev__seed0__*.csv")
+    latest_rows: dict[tuple[str, str, int], MetricRow] = {}
+    for path in sorted(METRICS_ROOT.glob("sac__*.csv")):
+        if "__public_dev__" not in path.name:
+            continue
+        row = _read_metric_row(path)
+        latest_rows[(row.variant, row.split, row.seed)] = row
     sac_rows = sorted(
-        (
-            _read_metric_row(path)
-            for path in METRICS_ROOT.glob("sac__*.csv")
-            if "__public_dev__" in path.name
-        ),
+        latest_rows.values(),
         key=lambda row: (row.variant, row.seed, row.run_id),
     )
     if not sac_rows:
@@ -189,6 +198,35 @@ def _load_released_rows() -> list[MetricRow]:
     return sorted(
         latest_rows.values(),
         key=lambda row: (_released_group(row.split), row.variant, row.split, row.seed, row.run_id),
+    )
+
+
+def _load_ppo_sweep_rows() -> list[PpoSweepRow]:
+    sweep_summary_path = REPO_ROOT / "results" / "sweep" / "summary.csv"
+    if not sweep_summary_path.exists():
+        return []
+
+    rows: list[PpoSweepRow] = []
+    with sweep_summary_path.open(newline="") as handle:
+        for row in csv.DictReader(handle):
+            if row["algo"] != "ppo":
+                continue
+            run_id = row["run_id"]
+            metric_path = METRICS_ROOT / f"{run_id}.csv"
+            if not metric_path.exists():
+                raise FileNotFoundError(
+                    f"missing metric row for PPO sweep run_id {run_id}: expected {metric_path}"
+                )
+            rows.append(PpoSweepRow(lr=row["lr"], metric=_read_metric_row(metric_path)))
+
+    return sorted(
+        rows,
+        key=lambda item: (
+            item.lr,
+            item.metric.split,
+            item.metric.seed,
+            item.metric.run_id,
+        ),
     )
 
 
@@ -306,8 +344,12 @@ def _build_released_group_summaries(rows: list[MetricRow]) -> list[ReleasedSumma
     for row in rows:
         grouped.setdefault((row.variant, _released_group(row.split)), []).append(row)
 
+    summaries = (
+        _summarize_released_rows(scope, grouped_rows)
+        for (_, scope), grouped_rows in grouped.items()
+    )
     return sorted(
-        (_summarize_released_rows(scope, grouped_rows) for (_, scope), grouped_rows in grouped.items()),
+        summaries,
         key=lambda summary: (summary.scope, summary.average_score_mean, summary.variant),
     )
 
@@ -317,8 +359,12 @@ def _build_released_split_summaries(rows: list[MetricRow]) -> list[ReleasedSumma
     for row in rows:
         grouped.setdefault((row.variant, row.split), []).append(row)
 
+    summaries = (
+        _summarize_released_rows(scope, grouped_rows)
+        for (_, scope), grouped_rows in grouped.items()
+    )
     return sorted(
-        (_summarize_released_rows(scope, grouped_rows) for (_, scope), grouped_rows in grouped.items()),
+        summaries,
         key=lambda summary: (summary.scope, summary.average_score_mean, summary.variant),
     )
 
@@ -621,6 +667,91 @@ def _build_released_seed_inventory_rows(
     return rows
 
 
+def _build_ppo_sweep_summary_rows(ppo_rows: list[PpoSweepRow]) -> list[dict[str, object]]:
+    grouped: dict[tuple[str, str], list[PpoSweepRow]] = {}
+    for row in ppo_rows:
+        grouped.setdefault((row.lr, row.metric.split), []).append(row)
+
+    rows: list[dict[str, object]] = []
+    for (lr, split), grouped_rows in sorted(grouped.items()):
+        summary = _summarize_rows([row.metric for row in grouped_rows])
+        best_row = min(grouped_rows, key=lambda row: row.metric.average_score).metric
+        worst_row = max(grouped_rows, key=lambda row: row.metric.average_score).metric
+        if split == "public_dev":
+            note = "10-seed shared PPO sweep on local phase_2"
+        else:
+            note = "10-seed shared PPO checkpoint evaluation on released phase_3"
+
+        rows.append(
+            {
+                "method_id": f"ppo_{summary.variant}_{lr}_{split}",
+                "method_label": _variant_label(summary.variant),
+                "algorithm": summary.algorithm,
+                "variant": summary.variant,
+                "lr": lr,
+                "split": split,
+                "seed_count": len(summary.rows),
+                "evidence_level": _evidence_level(len(summary.rows)),
+                "average_score_mean": round(summary.average_score_mean, 6),
+                "average_score_std": round(summary.average_score_std, 6),
+                "average_score_ci95": round(summary.average_score_ci95, 6),
+                "best_average_score": round(summary.best_average_score, 6),
+                "worst_average_score": round(summary.worst_average_score, 6),
+                "district_cost_total_mean": round(summary.district_cost_total_mean, 6),
+                "district_carbon_emissions_total_mean": round(
+                    summary.district_carbon_emissions_total_mean, 6
+                ),
+                "district_daily_peak_average_mean": round(
+                    summary.district_daily_peak_average_mean, 6
+                ),
+                "district_discomfort_proportion_mean": round(
+                    summary.district_discomfort_proportion_mean, 6
+                ),
+                "district_one_minus_thermal_resilience_proportion_mean": round(
+                    summary.district_one_minus_thermal_resilience_proportion_mean, 6
+                ),
+                "best_run_id": best_row.run_id,
+                "worst_run_id": worst_row.run_id,
+                "notes": note,
+            }
+        )
+
+    return rows
+
+
+def _build_ppo_sweep_inventory_rows(ppo_rows: list[PpoSweepRow]) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for row in ppo_rows:
+        metric = row.metric
+        rows.append(
+            {
+                "run_id": metric.run_id,
+                "file_name": metric.file_name,
+                "algorithm": metric.algorithm,
+                "variant": metric.variant,
+                "lr": row.lr,
+                "split": metric.split,
+                "seed": metric.seed,
+                "dataset_name": metric.dataset_name,
+                "average_score": round(metric.average_score, 6),
+                "district_cost_total": round(metric.district_cost_total, 6),
+                "district_carbon_emissions_total": round(
+                    metric.district_carbon_emissions_total, 6
+                ),
+                "district_daily_peak_average": round(
+                    metric.district_daily_peak_average, 6
+                ),
+                "district_discomfort_proportion": round(
+                    metric.district_discomfort_proportion, 6
+                ),
+                "district_one_minus_thermal_resilience_proportion": round(
+                    metric.district_one_minus_thermal_resilience_proportion, 6
+                ),
+            }
+        )
+    return rows
+
+
 def _build_reference_rows() -> list[dict[str, object]]:
     return [
         {
@@ -639,6 +770,8 @@ def _write_status_markdown(
     sac_summaries: list[MetricSummary],
     released_group_summaries: list[ReleasedSummary],
     released_split_summaries: list[ReleasedSummary],
+    ppo_sweep_rows: list[PpoSweepRow],
+    ppo_sweep_summary_rows: list[dict[str, object]],
 ) -> None:
     by_variant = {summary.variant: summary for summary in sac_summaries}
     best_summary = min(sac_summaries, key=lambda summary: summary.average_score_mean)
@@ -666,9 +799,6 @@ def _write_status_markdown(
         min(released_phase_2, key=lambda summary: summary.average_score_mean)
         if released_phase_2
         else None
-    )
-    shared_phase_2 = released_by_key.get(
-        ("shared_dtde_reward_v2", "released_phase_2_online_eval")
     )
     shared_phase_3 = released_by_key.get(("shared_dtde_reward_v2", "released_phase_3"))
 
@@ -731,6 +861,88 @@ def _write_status_markdown(
             f"`{len(shared_phase_3.rows)}` eval jobs."
         )
 
+    ppo_public_rows = [
+        row for row in ppo_sweep_summary_rows if row["split"] == "public_dev"
+    ]
+    ppo_public_rows.sort(key=lambda row: row["lr"])
+    ppo_public_text = "\n".join(
+        (
+            f"- Shared DTDE PPO reward_v2 lr=`{row['lr']}` on `public_dev`: mean "
+            f"`{row['average_score_mean']:.6f}`, std `{row['average_score_std']:.6f}`, "
+            f"95% CI `{row['average_score_ci95']:.6f}`, seeds `{row['seed_count']}`"
+        )
+        for row in ppo_public_rows
+    )
+    ppo_phase3_group_lines: list[str] = []
+    for lr in sorted({row.lr for row in ppo_sweep_rows}):
+        phase3_metrics = [
+            row.metric
+            for row in ppo_sweep_rows
+            if row.lr == lr and row.metric.split.startswith("phase_3_")
+        ]
+        if not phase3_metrics:
+            continue
+        summary = _summarize_rows(phase3_metrics)
+        ppo_phase3_group_lines.append(
+            f"- Shared DTDE PPO reward_v2 lr=`{lr}` across released `phase_3_*`: mean "
+            f"`{summary.average_score_mean:.6f}`, std `{summary.average_score_std:.6f}`, "
+            f"95% CI `{summary.average_score_ci95:.6f}`, eval jobs `{len(summary.rows)}`"
+        )
+    ppo_phase3_text = "\n".join(ppo_phase3_group_lines)
+    ppo_public_headline = ""
+    if ppo_public_rows:
+        best_ppo_public = min(ppo_public_rows, key=lambda row: row["average_score_mean"])
+        ppo_public_headline = (
+            f"The best shared-PPO local sweep setting is lr=`{best_ppo_public['lr']}` at "
+            f"`{best_ppo_public['average_score_mean']:.6f}` on `public_dev`."
+        )
+    ppo_artifact_caveat = (
+        "the centralized PPO baseline artifact is still missing locally, so the repo has "
+        "shared-PPO sweep evidence but not the fixed-topology PPO baseline row yet"
+    )
+    ppo_public_block = (
+        ppo_public_text
+        if ppo_public_text
+        else "- shared PPO sweep artifacts are not present locally yet"
+    )
+    ppo_phase3_block = (
+        ppo_phase3_text
+        if ppo_phase3_text
+        else "- released phase_3 shared-PPO sweep artifacts are not present locally yet"
+    )
+    released_phase_3_line = (
+        f"- {shared_phase_3_text}"
+        if shared_phase_3_text
+        else "- released phase_3 shared-checkpoint results are not available yet"
+    )
+    sac_claim_line = (
+        "- the central SAC baseline, central `reward_v1`, and central `reward_v2` "
+        "now all have claim-quality 5-seed local comparisons"
+    )
+    reward_compare_line = (
+        f"- `central_reward_v1` currently beats `central_reward_v2` on mean total score "
+        f"(`{reward_v1.average_score_mean:.6f}` vs `{reward_v2.average_score_mean:.6f}`)"
+    )
+    phase2_winner_line = (
+        "- `central_reward_v2` is the best saved fixed-topology checkpoint family on "
+        "the released phase-2 online-eval datasets"
+    )
+    released_split_block = chr(10).join(released_split_lines) if released_split_lines else ""
+    chesca_caveat = (
+        "- some local SAC means are numerically below the published CHESCA "
+        "references, but that is **not** enough to claim a true leaderboard win"
+    )
+    released_dataset_caveat = (
+        "- the released phase-2 online-eval datasets are much closer to the official "
+        "evaluator-side setting than `public_dev`, but they are still reported "
+        "separately from the local tuning split"
+    )
+    phase3_portability_caveat = (
+        "- centralized checkpoints are not portable to the released six-building "
+        "`phase_3_*` datasets, so the current `phase_3` evidence is "
+        "shared-controller-only"
+    )
+
     text = f"""# Current Results Snapshot
 
 These files are the clean tracked summary of the raw outputs under `results/`.
@@ -742,6 +954,8 @@ These files are the clean tracked summary of the raw outputs under `results/`.
 - `sac_seed_inventory.csv` — per-seed SAC run inventory for the local phase-2 batch
 - `released_eval_main_results.csv` — released official-eval family summaries
 - `released_eval_seed_inventory.csv` — per-seed released-eval checkpoint inventory
+- `ppo_shared_sweep_summary.csv` — per-learning-rate shared-PPO sweep summary rows
+- `ppo_shared_sweep_inventory.csv` — per-run shared-PPO sweep inventory with KPI columns
 - `official_benchmark_reference.csv` — published CityLearn 2023 reference numbers
 
 ## Local public_dev snapshot
@@ -755,6 +969,13 @@ These files are the clean tracked summary of the raw outputs under `results/`.
 
 Lower is better.
 
+## PPO shared sweep snapshot
+
+- centralized PPO baseline artifact: still missing locally
+{ppo_public_block}
+{ppo_public_headline}
+{ppo_phase3_block}
+
 ## Local tuning headline
 
 {headline_intro}
@@ -767,7 +988,7 @@ That is `{best_claim_delta:.6f}` lower than the local RBC baseline, a
 ## Released official-eval snapshot
 
 {released_phase_2_text}
-- {shared_phase_3_text if shared_phase_3_text else 'released phase_3 shared-checkpoint results are not available yet'}
+{released_phase_3_line}
 
 Lower is better.
 
@@ -778,20 +999,20 @@ Lower is better.
 ## What the full SAC evidence says
 
 - every measured SAC variant beats the local RBC baseline by a large margin
-- the central SAC baseline, central `reward_v1`, and central `reward_v2` now all have claim-quality 5-seed local comparisons
-- `central_reward_v1` currently beats `central_reward_v2` on mean total score (`{reward_v1.average_score_mean:.6f}` vs `{reward_v2.average_score_mean:.6f}`)
-- `central_reward_v2` is the best saved fixed-topology checkpoint family on the released phase-2 online-eval datasets
+{sac_claim_line}
+{reward_compare_line}
+{phase2_winner_line}
 - shared / decentralized `reward_v2` did not beat the released phase-2 central winner
-{chr(10).join(released_split_lines) if released_split_lines else ''}
+{released_split_block}
 - none of the saved checkpoints currently beat the published CHESCA references
 
 ## Important caveats
 
 - these numbers are local phase-2 evaluation numbers, not official leaderboard results
-- some local SAC means are numerically below the published CHESCA references, but that is **not** enough to claim a true leaderboard win
-- there is still no saved PPO artifact in this checkout, so PPO vs SAC is not yet empirical
-- the released phase-2 online-eval datasets are much closer to the official evaluator-side setting than `public_dev`, but they are still reported separately from the local tuning split
-- centralized checkpoints are not portable to the released six-building `phase_3_*` datasets, so the current `phase_3` evidence is shared-DTDE-only
+{chesca_caveat}
+- {ppo_artifact_caveat}
+{released_dataset_caveat}
+{phase3_portability_caveat}
 """
     (OUTPUT_ROOT / "README.md").write_text(text)
 
@@ -800,6 +1021,7 @@ def main() -> None:
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     rbc_row, sac_rows = _load_local_rows()
     released_rows = _load_released_rows()
+    ppo_sweep_rows = _load_ppo_sweep_rows()
     sac_summaries = _build_sac_summaries(sac_rows)
     released_group_summaries = _build_released_group_summaries(released_rows)
     released_split_summaries = _build_released_split_summaries(released_rows)
@@ -809,6 +1031,8 @@ def main() -> None:
     seed_rows = _build_seed_inventory_rows(sac_rows)
     released_main_rows = _build_released_main_rows(released_group_summaries)
     released_seed_rows = _build_released_seed_inventory_rows(released_rows)
+    ppo_sweep_summary_rows = _build_ppo_sweep_summary_rows(ppo_sweep_rows)
+    ppo_sweep_inventory_rows = _build_ppo_sweep_inventory_rows(ppo_sweep_rows)
     reference_rows = _build_reference_rows()
 
     _write_csv(
@@ -933,8 +1157,60 @@ def main() -> None:
         ["method_id", "method_label", "split_type", "average_score", "source_note"],
         reference_rows,
     )
+    _write_csv(
+        OUTPUT_ROOT / "ppo_shared_sweep_summary.csv",
+        [
+            "method_id",
+            "method_label",
+            "algorithm",
+            "variant",
+            "lr",
+            "split",
+            "seed_count",
+            "evidence_level",
+            "average_score_mean",
+            "average_score_std",
+            "average_score_ci95",
+            "best_average_score",
+            "worst_average_score",
+            "district_cost_total_mean",
+            "district_carbon_emissions_total_mean",
+            "district_daily_peak_average_mean",
+            "district_discomfort_proportion_mean",
+            "district_one_minus_thermal_resilience_proportion_mean",
+            "best_run_id",
+            "worst_run_id",
+            "notes",
+        ],
+        ppo_sweep_summary_rows,
+    )
+    _write_csv(
+        OUTPUT_ROOT / "ppo_shared_sweep_inventory.csv",
+        [
+            "run_id",
+            "file_name",
+            "algorithm",
+            "variant",
+            "lr",
+            "split",
+            "seed",
+            "dataset_name",
+            "average_score",
+            "district_cost_total",
+            "district_carbon_emissions_total",
+            "district_daily_peak_average",
+            "district_discomfort_proportion",
+            "district_one_minus_thermal_resilience_proportion",
+        ],
+        ppo_sweep_inventory_rows,
+    )
     _write_status_markdown(
-        rbc_row, sac_summaries, released_group_summaries, released_split_summaries
+        rbc_row,
+        sac_summaries,
+        released_group_summaries,
+        released_split_summaries,
+        ppo_sweep_rows,
+        ppo_sweep_summary_rows,
     )
 
 

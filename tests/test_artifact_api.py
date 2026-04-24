@@ -110,6 +110,155 @@ def test_artifact_import_rejects_unknown_artifact_kind(tmp_path: Path) -> None:
     assert response.status_code == 422
 
 
+def test_artifact_import_stores_extra_files_alongside_primary(tmp_path: Path) -> None:
+    # Regression: Central PPO checkpoints need ``ppo_model.zip`` and
+    # its companion sidecars co-located under a single ``artifact_id``. The
+    # import endpoint's ``extra_files`` field is the only way to produce that
+    # layout in one request; without this test, a future refactor could silently
+    # drop companion uploads and re-break central-PPO evaluation.
+    settings = build_test_settings(tmp_path)
+    client = TestClient(create_app(settings))
+
+    response = client.post(
+        "/api/artifacts/import",
+        data={
+            "artifact_kind": "checkpoint",
+            "label": "central ppo bundle",
+            "runner_id": "ppo_central_baseline",
+        },
+        # httpx TestClient repeats ``files`` tuple entries as form fields, so
+        # both ``extra_files`` entries arrive at FastAPI as a list.
+        files=[
+            ("file", ("ppo_model.zip", b"fake-sb3-zip", "application/zip")),
+            ("extra_files", ("vec_normalize.pkl", b"fake-vec", "application/octet-stream")),
+            ("extra_files", ("topology.json", b"{}", "application/json")),
+            (
+                "extra_files",
+                (
+                    "checkpoint_metadata.json",
+                    b"{\"variant\":\"central_baseline\"}",
+                    "application/json",
+                ),
+            ),
+        ],
+    )
+
+    assert response.status_code == 200, response.text
+    artifact = response.json()
+    artifact_id = artifact["artifact_id"]
+    artifact_dir = settings.imported_artifacts_root / artifact_id
+    assert (artifact_dir / "ppo_model.zip").exists()
+    assert (artifact_dir / "ppo_model.zip").read_bytes() == b"fake-sb3-zip"
+    # The companion file must land in the same directory, not its own UUID.
+    assert (artifact_dir / "vec_normalize.pkl").exists()
+    assert (artifact_dir / "vec_normalize.pkl").read_bytes() == b"fake-vec"
+    assert (artifact_dir / "topology.json").exists()
+    assert (artifact_dir / "checkpoint_metadata.json").exists()
+    # ``file_path`` still points at the primary upload -- it's what the
+    # artifact record and loaders key off. Companion files are discovered by
+    # convention (sibling lookup).
+    assert artifact["source_filename"] == "ppo_model.zip"
+
+
+def test_artifact_import_rejects_bound_central_ppo_missing_required_sidecars(
+    tmp_path: Path,
+) -> None:
+    settings = build_test_settings(tmp_path)
+    client = TestClient(create_app(settings))
+
+    response = client.post(
+        "/api/artifacts/import",
+        data={
+            "artifact_kind": "checkpoint",
+            "label": "central ppo missing sidecars",
+            "runner_id": "ppo_central_baseline",
+        },
+        files=[
+            ("file", ("ppo_model.zip", b"fake-sb3-zip", "application/zip")),
+            ("extra_files", ("vec_normalize.pkl", b"fake-vec", "application/octet-stream")),
+        ],
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "topology.json" in detail
+    assert "checkpoint_metadata.json" in detail
+
+
+def test_artifact_import_rejects_bound_central_ppo_sidecar_as_primary(
+    tmp_path: Path,
+) -> None:
+    settings = build_test_settings(tmp_path)
+    client = TestClient(create_app(settings))
+
+    response = client.post(
+        "/api/artifacts/import",
+        data={
+            "artifact_kind": "checkpoint",
+            "label": "central ppo wrong primary",
+            "runner_id": "ppo_central_baseline",
+        },
+        files=[
+            ("file", ("topology.json", b"{}", "application/json")),
+            ("extra_files", ("ppo_model.zip", b"fake-sb3-zip", "application/zip")),
+            ("extra_files", ("vec_normalize.pkl", b"fake-vec", "application/octet-stream")),
+            (
+                "extra_files",
+                (
+                    "checkpoint_metadata.json",
+                    b"{\"variant\":\"central_baseline\"}",
+                    "application/json",
+                ),
+            ),
+        ],
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "primary file" in detail
+    assert "model .zip" in detail
+
+
+def test_artifact_import_single_file_still_works_without_extra_files(tmp_path: Path) -> None:
+    # Backwards-compat: SAC checkpoints, shared-PPO checkpoints, and playback
+    # JSONs all ship as a single file. Adding ``extra_files`` to the endpoint
+    # must not break the single-file path.
+    settings = build_test_settings(tmp_path)
+    client = TestClient(create_app(settings))
+
+    response = client.post(
+        "/api/artifacts/import",
+        data={"artifact_kind": "checkpoint", "label": "solo sac"},
+        files={"file": ("checkpoint.pt", b"fake-torch", "application/octet-stream")},
+    )
+
+    assert response.status_code == 200, response.text
+    artifact_dir = settings.imported_artifacts_root / response.json()["artifact_id"]
+    assert (artifact_dir / "checkpoint.pt").exists()
+    assert not (artifact_dir / "vec_normalize.pkl").exists()
+
+
+def test_artifact_import_rejects_duplicate_filenames_in_extra_files(tmp_path: Path) -> None:
+    # If a user accidentally attaches the primary filename again as an extra,
+    # the second write would silently clobber the first. Fail at 400 with a
+    # message that names the offending file, so the UI can surface it.
+    settings = build_test_settings(tmp_path)
+    client = TestClient(create_app(settings))
+
+    response = client.post(
+        "/api/artifacts/import",
+        data={"artifact_kind": "checkpoint", "label": "dupe"},
+        files=[
+            ("file", ("ppo_model.zip", b"primary", "application/zip")),
+            ("extra_files", ("ppo_model.zip", b"collision", "application/zip")),
+        ],
+    )
+
+    assert response.status_code == 400
+    assert "duplicate filename" in response.json()["detail"]
+    assert "ppo_model.zip" in response.json()["detail"]
+
+
 def test_artifact_evaluate_maps_missing_split_file_to_400(tmp_path: Path) -> None:
     settings = build_test_settings(tmp_path)
     app = create_app(settings)
@@ -202,7 +351,9 @@ def test_artifact_evaluate_rejects_incompatible_sac_checkpoint_before_queueing(
         def fake_validate_checkpoint_env_compatibility(*_args, **_kwargs):
             return None
 
-        from cos435_citylearn.algorithms.sac.checkpoints import validate_checkpoint_runner_compatibility
+        from cos435_citylearn.algorithms.sac.checkpoints import (
+            validate_checkpoint_runner_compatibility,
+        )
 
         return (
             fake_resolve_imported_checkpoint_path,
@@ -221,6 +372,304 @@ def test_artifact_evaluate_rejects_incompatible_sac_checkpoint_before_queueing(
 
     assert response.status_code == 400
     assert "control_mode" in response.json()["detail"]
+
+
+def test_artifact_evaluate_rejects_incompatible_ppo_checkpoint_before_queueing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    # Regression: a central PPO artifact sidecar that advertises
+    # ``reward_v1`` must be rejected by the API preflight before the job
+    # queues, matching the SAC preflight above. Previously ``build_evaluation_request``
+    # had no PPO branch -- mismatched artifacts silently queued and blew up
+    # hours later inside the worker.
+    settings = build_test_settings(tmp_path)
+    app = create_app(settings)
+    artifact_id = "artifact_bad_ppo"
+    artifact_dir = settings.imported_artifacts_root / artifact_id
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    # The preflight resolves the file via artifact.json but we short-circuit
+    # to the sidecar loader below, so the actual zip content is irrelevant.
+    model_path = artifact_dir / "ppo_model.zip"
+    model_path.write_bytes(b"fake-sb3-zip")
+    (artifact_dir / "vec_normalize.pkl").write_bytes(b"fake-vec")
+    write_json(
+        artifact_dir / "artifact.json",
+        {
+            "artifact_id": artifact_id,
+            "artifact_kind": "checkpoint",
+            "label": "bad ppo checkpoint",
+            "source_filename": "ppo_model.zip",
+            "imported_at": "2026-04-20T00:00:00Z",
+            "algorithm": "ppo",
+            "runner_id": "ppo_central_baseline",
+            "status": "evaluable",
+            "file_path": str(model_path),
+            "notes": None,
+            "evaluable": True,
+            "playback_path": None,
+            "simulation_dir": None,
+        },
+    )
+
+    def fake_load_central_ppo_sidecar_tools():
+        def fake_load_sidecar(_model_path):
+            # Sidecar reports the artifact was trained under reward_v1 /
+            # features_v1 -- the runner config (ppo_central_baseline.yaml)
+            # expects reward_v2 / features_v2. The real validator should raise.
+            return {
+                "algorithm": "ppo",
+                "control_mode": "centralized",
+                "variant": "central_baseline",
+                "reward_version": "v1",
+                "features_version": "v1",
+            }
+
+        from cos435_citylearn.baselines.ppo import _validate_central_ppo_sidecar
+
+        return fake_load_sidecar, _validate_central_ppo_sidecar
+
+    monkeypatch.setattr(
+        "cos435_citylearn.api.services.artifact_store._load_central_ppo_sidecar_tools",
+        fake_load_central_ppo_sidecar_tools,
+    )
+
+    client = TestClient(app)
+    response = client.post(f"/api/artifacts/{artifact_id}/evaluate", json={})
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    # The validator mentions the specific mismatched fields; make sure the
+    # 400 payload surfaces something actionable rather than a generic error.
+    assert "reward_version" in detail or "features_version" in detail
+
+
+def test_artifact_evaluate_rejects_central_ppo_missing_vec_normalize_before_queueing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    settings = build_test_settings(tmp_path)
+    app = create_app(settings)
+    artifact_id = "artifact_missing_vec"
+    artifact_dir = settings.imported_artifacts_root / artifact_id
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    model_path = artifact_dir / "ppo_model.zip"
+    model_path.write_bytes(b"fake-sb3-zip")
+    write_json(
+        artifact_dir / "artifact.json",
+        {
+            "artifact_id": artifact_id,
+            "artifact_kind": "checkpoint",
+            "label": "central ppo missing vec",
+            "source_filename": "ppo_model.zip",
+            "imported_at": "2026-04-22T00:00:00Z",
+            "algorithm": "ppo",
+            "runner_id": "ppo_central_baseline",
+            "status": "evaluable",
+            "file_path": str(model_path),
+            "notes": None,
+            "evaluable": True,
+            "playback_path": None,
+            "simulation_dir": None,
+        },
+    )
+
+    def fake_load_central_ppo_sidecar_tools():
+        def fake_load_sidecar(_model_path):
+            return {
+                "algorithm": "ppo",
+                "control_mode": "centralized",
+                "variant": "central_baseline",
+                "reward_version": "reward_v0",
+                "features_version": "base_central_obs",
+            }
+
+        def fake_validate_sidecar(*_args, **_kwargs):
+            return {}
+
+        return fake_load_sidecar, fake_validate_sidecar
+
+    monkeypatch.setattr(
+        "cos435_citylearn.api.services.artifact_store._load_central_ppo_sidecar_tools",
+        fake_load_central_ppo_sidecar_tools,
+    )
+
+    client = TestClient(app)
+    response = client.post(f"/api/artifacts/{artifact_id}/evaluate", json={})
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "vec_normalize.pkl" in detail
+    assert "centralized PPO cannot evaluate" in detail
+
+
+def test_artifact_evaluate_rejects_central_ppo_missing_topology_before_queueing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    settings = build_test_settings(tmp_path)
+    app = create_app(settings)
+    artifact_id = "artifact_missing_topology"
+    artifact_dir = settings.imported_artifacts_root / artifact_id
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    model_path = artifact_dir / "ppo_model.zip"
+    model_path.write_bytes(b"fake-sb3-zip")
+    (artifact_dir / "vec_normalize.pkl").write_bytes(b"fake-vec")
+    write_json(
+        artifact_dir / "artifact.json",
+        {
+            "artifact_id": artifact_id,
+            "artifact_kind": "checkpoint",
+            "label": "central ppo missing topology",
+            "source_filename": "ppo_model.zip",
+            "imported_at": "2026-04-22T00:00:00Z",
+            "algorithm": "ppo",
+            "runner_id": "ppo_central_baseline",
+            "status": "evaluable",
+            "file_path": str(model_path),
+            "notes": None,
+            "evaluable": True,
+            "playback_path": None,
+            "simulation_dir": None,
+        },
+    )
+
+    def fake_load_central_ppo_sidecar_tools():
+        def fake_load_sidecar(_model_path):
+            return {
+                "algorithm": "ppo",
+                "control_mode": "centralized",
+                "variant": "central_baseline",
+                "reward_version": "reward_v0",
+                "features_version": "base_central_obs",
+            }
+
+        def fake_validate_sidecar(*_args, **_kwargs):
+            return {}
+
+        return fake_load_sidecar, fake_validate_sidecar
+
+    monkeypatch.setattr(
+        "cos435_citylearn.api.services.artifact_store._load_central_ppo_sidecar_tools",
+        fake_load_central_ppo_sidecar_tools,
+    )
+
+    client = TestClient(app)
+    response = client.post(f"/api/artifacts/{artifact_id}/evaluate", json={})
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "topology.json" in detail
+    assert "centralized PPO cannot evaluate safely" in detail
+
+
+def test_artifact_evaluate_rejects_central_ppo_topology_mismatch_before_queueing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    settings = build_test_settings(tmp_path)
+    app = create_app(settings)
+    artifact_id = "artifact_bad_topology"
+    artifact_dir = settings.imported_artifacts_root / artifact_id
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    model_path = artifact_dir / "ppo_model.zip"
+    model_path.write_bytes(b"fake-sb3-zip")
+    (artifact_dir / "vec_normalize.pkl").write_bytes(b"fake-vec")
+    write_json(
+        artifact_dir / "topology.json",
+        {
+            "observation_names": [["hour", "load"]] * 3,
+            "action_names": [["battery"]] * 3,
+        },
+    )
+    write_json(
+        artifact_dir / "artifact.json",
+        {
+            "artifact_id": artifact_id,
+            "artifact_kind": "checkpoint",
+            "label": "central ppo wrong split",
+            "source_filename": "ppo_model.zip",
+            "imported_at": "2026-04-22T00:00:00Z",
+            "algorithm": "ppo",
+            "runner_id": "ppo_central_baseline",
+            "status": "evaluable",
+            "file_path": str(model_path),
+            "notes": None,
+            "evaluable": True,
+            "playback_path": None,
+            "simulation_dir": None,
+        },
+    )
+
+    def fake_load_ppo_checkpoint_tools():
+        def fake_resolve_imported_checkpoint_path(**_kwargs):
+            return model_path
+
+        def fake_safe_load_checkpoint_payload(_path):
+            raise AssertionError("central PPO preflight should not load torch payloads")
+
+        def fake_validate_checkpoint_env_compatibility(*_args, **_kwargs):
+            raise AssertionError("central PPO preflight should use topology metadata")
+
+        def fake_validate_checkpoint_runner_compatibility(*_args, **_kwargs):
+            raise AssertionError("central PPO preflight should use sidecar validation")
+
+        return (
+            fake_resolve_imported_checkpoint_path,
+            fake_safe_load_checkpoint_payload,
+            fake_validate_checkpoint_env_compatibility,
+            fake_validate_checkpoint_runner_compatibility,
+        )
+
+    def fake_load_central_ppo_sidecar_tools():
+        def fake_load_sidecar(_model_path):
+            return {
+                "algorithm": "ppo",
+                "control_mode": "centralized",
+                "variant": "central_baseline",
+                "reward_version": "reward_v0",
+                "features_version": "base_central_obs",
+            }
+
+        def fake_validate_sidecar(*_args, **_kwargs):
+            return {}
+
+        return fake_load_sidecar, fake_validate_sidecar
+
+    def fake_make_citylearn_env(*_args, **_kwargs):
+        return type(
+            "Bundle",
+            (),
+            {
+                "env": type(
+                    "Env",
+                    (),
+                    {
+                        "observation_names": [["hour", "load"]] * 6,
+                        "action_names": [["battery"]] * 6,
+                    },
+                )(),
+            },
+        )()
+
+    monkeypatch.setattr(
+        "cos435_citylearn.api.services.artifact_store._load_ppo_checkpoint_tools",
+        fake_load_ppo_checkpoint_tools,
+    )
+    monkeypatch.setattr(
+        "cos435_citylearn.api.services.artifact_store._load_central_ppo_sidecar_tools",
+        fake_load_central_ppo_sidecar_tools,
+    )
+    monkeypatch.setattr(
+        "cos435_citylearn.api.services.artifact_store._load_citylearn_env_factory",
+        lambda: fake_make_citylearn_env,
+    )
+
+    client = TestClient(app)
+    response = client.post(f"/api/artifacts/{artifact_id}/evaluate", json={"split": "phase_3_1"})
+
+    assert response.status_code == 400
+    assert "trained on 3 buildings but target env has 6" in response.json()["detail"]
 
 
 def test_create_app_does_not_require_sac_modules_for_startup(tmp_path: Path, monkeypatch) -> None:

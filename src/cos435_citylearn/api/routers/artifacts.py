@@ -45,6 +45,13 @@ def get_artifact_playback(request: Request, artifact_id: str) -> PlaybackRespons
 async def import_artifact(
     request: Request,
     file: UploadFile = File(...),
+    # ``extra_files`` lets a single POST ship companion files into the same
+    # artifact directory. This is the only way to import a centralized PPO
+    # checkpoint -- it needs ``ppo_model.zip`` (primary) + ``vec_normalize.pkl``
+    # (companion) co-located so the loader can pair them by ``artifact_id``.
+    # Optional; single-file uploads (SAC .pt, shared-PPO .pt, playback JSON)
+    # continue to work by simply omitting this field.
+    extra_files: list[UploadFile] = File(default_factory=list),
     artifact_kind: ArtifactKind = Form(...),
     label: str = Form(""),
     notes: str | None = Form(default=None),
@@ -54,6 +61,7 @@ async def import_artifact(
     try:
         return await request.app.state.artifact_store.import_upload(
             file=file,
+            extra_files=extra_files,
             artifact_kind=artifact_kind,
             label=label,
             notes=notes,

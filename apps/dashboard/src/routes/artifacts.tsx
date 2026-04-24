@@ -15,6 +15,12 @@ import { MetricCard, PlaybackScene, SectionHeader, TimeseriesPanel, TraceTable }
 
 type ArtifactKind = "checkpoint" | "run_bundle" | "simulation_bundle";
 
+const CENTRAL_PPO_REQUIRED_COMPANIONS = [
+  "vec_normalize.pkl",
+  "topology.json",
+  "checkpoint_metadata.json",
+] as const;
+
 export function ArtifactsPage() {
   const queryClient = useQueryClient();
   const [artifactKind, setArtifactKind] = useState<ArtifactKind>("run_bundle");
@@ -23,6 +29,11 @@ export function ArtifactsPage() {
   const [label, setLabel] = useState("");
   const [notes, setNotes] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  // Companion files that live alongside the primary upload under the same
+  // artifact_id (e.g. ``vec_normalize.pkl`` next to the centralized PPO zip).
+  // The backend saves each sibling file into the artifact directory and the
+  // loader pairs them by filename.
+  const [extraFiles, setExtraFiles] = useState<File[]>([]);
   const [selectedBuildingIndex, setSelectedBuildingIndex] = useState(0);
   const [stepIndex, setStepIndex] = useState(0);
 
@@ -72,6 +83,7 @@ export function ArtifactsPage() {
       queryClient.invalidateQueries({ queryKey: ["artifacts"] });
       setSelectedArtifactId(artifact.artifact_id);
       setSelectedFile(null);
+      setExtraFiles([]);
       setLabel("");
       setNotes("");
     },
@@ -92,13 +104,37 @@ export function ArtifactsPage() {
     },
   });
 
+  const checkpointRunners = (runnersQuery.data ?? []).filter((runner) => runner.supports_checkpoint_eval);
+  const selectedRunner = checkpointRunners.find((runner) => runner.runner_id === selectedRunnerId) ?? null;
+  const needsCentralPpoCompanions =
+    artifactKind === "checkpoint" &&
+    selectedRunner !== null &&
+    selectedRunner.algorithm === "ppo" &&
+    selectedRunner.variant === "central_baseline";
+  const extraFileNames = useMemo(
+    () => new Set(extraFiles.map((file) => file.name)),
+    [extraFiles],
+  );
+  const missingCentralPpoCompanions = needsCentralPpoCompanions
+    ? CENTRAL_PPO_REQUIRED_COMPANIONS.filter((name) => !extraFileNames.has(name))
+    : [];
+  const attachedCentralPpoCompanions = needsCentralPpoCompanions
+    ? CENTRAL_PPO_REQUIRED_COMPANIONS.filter((name) => extraFileNames.has(name))
+    : [];
+
   function handleSubmit(): void {
     if (!selectedFile) {
+      return;
+    }
+    if (needsCentralPpoCompanions && missingCentralPpoCompanions.length > 0) {
       return;
     }
 
     const payload = new FormData();
     payload.append("file", selectedFile);
+    for (const extra of extraFiles) {
+      payload.append("extra_files", extra);
+    }
     payload.append("artifact_kind", artifactKind);
     payload.append("label", label);
     if (notes.trim()) {
@@ -109,8 +145,6 @@ export function ArtifactsPage() {
     }
     uploadMutation.mutate(payload);
   }
-
-  const checkpointRunners = (runnersQuery.data ?? []).filter((runner) => runner.supports_checkpoint_eval);
   const playback = playbackQuery.data;
   const totalArtifacts = artifactsQuery.data?.length ?? 0;
   const playbackCount = (artifactsQuery.data ?? []).filter((artifact) => artifact.playback_path).length;
@@ -141,7 +175,9 @@ export function ArtifactsPage() {
   }, [artifactDetailQuery.data?.file_path, selectedArtifact]);
 
   const readinessCopy =
-    artifactKind === "checkpoint"
+    needsCentralPpoCompanions
+      ? "Attach vec_normalize.pkl, topology.json, and checkpoint_metadata.json before importing."
+      : artifactKind === "checkpoint"
       ? checkpointRunners.length > 0
         ? "Bind a runner when you want to stage the next eval."
         : "Store the checkpoint now and bind it once the evaluator path lands."
@@ -209,6 +245,28 @@ export function ArtifactsPage() {
                 </select>
               </label>
             ) : null}
+            {needsCentralPpoCompanions ? (
+              <label className="form-grid__wide">
+                centralized PPO companion files
+                <input
+                  accept=".json,.pkl,application/json,application/octet-stream"
+                  onChange={(event) => setExtraFiles(event.target.files ? Array.from(event.target.files) : [])}
+                  type="file"
+                  multiple
+                />
+                <span className="muted-copy">
+                  Attach all three sidecars so the dashboard can evaluate the imported checkpoint: vec_normalize.pkl, topology.json, and checkpoint_metadata.json.
+                </span>
+                <span className="muted-copy">
+                  attached: {attachedCentralPpoCompanions.length > 0 ? attachedCentralPpoCompanions.join(", ") : "none yet"}
+                </span>
+                {missingCentralPpoCompanions.length > 0 ? (
+                  <span style={{ color: "var(--danger)" }}>
+                    missing: {missingCentralPpoCompanions.join(", ")}
+                  </span>
+                ) : null}
+              </label>
+            ) : null}
             <label className="form-grid__wide">
               notes
               <textarea
@@ -220,7 +278,16 @@ export function ArtifactsPage() {
             </label>
           </div>
           <div className="inline-actions">
-            <button className="primary-button" disabled={!selectedFile || uploadMutation.isPending} onClick={handleSubmit} type="button">
+            <button
+              className="primary-button"
+              disabled={
+                !selectedFile
+                || uploadMutation.isPending
+                || (needsCentralPpoCompanions && missingCentralPpoCompanions.length > 0)
+              }
+              onClick={handleSubmit}
+              type="button"
+            >
               {uploadMutation.isPending ? "importing…" : "register artifact"}
             </button>
             <div className="muted-copy">{readinessCopy}</div>
