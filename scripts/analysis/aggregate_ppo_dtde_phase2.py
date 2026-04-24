@@ -6,12 +6,13 @@ per-split means into submission/results/cross_split_scores.csv for the
 
   * phase_2_online_eval_{1,2,3}: parsed from the latest
     results/eval_phase2_ppo_dtde_*/progress.log. Selects the best-public_dev
-    learning-rate checkpoint per seed (one per seed) before averaging,
-    to match the released phase_3 aggregation methodology (eval_job_count =
-    10 seeds * 3 splits).
-  * phase_3_{1,2,3}: averaged across all results/runs/
-    ppo__ppo_shared_dtde_reward_v2__phase_3_* metrics.json files, matching
-    the naive mean already reported in released_eval_main_results.csv.
+    learning-rate checkpoint per seed (one per seed) before averaging
+    (eval_job_count = 10 seeds * 3 splits).
+  * phase_3_{1,2,3}: averaged across results/runs/
+    ppo__ppo_shared_dtde_reward_v2__phase_3_* metrics.json files, filtered
+    to the same best-public_dev LR per seed via manifest.artifact_id so
+    cross_split_scores.csv stays consistent with the n=30 phase_3 row already
+    reported in released_eval_main_results.csv.
 
 This script also backfills the PPO DTDE reward_v2 phase_2 row into
 submission/results/released_eval_main_results.csv (full stats: mean/std/ci95
@@ -279,26 +280,152 @@ def _patch_released_inventory_csv(new_rows: list[dict[str, str]]) -> None:
     print(f"  updated {RELEASED_INVENTORY_CSV.relative_to(REPO_ROOT)}")
 
 
-def _load_phase3_per_split_means() -> dict[str, float]:
-    """Return {p3_1|p3_2|p3_3: mean_score} for PPO DTDE reward_v2 across
-    all eval runs under results/runs/."""
+def _load_phase3_per_split_means(
+    best_run_ids: set[str] | None = None,
+) -> dict[str, float]:
+    """Return {p3_1|p3_2|p3_3: mean_score} for PPO DTDE reward_v2.
+
+    If ``best_run_ids`` is given, restrict to eval runs whose manifest
+    ``artifact_id`` is in that set (the best-public_dev LR per seed). This
+    matches the selection used for released_eval_main_results.csv and keeps
+    cross_split_scores.csv internally consistent with the released snapshot.
+    Duplicate (split, seed) eval artifacts — accidentally re-run checkpoints
+    — are deduped by keeping the first run directory encountered (sorted by
+    name). NOTE: within the best-LR-per-seed set, the only duplicates we
+    observe are two (phase_3_2 seed9, phase_3_3 seed9) pairs that share the
+    same checkpoint and produce identical scores, so dedupe order does not
+    affect the reported mean. If ``best_run_ids`` is None, average across all
+    phase_3 eval runs (legacy behaviour, kept so the helper works for ad-hoc
+    queries).
+    """
     from collections import defaultdict
-    by_split: dict[str, list[float]] = defaultdict(list)
+    # Map (split, seed) -> first score seen, to dedupe re-run eval artifacts
+    # that share an artifact_id with identical scores.
+    seen: dict[tuple[str, int], float] = {}
     for r in sorted(RUNS_DIR.glob("ppo__ppo_shared_dtde_reward_v2__phase_3_*")):
         mpath = r / "metrics.json"
         if not mpath.exists():
             continue
+        if best_run_ids is not None:
+            manifest_path = r / "manifest.json"
+            if not manifest_path.exists():
+                continue
+            artifact_id = json.loads(manifest_path.read_text()).get("artifact_id")
+            if artifact_id not in best_run_ids:
+                continue
         d = json.loads(mpath.read_text())
         split = d.get("split")
         score = d.get("average_score")
-        if split and score is not None:
-            by_split[split].append(float(score))
+        seed = d.get("seed")
+        if split is None or score is None or seed is None:
+            continue
+        key = (split, int(seed))
+        if key in seen:
+            continue  # keep first occurrence (sorted by name ~= oldest timestamp)
+        seen[key] = float(score)
+
+    by_split: dict[str, list[float]] = defaultdict(list)
+    for (split, _seed), score in seen.items():
+        by_split[split].append(score)
+
     label = {"phase_3_1": "p3_1", "phase_3_2": "p3_2", "phase_3_3": "p3_3"}
     return {
         label[s]: sum(v) / len(v)
         for s, v in by_split.items()
         if s in label
     }
+
+
+# Cross-split row identity for every tracked method. Each entry maps a display
+# label used in cross_split_scores.csv to (algorithm, variant) keys used in
+# released_eval_seed_inventory.csv and to the method_id used for the public_dev
+# column in local_main_results.csv.
+CROSS_SPLIT_METHOD_KEYS: list[tuple[str, str, str, str | None]] = [
+    ("RBC",          "rbc", "basic_rbc",              "local_rbc"),
+    ("PPO Central",  "ppo", "ppo_central_baseline",   "ppo_central_baseline_public_dev"),
+    ("PPO DTDE",     "ppo", "ppo_shared_dtde_reward_v2", "ppo_shared_dtde_reward_v2_public_dev"),
+    ("SAC Central",  "sac", "central_baseline",       "sac_central_baseline_public_dev"),
+    ("SAC rv1",      "sac", "central_reward_v1",      "sac_central_reward_v1_public_dev"),
+    ("SAC rv2",      "sac", "central_reward_v2",      "sac_central_reward_v2_public_dev"),
+    ("SAC DTDE",     "sac", "shared_dtde_reward_v2",  "sac_shared_dtde_reward_v2_public_dev"),
+]
+
+SPLIT_TO_CROSS_COL = {
+    "phase_2_online_eval_1": "p2_eval1",
+    "phase_2_online_eval_2": "p2_eval2",
+    "phase_2_online_eval_3": "p2_eval3",
+    "phase_3_1": "p3_1",
+    "phase_3_2": "p3_2",
+    "phase_3_3": "p3_3",
+}
+
+LOCAL_MAIN_CSV = REPO_ROOT / "submission" / "results" / "local_main_results.csv"
+
+
+def _rebuild_cross_split_from_inventory() -> None:
+    """Regenerate every row of cross_split_scores.csv from the authoritative
+    sources: submission/results/released_eval_seed_inventory.csv (per-split
+    means) and submission/results/local_main_results.csv (public_dev column).
+
+    Preserves the existing fieldnames / row order of cross_split_scores.csv.
+    Any method already present in the file but not listed in
+    ``CROSS_SPLIT_METHOD_KEYS`` is left untouched.
+    """
+    if not RELEASED_INVENTORY_CSV.exists() or not LOCAL_MAIN_CSV.exists():
+        print("  skip cross_split rebuild: inventory or local_main csv missing")
+        return
+
+    inv_rows = list(csv.DictReader(RELEASED_INVENTORY_CSV.open(newline="")))
+    local_rows = {r["method_id"]: r for r in csv.DictReader(LOCAL_MAIN_CSV.open(newline=""))}
+
+    # Group inventory by (algorithm, variant, split) -> list of scores.
+    from collections import defaultdict
+    by_key: dict[tuple[str, str, str], list[float]] = defaultdict(list)
+    for r in inv_rows:
+        try:
+            score = float(r["average_score"])
+        except (KeyError, ValueError):
+            continue
+        by_key[(r["algorithm"], r["variant"], r["split"])].append(score)
+
+    def _per_split_mean(algo: str, variant: str, split: str) -> str:
+        vals = by_key.get((algo, variant, split), [])
+        return f"{sum(vals) / len(vals):.4f}" if vals else ""
+
+    # Walk the existing CSV to preserve fieldnames + ordering.
+    with CROSS_SPLIT_CSV.open(newline="") as f:
+        reader = csv.DictReader(f)
+        fieldnames = list(reader.fieldnames or [])
+        existing = list(reader)
+
+    by_method = {r["method"].strip(): r for r in existing}
+
+    for label, algo, variant, local_method_id in CROSS_SPLIT_METHOD_KEYS:
+        row = by_method.get(label)
+        if row is None:
+            # Row absent from CSV — skip rather than invent new rows.
+            continue
+        # public_dev from local_main_results.csv (if available).
+        if local_method_id and local_method_id in local_rows:
+            mean = local_rows[local_method_id].get("average_score_mean")
+            if mean:
+                row["public_dev"] = f"{float(mean):.4f}"
+        # per-split columns from inventory.
+        for split, col in SPLIT_TO_CROSS_COL.items():
+            if col not in fieldnames:
+                continue
+            value = _per_split_mean(algo, variant, split)
+            if value:
+                row[col] = value
+
+    CROSS_SPLIT_CSV.write_text(
+        ",".join(fieldnames) + "\n"
+        + "".join(
+            ",".join(row.get(f, "") for f in fieldnames) + "\n"
+            for row in existing
+        )
+    )
+    print(f"  rebuilt {CROSS_SPLIT_CSV.relative_to(REPO_ROOT)} from inventory")
 
 
 def main() -> None:
@@ -347,10 +474,12 @@ def main() -> None:
         new_row[col] = f"{mean:.4f}"
         print(f"    {split}: mean={mean:.4f} n={len(scores)}")
 
-    # 3b) Phase_3 per-split means from raw run metrics.
-    phase3 = _load_phase3_per_split_means()
+    # 3b) Phase_3 per-split means from raw run metrics, filtered to the same
+    #     best-public_dev LR per seed used above so cross_split_scores.csv
+    #     matches released_eval_main_results.csv (n=30 = 10 seeds * 3 splits).
+    phase3 = _load_phase3_per_split_means(best_run_ids=best_run_ids)
     if phase3:
-        print("\n  phase_3 per-split results (all-runs mean):")
+        print("\n  phase_3 per-split results (best-lr-per-seed):")
         for col in ("p3_1", "p3_2", "p3_3"):
             if col in phase3:
                 new_row[col] = f"{phase3[col]:.4f}"
@@ -391,6 +520,12 @@ def main() -> None:
     )
     _patch_released_main_csv(main_row)
     _patch_released_inventory_csv(inventory_rows)
+
+    # 6) Rebuild ALL rows of cross_split_scores.csv from the now-up-to-date
+    #    inventory + local_main_results.csv so every method (not just PPO DTDE)
+    #    stays consistent with the authoritative per-seed eval data.
+    print()
+    _rebuild_cross_split_from_inventory()
 
 
 if __name__ == "__main__":

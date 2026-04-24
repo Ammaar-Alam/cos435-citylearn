@@ -274,7 +274,8 @@ def plot_per_split_scores() -> None:
 
         ax.axhline(
             CHESCA_SCORE, color="#e53935", linewidth=1.6, linestyle="--",
-            label=f"CHESCA ({CHESCA_SCORE:.3f})", zorder=3,
+            label=f"CHESCA 2023 public ref ({CHESCA_SCORE:.3f}, diff. eval server)",
+            zorder=3,
         )
 
         ax.text(
@@ -422,7 +423,8 @@ def plot_generalization_gap(rows: dict[str, dict]) -> None:
         )
         ax.axhline(
             CHESCA_SCORE, color="#e53935", linewidth=1.5, linestyle="--",
-            label=f"CHESCA winner ({CHESCA_SCORE:.3f})", zorder=4,
+            label=f"CHESCA 2023 public ref ({CHESCA_SCORE:.3f}, diff. eval server)",
+            zorder=4,
         )
 
         ax.set_xticks(x)

@@ -231,7 +231,7 @@ def _add_results_numbers_block(slide) -> None:
         ]),
         ("phase_3 (6 buildings, held-out — portable only)", [
             ("RBC", "1.114"),
-            ("PPO DTDE", "0.848"),
+            ("PPO DTDE", "0.843"),
             ("SAC DTDE", "0.774", True),
         ]),
     ]
@@ -535,10 +535,11 @@ def build_presentation() -> Path:
         s7,
         "The headline panel is the held-out phase_2_online_eval split — same "
         "3-building setup as training but weather and demand the agent has never "
-        "seen. RBC sits at 1.09, PPO central at 0.87, SAC variants cluster at "
-        "0.65-0.68. The dashed line at 0.562 is CHESCA's 2023 public-leaderboard "
-        "score — benchmark context, not a head-to-head number, because CHESCA "
-        "was scored on the original competition server we cannot re-run.\n\n"
+        "seen. RBC sits at 1.09, PPO central at 0.87, PPO-DTDE at 0.79, and SAC "
+        "variants cluster at 0.65-0.68. The dashed line at 0.562 is CHESCA's "
+        "2023 public-leaderboard score — benchmark context, not a head-to-head "
+        "number, because CHESCA was scored on the original competition server "
+        "we cannot re-run.\n\n"
         "The harder test is phase_3 — held-out AND a different 6-building "
         "cluster, not the 3 we trained on. Only the shared-DTDE variants can "
         "execute here: a centralized policy's input and output layers are wired "
