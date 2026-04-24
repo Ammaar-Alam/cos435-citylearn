@@ -79,37 +79,47 @@ Each slide is ~30 seconds. All five rubric questions (problem / importance / har
 
 **On-slide content (compact table):**
 
-| Variant | Cost weight | Carbon weight | Discomfort | Shaping |
-|---|---|---|---|---|
-| baseline | equal | equal | equal | raw composite |
-| **reward_v1** | × 2 | × 1 | — | Cost-forward |
-| **reward_v2** | × 1.5 | × 1.5 | × 1.5 | **Balanced + generalization-friendly** |
+| Variant | What it is | Why |
+|---|---|---|
+| `reward_v0` (baseline) | CityLearn's built-in default (negative net-consumption proxy) | Sanity baseline; the training signal does not match the scoring rule |
+| **`reward_v1`** | Hand-crafted 8-term weighted penalty mirroring the **official 2023 scoring weights**: 0.30·comfort + 0.15·outage_comfort + 0.15·outage_unserved + 0.10·carbon + 0.075·{ramping, load_factor, daily_peak, all_time_peak} | Train on the same thing the competition scores on |
+| **`reward_v2`** | `reward_v1` + 0.05·\|ΔSoC\| + 0.05·1[sign_flip] | Battery smoothness penalties — discourages bang-bang charge/discharge; empirically improves cross-split generalization |
 
 **Speaker notes:**
-> Reward shaping had more impact than any single hyperparameter tweak. reward_v1 is tuned for public_dev; reward_v2 sacrifices ~1% on local but generalizes better to released splits.
+> Instead of inventing weights, reward_v1 literally mirrors the 8-term weighted penalty the competition uses to score submissions, so the agent is trained directly on the objective it's evaluated on. reward_v2 adds two battery-behavior terms that penalize SoC swings and charge-discharge sign flips between consecutive steps. Without them, SAC learns bang-bang policies that are locally optimal on public_dev but brittle on held-out splits; with them, the policy is steadier and generalizes better. The reward-ablation axis is run only on SAC-central — we didn't have compute to matched-ablate PPO.
 
 ---
 
 ## Slide 7 — Results + limitations (30s)
 
-**On-slide content — THE figure (Rubric §2 deliverable)**: [`submission/figures/generalization_gap.png`](submission/figures/generalization_gap.png). Shows six methods (RBC, PPO Central, SAC Central baseline/rv1/rv2, SAC DTDE) with paired bars for `public_dev` (light, tuning split) and released `phase_2_online_eval` (solid, mean ± std over 3 splits) and a dashed CHESCA-public reference line at 0.562. Backup figures available if a simpler view is preferred: [`method_comparison.png`](submission/figures/method_comparison.png) (7 methods on public_dev only) and [`cross_split_comparison.png`](submission/figures/cross_split_comparison.png) (phase_2 only).
+**On-slide content — THE figure (Rubric §2 deliverable)**: [`submission/figures/per_split_scores.png`](submission/figures/per_split_scores.png) — the single strongest figure we have, because it shows **all methods on both held-out tiers in one panel**: 3 `phase_2_online_eval` splits (same-size generalization, 3 buildings) on the left, 3 `phase_3` splits (cross-size generalization, 6 buildings) on the right, with a visual separator and a "centralized models not portable" annotation in the phase_3 region. The dashed red line is the CHESCA 2023 public-leaderboard reference (0.562). Backup / supporting figures available: [`cross_split_comparison.png`](submission/figures/cross_split_comparison.png) (phase_2 bar chart), [`generalization_gap.png`](submission/figures/generalization_gap.png) (public_dev → phase_2 paired bars).
 
-**Headline numbers (from [local_main_results.csv](submission/results/local_main_results.csv) and [released_eval_main_results.csv](submission/results/released_eval_main_results.csv)):**
-- Best local (public_dev): **SAC centralized reward_v1 = 0.527** (−48.4% vs RBC)
-- CHESCA public reference: **0.562**
-- Best on released phase_2: **SAC central reward_v2 = 0.653** (generalization gap of ~0.12 vs public_dev)
-- Best portable (phase_3, 6-building held-out): **SAC shared-DTDE = 0.774**
+**Headline numbers (from [released_eval_main_results.csv](submission/results/released_eval_main_results.csv)):**
+
+On `phase_2_online_eval` (3 buildings, held-out):
+- RBC baseline: 1.087
+- PPO central: 0.873
+- **SAC central reward_v2: 0.653 (best)**
+- SAC DTDE: 0.677
+- CHESCA public reference (different eval): 0.562
+
+On `phase_3` (6 buildings, held-out — only portable methods):
+- RBC baseline: 1.114
+- PPO DTDE: 0.843
+- **SAC DTDE: 0.774 (best)**
 
 **Speaker notes (Rubric Q5: "Key components + results + limitations"):**
-> Three takeaways. First: SAC beats PPO by ~30% on every matched split — off-policy sample efficiency matters on this horizon. Second: centralized beats shared-DTDE on public_dev, but only the DTDE variants transfer to the 6-building held-out phase-3 split — architecture is a generalization bet. Third: on the `public_dev` tuning split we're below CHESCA's public reference, but on the released phase-2 splits every one of our variants is above CHESCA's line and the RL methods narrow toward each other — the cross-split gap means we do not claim an apples-to-apples leaderboard win, and the honest contribution is the ablation, not a new SOTA.
+> The headline panel is the held-out `phase_2_online_eval` split — same 3-building setup as training but weather and demand the agent has never seen. RBC sits at 1.09, PPO central at 0.87, SAC variants cluster at 0.65-0.68. The dashed line at 0.562 is CHESCA's 2023 public-leaderboard score — benchmark context, not a head-to-head number, because CHESCA was scored on the original competition server we cannot re-run.
 >
-> Limitations: single `public_dev` tuning split used to select final reward variants (risk of overfitting); compute-bound so we capped PPO-DTDE at 10 seeds and SAC-DTDE at 3. CHESCA was evaluated on the official hidden leaderboard that we cannot re-run, so the dashed reference line is benchmark context, not a head-to-head number.
+> The harder test is `phase_3` — held-out AND a different 6-building cluster, not the 3 we trained on. Only the shared-DTDE variants can execute here: a centralized policy's input and output layers are wired for exactly 3 buildings, so feeding it a 6-building observation is a shape mismatch, not a degradation. SAC-DTDE generalizes best at 0.774, PPO-DTDE at 0.843. This is our cleanest architectural claim: **if deployment might see a different building count than training, choose shared-DTDE**.
+>
+> Limitations: single `public_dev` tuning split was used to select reward variants (overfitting risk); compute-bound so we capped PPO-DTDE and SAC-DTDE at 10 and 3 seeds respectively; reward-variant ablation was run only on SAC-central, not on PPO-central. CHESCA's line is reference, not a competitive bar we're claiming to have cleared.
 
 ---
 
-## Figure caption (for Google Slides paste — Rubric §2)
+## Figure caption (for PowerPoint / Slides paste — Rubric §2)
 
-> **Figure.** CityLearn 2023 Track-3 `average_score` (↓ better) for rule-based control (RBC), PPO centralized, and SAC variants, evaluated on our local `public_dev` tuning split (light bars) and the released `phase_2_online_eval` splits (solid bars, mean ± std over 3 splits). Error bars on released bars are std across splits; multi-seed runs use n = 3–10 checkpoints per variant. The dashed horizontal line marks the CHESCA 2023 public-leaderboard score (0.562) as benchmark context. **Takeaway:** on `public_dev` every SAC variant reaches or beats CHESCA's public line, with centralized SAC reward_v1 best at 0.527; but on the released `phase_2` splits the same SAC variants shift up by ~0.12 and sit above the CHESCA reference, so we do not claim an apples-to-apples leaderboard win. Centralized policies are non-portable to `phase_3`'s six-building held-out setting — only the shared-DTDE variants transfer (SAC-DTDE `phase_3` = 0.774).
+> **Figure.** CityLearn 2023 Track-3 `average_score` (↓ better) across six released held-out evaluation datasets: three `phase_2_online_eval` splits (left, same 3-building setup as training) and three `phase_3` splits (right, six-building cluster, shaded). Each line is one method: rule-based control (grey), PPO centralized (blue), three SAC centralized reward variants (orange/green/red), and SAC shared-DTDE (purple). The dashed red reference line at 0.562 is CHESCA's 2023 public-leaderboard score, shown as benchmark context (not same eval). **Takeaways**: (1) on `phase_2` (3 buildings), all SAC variants cluster around 0.65-0.68 and PPO-central around 0.87 — RL reduces the RBC score of ~1.09 by 30-40 % on held-out data. (2) On `phase_3` (6 buildings), only shared-DTDE policies can run; SAC-DTDE is the best portable variant at 0.774. Centralized policies are architecturally non-portable to a different building count, which is the headline architectural trade-off.
 
 ---
 
