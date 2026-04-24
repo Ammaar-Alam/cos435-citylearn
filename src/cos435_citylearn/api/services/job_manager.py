@@ -134,6 +134,10 @@ class JobManager:
                 "ui_exports_root": str(self.settings.ui_exports_root),
                 "artifacts_root": str(self.settings.artifacts_root),
                 "imported_artifacts_root": str(self.settings.imported_artifacts_root),
+                # Forward the opt-in cross-reward eval flag to the worker
+                # payload. ``eval_ppo_checkpoint`` / ``eval_sac_checkpoint``
+                # read it via ``request.get("allow_cross_reward_eval", False)``.
+                "allow_cross_reward_eval": request.allow_cross_reward_eval,
             }
             write_json(self._job_request_path(job_id), request_payload)
 

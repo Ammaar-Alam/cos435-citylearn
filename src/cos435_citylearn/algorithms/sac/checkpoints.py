@@ -1,13 +1,25 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any, Sequence
 
 import torch
 
+from cos435_citylearn.algorithms._runtime_labels import (
+    RUNTIME_LABEL_FIELDS as _RUNTIME_LABEL_FIELDS,
+)
+from cos435_citylearn.algorithms._runtime_labels import (
+    expected_runtime_labels as _expected_runtime_labels,
+)
+from cos435_citylearn.algorithms._runtime_labels import (
+    trained_runtime_labels as _trained_runtime_labels,
+)
 from cos435_citylearn.algorithms.sac.features import SHARED_CONTEXT_DIMENSION
 from cos435_citylearn.paths import REPO_ROOT, RESULTS_DIR
+
+_LOGGER = logging.getLogger(__name__)
 
 REQUIRED_CHECKPOINT_KEYS = {
     "algorithm",
@@ -170,7 +182,9 @@ def validate_checkpoint_payload_structure(payload: Any) -> None:
 def validate_checkpoint_runner_compatibility(
     checkpoint_payload: dict[str, Any],
     config: dict[str, Any],
-) -> None:
+    *,
+    allow_cross_reward_eval: bool = False,
+) -> dict[str, tuple[Any, Any]]:
     expected_algorithm = str(config["algorithm"]["name"])
     expected_control_mode = str(config["algorithm"]["control_mode"])
 
@@ -184,6 +198,32 @@ def validate_checkpoint_runner_compatibility(
             f"checkpoint control_mode '{checkpoint_payload['control_mode']}' is incompatible with runner control_mode '{expected_control_mode}'"
         )
 
+    expected_labels = _expected_runtime_labels(config)
+    trained_labels = _trained_runtime_labels(checkpoint_payload)
+    mismatches: dict[str, tuple[Any, Any]] = {}
+    for field in _RUNTIME_LABEL_FIELDS:
+        trained = trained_labels.get(field)
+        expected = expected_labels.get(field)
+        if trained != expected:
+            mismatches[field] = (trained, expected)
+
+    if mismatches and not allow_cross_reward_eval:
+        parts = [f"{field}: checkpoint={t!r} config={e!r}" for field, (t, e) in mismatches.items()]
+        raise ValueError(
+            "SAC checkpoint runtime metadata is incompatible with runner config; "
+            "pass allow_cross_reward_eval=True to opt into cross-reward evaluation "
+            "(run_id keeps the training label, manifest records the mismatch). "
+            + "; ".join(parts)
+        )
+    if mismatches:
+        parts = [f"{field}: checkpoint={t!r} config={e!r}" for field, (t, e) in mismatches.items()]
+        _LOGGER.warning(
+            "allow_cross_reward_eval=True; evaluating checkpoint under "
+            "mismatched runtime labels: %s",
+            "; ".join(parts),
+        )
+    return mismatches
+
 
 def validate_checkpoint_env_compatibility(
     checkpoint_payload: dict[str, Any],
@@ -191,37 +231,83 @@ def validate_checkpoint_env_compatibility(
     observation_names: Sequence[Sequence[str]],
     action_names: Sequence[Sequence[str]],
 ) -> None:
-    checkpoint_observation_names = [list(names) for names in checkpoint_payload["observation_names"]]
+    checkpoint_observation_names = [
+        list(names) for names in checkpoint_payload["observation_names"]
+    ]
     checkpoint_action_names = [list(names) for names in checkpoint_payload["action_names"]]
-    current_observation_names = [list(names) for names in observation_names]
-    current_action_names = [list(names) for names in action_names]
+    env_observation_names = [list(names) for names in observation_names]
+    env_action_names = [list(names) for names in action_names]
+    control_mode = checkpoint_payload.get("control_mode", "<unknown>")
 
-    if checkpoint_payload["control_mode"] == "shared_dtde":
+    if control_mode == "shared_dtde":
+        # Shared policies are topology-invariant: the number of buildings can differ
+        # as long as the per-building observation/action schemas match.
+        if not checkpoint_observation_names or not env_observation_names:
+            raise ValueError(
+                "shared_dtde checkpoint requires non-empty observation schema on both sides"
+            )
+        if not checkpoint_action_names or not env_action_names:
+            raise ValueError(
+                "shared_dtde checkpoint requires non-empty action schema on both sides"
+            )
         reference_observation_names = checkpoint_observation_names[0]
         reference_action_names = checkpoint_action_names[0]
 
         if any(names != reference_observation_names for names in checkpoint_observation_names):
-            raise ValueError("shared SAC checkpoint observation schema is internally inconsistent")
-
-        if any(names != reference_action_names for names in checkpoint_action_names):
-            raise ValueError("shared SAC checkpoint action schema is internally inconsistent")
-
-        if any(names != reference_observation_names for names in current_observation_names):
             raise ValueError(
-                "checkpoint observation schema is incompatible with the selected runner config"
+                "shared SAC checkpoint observation schema is internally inconsistent"
             )
-
-        if any(names != reference_action_names for names in current_action_names):
-            raise ValueError("checkpoint action schema is incompatible with the selected runner config")
-
+        if any(names != reference_action_names for names in checkpoint_action_names):
+            raise ValueError(
+                "shared SAC checkpoint action schema is internally inconsistent"
+            )
+        env_reference_observation = env_observation_names[0]
+        env_reference_action = env_action_names[0]
+        if any(names != env_reference_observation for names in env_observation_names):
+            raise ValueError(
+                "target env has inconsistent per-building observation schemas; "
+                "shared_dtde requires identical buildings"
+            )
+        if any(names != env_reference_action for names in env_action_names):
+            raise ValueError(
+                "target env has inconsistent per-building action schemas; "
+                "shared_dtde requires identical buildings"
+            )
+        if reference_observation_names != env_reference_observation:
+            raise ValueError(
+                "shared_dtde checkpoint per-building observation schema does not match target env; "
+                "the two datasets expose different building features."
+            )
+        if reference_action_names != env_reference_action:
+            raise ValueError(
+                "shared_dtde checkpoint per-building action schema does not match target env."
+            )
         return
 
-    if current_observation_names != checkpoint_observation_names:
+    if env_observation_names != checkpoint_observation_names:
+        ckpt_n = len(checkpoint_observation_names)
+        env_n = len(env_observation_names)
+        if ckpt_n != env_n:
+            raise ValueError(
+                f"checkpoint was trained on {ckpt_n} buildings but target env has {env_n} "
+                f"(control_mode={control_mode}). centralized checkpoints cannot cross "
+                "building counts; use a sac_shared_dtde_* checkpoint for cross-topology eval."
+            )
         raise ValueError(
-            "checkpoint observation schema is incompatible with the selected runner config"
+            f"checkpoint observation schema is incompatible with the selected runner config "
+            f"(control_mode={control_mode})"
         )
 
-    if current_action_names != checkpoint_action_names:
+    if env_action_names != checkpoint_action_names:
+        ckpt_n = len(checkpoint_action_names)
+        env_n = len(env_action_names)
+        if ckpt_n != env_n:
+            raise ValueError(
+                f"checkpoint was trained on {ckpt_n} buildings but target env has {env_n} "
+                f"(control_mode={control_mode}). centralized checkpoints cannot cross "
+                "building counts; use a sac_shared_dtde_* checkpoint for cross-topology eval."
+            )
         raise ValueError(
-            "checkpoint action schema is incompatible with the selected runner config"
+            f"checkpoint action schema is incompatible with the selected runner config "
+            f"(control_mode={control_mode})"
         )

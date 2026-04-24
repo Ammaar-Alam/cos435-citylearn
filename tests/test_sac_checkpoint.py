@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import numpy as np
 import pytest
 import torch
 
+from cos435_citylearn.algorithms.sac import resolve_reward_function
 from cos435_citylearn.algorithms.sac.checkpoints import (
     safe_load_checkpoint_payload,
-    validate_checkpoint_payload_structure,
     validate_checkpoint_env_compatibility,
+    validate_checkpoint_payload_structure,
     validate_checkpoint_runner_compatibility,
 )
 from cos435_citylearn.baselines.sac import (
@@ -17,11 +19,11 @@ from cos435_citylearn.baselines.sac import (
     _build_checkpoint_payload,
     _instantiate_controller,
     _instantiate_controller_from_checkpoint,
+    _load_imported_checkpoint,
     _maybe_reset_reward,
 )
 from cos435_citylearn.config import load_yaml
 from cos435_citylearn.env import make_citylearn_env
-from cos435_citylearn.algorithms.sac import resolve_reward_function
 from tests.smoke.helpers import require_benchmark_runtime, require_dataset
 
 
@@ -29,6 +31,9 @@ def _minimal_central_checkpoint_payload() -> dict[str, object]:
     return {
         "algorithm": "sac",
         "control_mode": "centralized",
+        "variant": "centralized_baseline",
+        "reward_version": "v2",
+        "features_version": "v2",
         "observation_names": [["hour", "load"]],
         "action_names": [["battery"]],
         "controller_state": {
@@ -69,6 +74,9 @@ def _minimal_shared_checkpoint_payload() -> dict[str, object]:
     return {
         "algorithm": "sac",
         "control_mode": "shared_dtde",
+        "variant": "shared_dtde_reward_v2",
+        "reward_version": "v2",
+        "features_version": "v2",
         "observation_names": [["hour", "load"]],
         "action_names": [["battery"]],
         "controller_state": {
@@ -208,6 +216,129 @@ def test_validate_checkpoint_runner_compatibility_rejects_control_mode_mismatch(
         validate_checkpoint_runner_compatibility(payload, config)
 
 
+def _matching_runner_config_shared() -> dict[str, object]:
+    return {
+        "algorithm": {
+            "name": "sac",
+            "control_mode": "shared_dtde",
+            "variant": "shared_dtde_reward_v2",
+        },
+        "reward": {"version": "v2"},
+        "features": {"version": "v2"},
+    }
+
+
+def test_validate_checkpoint_runner_compatibility_passes_on_matching_runtime_labels() -> None:
+    payload = _minimal_shared_checkpoint_payload()
+    config = _matching_runner_config_shared()
+    mismatches = validate_checkpoint_runner_compatibility(payload, config)
+    assert mismatches == {}
+
+
+def test_validate_checkpoint_runner_compatibility_rejects_reward_mismatch_without_flag() -> None:
+    payload = _minimal_shared_checkpoint_payload()
+    config = _matching_runner_config_shared()
+    config["reward"]["version"] = "v1"
+    with pytest.raises(ValueError, match="reward_version"):
+        validate_checkpoint_runner_compatibility(payload, config)
+
+
+def test_validate_checkpoint_runner_compatibility_allows_reward_mismatch_with_flag(caplog) -> None:
+    payload = _minimal_shared_checkpoint_payload()
+    config = _matching_runner_config_shared()
+    config["reward"]["version"] = "v1"
+    config["features"]["version"] = "v1"
+    with caplog.at_level(logging.WARNING, logger="cos435_citylearn.algorithms.sac.checkpoints"):
+        mismatches = validate_checkpoint_runner_compatibility(
+            payload, config, allow_cross_reward_eval=True
+        )
+    assert mismatches == {
+        "reward_version": ("v2", "v1"),
+        "features_version": ("v2", "v1"),
+    }
+    assert "allow_cross_reward_eval=True" in caplog.text
+
+
+def test_validate_checkpoint_runner_compatibility_falls_back_to_nested_config() -> None:
+    # pre-P1.2 SAC checkpoints only carry variant/reward_version/features_version
+    # inside the nested config snapshot. the tightened validator must still accept
+    # those as matching (otherwise the compatibility fix regresses older runs).
+    payload = _minimal_shared_checkpoint_payload()
+    del payload["variant"]
+    del payload["reward_version"]
+    del payload["features_version"]
+    payload["config"] = {
+        "algorithm": {"variant": "shared_dtde_reward_v2"},
+        "reward": {"version": "v2"},
+        "features": {"version": "v2"},
+    }
+    config = _matching_runner_config_shared()
+    mismatches = validate_checkpoint_runner_compatibility(payload, config)
+    assert mismatches == {}
+
+
+def test_validate_checkpoint_runner_compatibility_detects_legacy_payload_mismatch() -> None:
+    # fallback still catches genuine label drift -- this guards against the
+    # fallback turning into a silent bypass for mismatched checkpoints.
+    payload = _minimal_shared_checkpoint_payload()
+    del payload["variant"]
+    del payload["reward_version"]
+    del payload["features_version"]
+    payload["config"] = {
+        "algorithm": {"variant": "shared_dtde_reward_v2"},
+        "reward": {"version": "v1"},
+        "features": {"version": "v2"},
+    }
+    config = _matching_runner_config_shared()  # expects reward v2
+    with pytest.raises(ValueError, match="reward_version"):
+        validate_checkpoint_runner_compatibility(payload, config)
+
+
+def test_load_imported_checkpoint_accepts_artifacts_root_only(tmp_path: Path) -> None:
+    # Regression: SAC eval with artifact_id + artifacts_root but no
+    # imported_artifacts_root must resolve against artifacts_root (tests / batch
+    # jobs that point artifact_id at a custom local run root). Previously this
+    # combination raised ValueError, breaking re-eval workflows that the PPO
+    # path already supported.
+    artifact_id = "sac__smoke__public_dev__seed0"
+    run_dir = tmp_path / "runs" / artifact_id
+    run_dir.mkdir(parents=True)
+    checkpoint_path = run_dir / "checkpoint.pt"
+    payload = _minimal_shared_checkpoint_payload()
+    torch.save(payload, checkpoint_path)
+
+    resolved_path, loaded_payload = _load_imported_checkpoint(
+        artifact_id=artifact_id,
+        imported_artifacts_root=None,
+        artifacts_root=tmp_path,
+    )
+
+    assert resolved_path == checkpoint_path
+    assert loaded_payload["algorithm"] == "sac"
+    assert loaded_payload["control_mode"] == "shared_dtde"
+
+
+def test_load_imported_checkpoint_requires_artifacts_root_when_importing(tmp_path: Path) -> None:
+    # With imported_artifacts_root set but artifacts_root missing we cannot
+    # resolve relative file_path entries in the artifact record -- fail loudly
+    # rather than silently assuming a results_root default.
+    with pytest.raises(ValueError, match="artifacts_root must be set"):
+        _load_imported_checkpoint(
+            artifact_id="anything",
+            imported_artifacts_root=tmp_path / "imported",
+            artifacts_root=None,
+        )
+
+
+def test_load_imported_checkpoint_reports_missing_local_checkpoint(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError, match="SAC checkpoint not found"):
+        _load_imported_checkpoint(
+            artifact_id="missing_run",
+            imported_artifacts_root=None,
+            artifacts_root=tmp_path,
+        )
+
+
 def test_validate_checkpoint_env_compatibility_rejects_schema_mismatch() -> None:
     payload = _minimal_central_checkpoint_payload()
 
@@ -219,7 +350,31 @@ def test_validate_checkpoint_env_compatibility_rejects_schema_mismatch() -> None
         )
 
 
+def test_validate_checkpoint_env_compatibility_rejects_building_count_mismatch_for_central():
+    """Central checkpoints must fail loudly when eval env has more buildings."""
+    payload = _minimal_central_checkpoint_payload()  # 1-building checkpoint
+
+    with pytest.raises(ValueError, match="trained on 1 buildings but target env has 2"):
+        validate_checkpoint_env_compatibility(
+            payload,
+            observation_names=[["hour", "load"], ["hour", "load"]],
+            action_names=[["battery"], ["battery"]],
+        )
+
+
+def test_validate_checkpoint_env_compatibility_allows_shared_building_count_change() -> None:
+    """Shared checkpoints are topology-invariant: 1->3 buildings must pass."""
+    payload = _minimal_shared_checkpoint_payload()  # 1-building checkpoint
+
+    validate_checkpoint_env_compatibility(
+        payload,
+        observation_names=[["hour", "load"], ["hour", "load"], ["hour", "load"]],
+        action_names=[["battery"], ["battery"], ["battery"]],
+    )
+
+
 def test_validate_shared_checkpoint_env_compatibility_allows_more_buildings_with_matching_schema() -> None:
+    """Shared checkpoints must pass when moving from 1 to 6 buildings (phase_3 size)."""
     payload = _minimal_shared_checkpoint_payload()
 
     validate_checkpoint_env_compatibility(
@@ -227,6 +382,32 @@ def test_validate_shared_checkpoint_env_compatibility_allows_more_buildings_with
         observation_names=[["hour", "load"]] * 6,
         action_names=[["battery"]] * 6,
     )
+
+
+def test_validate_checkpoint_env_compatibility_rejects_shared_per_building_mismatch() -> None:
+    """Shared checkpoints must still fail when per-building schemas differ."""
+    payload = _minimal_shared_checkpoint_payload()
+
+    with pytest.raises(ValueError, match="per-building observation schema"):
+        validate_checkpoint_env_compatibility(
+            payload,
+            observation_names=[["hour", "solar"]],  # different feature set
+            action_names=[["battery"]],
+        )
+
+
+def test_shared_checkpoint_rejects_non_first_building_action_drift() -> None:
+    # env buildings[2] diverges -> previous code compared only [0] so would pass silently
+    payload = _minimal_shared_checkpoint_payload()
+    payload["action_names"] = [["battery"]]
+    env_obs = [["hour", "load"]] * 6
+    env_act = [["battery"], ["battery"], ["heat_pump"], ["battery"], ["battery"], ["battery"]]
+
+    with pytest.raises(ValueError, match="inconsistent per-building action schemas"):
+        validate_checkpoint_env_compatibility(
+            payload, observation_names=env_obs, action_names=env_act
+        )
+
 
 
 def test_validate_checkpoint_payload_structure_rejects_missing_shared_context_dimension() -> None:
