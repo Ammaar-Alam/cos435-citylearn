@@ -106,13 +106,13 @@ On `phase_2_online_eval` (3 buildings, held-out, mean over 3 splits):
 
 On `phase_3` (6 buildings, held-out — only portable methods):
 - RBC baseline: 1.114
-- PPO DTDE: 0.848
+- PPO DTDE: 0.843
 - **SAC DTDE: 0.774 (best)**
 
 **Speaker notes (Rubric Q5: "Key components + results + limitations"):**
 > The headline panel is the held-out `phase_2_online_eval` split — same 3-building setup as training but weather and demand the agent has never seen. RBC sits at 1.09, PPO central at 0.87, PPO-DTDE at 0.79, SAC variants cluster at 0.65-0.68. The dashed line at 0.562 is CHESCA's 2023 public-leaderboard score — benchmark context, not a head-to-head number, because CHESCA was scored on the original competition server we cannot re-run.
 >
-> The harder test is `phase_3` — held-out AND a different 6-building cluster, not the 3 we trained on. Only the shared-DTDE variants can execute here: a centralized policy's input and output layers are wired for exactly 3 buildings, so feeding it a 6-building observation is a shape mismatch, not a degradation. SAC-DTDE generalizes best at 0.774, PPO-DTDE at 0.848. This is our cleanest architectural claim: **if deployment might see a different building count than training, choose shared-DTDE**.
+> The harder test is `phase_3` — held-out AND a different 6-building cluster, not the 3 we trained on. Only the shared-DTDE variants can execute here: a centralized policy's input and output layers are wired for exactly 3 buildings, so feeding it a 6-building observation is a shape mismatch, not a degradation. SAC-DTDE generalizes best at 0.774, PPO-DTDE at 0.843. This is our cleanest architectural claim: **if deployment might see a different building count than training, choose shared-DTDE**.
 >
 > Limitations: single `public_dev` tuning split was used to select reward variants (overfitting risk); compute-bound so we capped PPO-DTDE and SAC-DTDE at 10 and 3 seeds respectively; reward-variant ablation was run only on SAC-central, not on PPO-central. CHESCA's line is reference, not a competitive bar we're claiming to have cleared.
 
@@ -120,7 +120,7 @@ On `phase_3` (6 buildings, held-out — only portable methods):
 
 ## Figure caption (for PowerPoint / Slides paste — Rubric §2)
 
-> **Figure.** CityLearn 2023 Track-3 `average_score` (↓ better) across six released held-out evaluation datasets: three `phase_2_online_eval` splits (left, same 3-building setup as training) and three `phase_3` splits (right, six-building cluster, shaded). Each line is one method: rule-based control (grey), PPO centralized (blue), three SAC centralized reward variants (orange/green/red), and SAC shared-DTDE (purple). The dashed red reference line at 0.562 is CHESCA's 2023 public-leaderboard score, shown as benchmark context (not same eval). **Takeaways**: (1) on `phase_2` (3 buildings), all SAC variants cluster around 0.65-0.68 and PPO-central around 0.87 — RL reduces the RBC score of ~1.09 by 30-40 % on held-out data. (2) On `phase_3` (6 buildings), only shared-DTDE policies can run; SAC-DTDE is the best portable variant at 0.774. Centralized policies are architecturally non-portable to a different building count, which is the headline architectural trade-off.
+> **Figure.** CityLearn 2023 Track-3 `average_score` (↓ better) across six released held-out evaluation datasets: three `phase_2_online_eval` splits (left, same 3-building setup as training) and three `phase_3` splits (right, six-building cluster, shaded). Each line is one method: rule-based control (grey), PPO centralized (dark blue), PPO shared-DTDE (light blue), three SAC centralized reward variants (orange/green/red), and SAC shared-DTDE (purple). The dashed red reference line at 0.562 is CHESCA's 2023 public-leaderboard score, shown as benchmark context (not same eval). **Takeaways**: (1) on `phase_2` (3 buildings), all SAC variants cluster around 0.65-0.68, PPO-DTDE around 0.79, and PPO-central around 0.87 — RL reduces the RBC score of ~1.09 by 30-40 % on held-out data. (2) On `phase_3` (6 buildings), only the shared-DTDE policies can run; SAC-DTDE is the best portable variant at 0.774, ahead of PPO-DTDE at 0.843. Centralized policies are architecturally non-portable to a different building count, which is the headline architectural trade-off.
 
 ---
 
