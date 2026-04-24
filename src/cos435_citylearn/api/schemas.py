@@ -4,7 +4,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-
 ArtifactKind = Literal["checkpoint", "run_bundle", "simulation_bundle"]
 
 
@@ -29,6 +28,13 @@ class LaunchJobRequest(BaseModel):
     capture_render_frames: bool | None = None
     max_render_frames: int | None = Field(default=None, ge=8, le=180)
     render_frame_width: int | None = Field(default=None, ge=480, le=1600)
+    # Opt-in escape hatch for evaluating a checkpoint whose trained
+    # reward/features version differs from the current config. Pydantic v2
+    # defaults to ``extra="ignore"``; without declaring the field here it would
+    # be silently dropped when ``artifact_store.build_evaluation_request`` hands
+    # its dict to ``LaunchJobRequest(**launch_payload)``, and the worker would
+    # always see the default ``False``.
+    allow_cross_reward_eval: bool = False
 
 
 class JobSummary(BaseModel):
@@ -149,3 +155,4 @@ class EvaluateArtifactRequest(BaseModel):
     capture_render_frames: bool | None = None
     max_render_frames: int | None = Field(default=None, ge=8, le=180)
     render_frame_width: int | None = Field(default=None, ge=480, le=1600)
+    allow_cross_reward_eval: bool = False

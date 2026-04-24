@@ -16,7 +16,7 @@ from cos435_citylearn.algorithms.sac import (
     validate_checkpoint_env_compatibility,
     validate_checkpoint_runner_compatibility,
 )
-from cos435_citylearn.config import load_yaml, resolve_path
+from cos435_citylearn.config import assert_training_allowed_on_split, load_yaml, resolve_path
 from cos435_citylearn.env import (
     CentralizedEnvAdapter,
     PerBuildingEnvAdapter,
@@ -122,7 +122,8 @@ def _instantiate_controller_from_checkpoint(
             **common_kwargs,
         )
     else:
-        raise ValueError(f"unknown SAC checkpoint controller type: {controller_state['controller_type']}")
+        controller_type = controller_state["controller_type"]
+        raise ValueError(f"unknown SAC checkpoint controller type: {controller_type}")
 
     controller.reset()
     controller.load_checkpoint_state(controller_state)
@@ -176,14 +177,25 @@ def _load_imported_checkpoint(
     imported_artifacts_root: str | Path | None,
     artifacts_root: str | Path | None,
 ) -> tuple[Path, dict[str, Any]]:
-    if imported_artifacts_root is None or artifacts_root is None:
-        raise ValueError("checkpoint evaluation requires imported_artifacts_root and artifacts_root")
-
-    checkpoint_path = resolve_imported_checkpoint_path(
-        artifact_id=artifact_id,
-        imported_artifacts_root=imported_artifacts_root,
-        artifacts_root=artifacts_root,
-    )
+    if imported_artifacts_root is None:
+        # re-eval a locally trained run: look under artifacts_root (or default
+        # results dir). Matches the PPO path and lets tests / batch jobs point
+        # artifact_id at custom output roots without also setting
+        # imported_artifacts_root.
+        root = Path(artifacts_root) if artifacts_root is not None else RESULTS_DIR
+        checkpoint_path = root / "runs" / artifact_id / "checkpoint.pt"
+        if not checkpoint_path.exists():
+            raise FileNotFoundError(f"SAC checkpoint not found for artifact: {checkpoint_path}")
+    else:
+        if artifacts_root is None:
+            raise ValueError(
+                "artifacts_root must be set when imported_artifacts_root is provided"
+            )
+        checkpoint_path = resolve_imported_checkpoint_path(
+            artifact_id=artifact_id,
+            imported_artifacts_root=imported_artifacts_root,
+            artifacts_root=artifacts_root,
+        )
     checkpoint_payload = safe_load_checkpoint_payload(checkpoint_path)
     return checkpoint_path, checkpoint_payload
 
@@ -417,9 +429,29 @@ def run_sac(
     job_id: str | None = None,
     job_dir: str | Path | None = None,
     progress_context: Any | None = None,
+    split_override: str | None = None,
+    seed_override: int | None = None,
+    lr_override: float | None = None,
+    allow_cross_reward_eval: bool = False,
 ) -> dict[str, Any]:
     config = load_yaml(config_path)
     eval_config = load_yaml(eval_config_path)
+
+    if split_override is not None:
+        config["env"]["split"] = split_override
+    if seed_override is not None:
+        config["training"]["seed"] = int(seed_override)
+    if lr_override is not None:
+        config["training"]["learning_rate"] = float(lr_override)
+
+    split_config_path = f"configs/splits/{config['env']['split']}.yaml"
+    split_config = load_yaml(split_config_path)
+    assert_training_allowed_on_split(
+        split_config,
+        artifact_id=artifact_id,
+        checkpoint_path=checkpoint_path,
+    )
+
     reward_function = resolve_reward_function(config["reward"]["version"])
     central_agent = config["algorithm"]["control_mode"] == "centralized"
 
@@ -436,6 +468,7 @@ def run_sac(
         variant=variant,
         split=config["env"]["split"],
         seed=env_bundle.seed,
+        lr=float(config["training"]["learning_rate"]),
     )
     run_root = RESULTS_DIR / "runs" if output_root is None else Path(output_root)
     metrics_dir = (
@@ -450,12 +483,18 @@ def run_sac(
     )
     requested_checkpoint_path = checkpoint_path
     run_dir = run_root / run_id
+    # Collision tripwire: build_run_id should already guarantee uniqueness
+    # (uuid / SLURM array+restart suffix), but if it ever regresses we want
+    # FileExistsError here rather than two runs silently clobbering each
+    # other's checkpoints / metrics / manifests.
+    run_dir.mkdir(parents=True, exist_ok=False)
     run_checkpoint_path = run_dir / "checkpoint.pt"
     training_curve_path = run_dir / "training_curve.csv"
 
     if artifact_id is not None and requested_checkpoint_path is not None:
         raise ValueError("checkpoint evaluation accepts either artifact_id or checkpoint_path, not both")
 
+    label_mismatches: dict[str, tuple[Any, Any]] = {}
     if artifact_id is None and requested_checkpoint_path is None:
         training_controller = _instantiate_controller(env_bundle.env, config)
         curve_rows = _run_training_loop(
@@ -479,7 +518,11 @@ def run_sac(
         resolved_checkpoint_path, checkpoint_payload = _load_local_checkpoint(
             checkpoint_path=requested_checkpoint_path
         )
-        validate_checkpoint_runner_compatibility(checkpoint_payload, config)
+        label_mismatches = validate_checkpoint_runner_compatibility(
+            checkpoint_payload,
+            config,
+            allow_cross_reward_eval=allow_cross_reward_eval,
+        )
         _write_training_curve(training_curve_path, [])
     else:
         resolved_checkpoint_path, checkpoint_payload = _load_imported_checkpoint(
@@ -487,7 +530,11 @@ def run_sac(
             imported_artifacts_root=imported_artifacts_root,
             artifacts_root=artifacts_root,
         )
-        validate_checkpoint_runner_compatibility(checkpoint_payload, config)
+        label_mismatches = validate_checkpoint_runner_compatibility(
+            checkpoint_payload,
+            config,
+            allow_cross_reward_eval=allow_cross_reward_eval,
+        )
         _write_training_curve(training_curve_path, [])
     if artifact_id is None and requested_checkpoint_path is None:
         checkpoint_payload = safe_load_checkpoint_payload(resolved_checkpoint_path)
@@ -532,9 +579,19 @@ def run_sac(
         "checkpoint_path": str(resolved_checkpoint_path),
         "training_curve_path": str(training_curve_path),
         "training_total_timesteps": int(config["training"]["total_timesteps"]),
+        "split": config["env"]["split"],
+        "control_mode": config["algorithm"]["control_mode"],
     }
     if artifact_id:
         manifest["artifact_id"] = artifact_id
+        trained_on_split = checkpoint_payload.get("config", {}).get("env", {}).get("split")
+        if trained_on_split is not None:
+            manifest["trained_on_split"] = trained_on_split
+        if label_mismatches:
+            manifest["runtime_label_mismatches"] = {
+                field: {"checkpoint": trained, "config": expected}
+                for field, (trained, expected) in label_mismatches.items()
+            }
     if job_id:
         manifest["job_id"] = job_id
     if job_dir is not None:

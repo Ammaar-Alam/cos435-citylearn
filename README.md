@@ -78,9 +78,22 @@ The benchmark stack stays separate from the default install so the repo can stil
 
 Official 2023 leaderboard numbers, including the RBC baseline, the winning CHESCA scores, and the public vs private gaps, are documented in [docs/benchmark-reference.md](docs/benchmark-reference.md).
 
+## held-out eval and benchmark submission
+
 The repo split and dataset policy, including the difference between `public_dev`,
 the released phase-2 online-eval datasets, and the released phase-3 six-building
 datasets, is documented in [docs/evaluation-splits.md](docs/evaluation-splits.md).
+
+The 2023 challenge trains on 3 buildings (phase-2 local_evaluation ≈ `public_dev`) and evaluates on all 6 buildings in phase 3. That 3 → 6 topology jump means a policy can only be evaluated on `phase_3_{1,2,3}` if its architecture is topology-invariant.
+
+- `sac_shared_dtde_*` — shared-parameter per-building SAC. One actor-critic is called once per building. Eligible for phase-3 held-out evaluation and AICrowd submission.
+- `ppo_shared_dtde_*` — shared-parameter per-building PPO. Mirrors the SAC-shared design (one actor + one critic, called once per building, GAE(λ) on-policy updates) with a count-invariant `shared_context_version=v2`. Also eligible for phase-3 held-out evaluation.
+- `ppo_central_baseline` — centralized PPO (stable-baselines3). Fixed-topology reference number on `public_dev` only.
+- `sac_central_*` — centralized SAC. Fixed-topology reference numbers on `public_dev` only.
+
+The runners enforce this at eval time. Running `scripts/train/run_sac.py --artifact-id <central_checkpoint> --split phase_3_1` raises with a message naming the building-count mismatch; the same preflight runs for PPO via a sibling `topology.json` that each training run now writes alongside the model.
+
+When evaluating a saved checkpoint with `--artifact-id`, you must also pass `--config <the training config for that checkpoint>` so the controller is rebuilt with the matching `control_mode`; mismatches are caught by `validate_checkpoint_runner_compatibility`.
 
 ## common commands
 
@@ -242,13 +255,15 @@ make dashboard-backend
 The dashboard currently supports:
 - launching the built-in RBC benchmark from the UI
 - launching the centralized SAC baseline from the UI
+- launching the centralized PPO baseline from the UI
 - launching the shared SAC `reward_v2` runner from the UI
+- launching the shared PPO `reward_v2` runner from the UI
 - watching live preview payloads and worker logs while the benchmark job runs
 - listing discovered runs from `results/runs/`
 - inspecting one run with synchronized metrics, trace playback, and render media
 - comparing multiple runs side by side
 - importing playback payloads or other artifacts into a local registry
 - inspecting imported playback payloads directly in the UI
-- importing SAC checkpoints and evaluating them through a checkpoint-capable runner
+- importing SAC or shared PPO checkpoints and evaluating them through a checkpoint-capable runner
 
-PPO is still a config contract only. The dashboard intentionally exposes only the two launchable SAC runners instead of every config variant in `configs/train/sac/`.
+The dashboard exposes the launchable runners (RBC, centralized SAC, centralized PPO, shared SAC `reward_v2`, and shared PPO `reward_v2`) rather than every config variant in `configs/train/`.

@@ -79,6 +79,11 @@ def run_rbc(
         else Path(manifests_root)
     )
     run_dir = run_root / run_id
+    # Collision tripwire: fail loudly on run_id reuse rather than silently
+    # overwriting a sibling run's metrics. RBC is deterministic so two
+    # submissions with the same seed/split should use distinct run_ids (the
+    # job_id/uuid suffix in build_run_id enforces this).
+    run_dir.mkdir(parents=True, exist_ok=False)
     trace_limit = int(config["evaluation"].get("trace_limit", 96))
     rollout_trace = []
     playback_trace: list[dict[str, Any]] = [] if export_enabled else []
