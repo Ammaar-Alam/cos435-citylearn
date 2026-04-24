@@ -185,6 +185,40 @@ def test_artifact_import_rejects_bound_central_ppo_missing_required_sidecars(
     assert "checkpoint_metadata.json" in detail
 
 
+def test_artifact_import_rejects_bound_central_ppo_sidecar_as_primary(
+    tmp_path: Path,
+) -> None:
+    settings = build_test_settings(tmp_path)
+    client = TestClient(create_app(settings))
+
+    response = client.post(
+        "/api/artifacts/import",
+        data={
+            "artifact_kind": "checkpoint",
+            "label": "central ppo wrong primary",
+            "runner_id": "ppo_central_baseline",
+        },
+        files=[
+            ("file", ("topology.json", b"{}", "application/json")),
+            ("extra_files", ("ppo_model.zip", b"fake-sb3-zip", "application/zip")),
+            ("extra_files", ("vec_normalize.pkl", b"fake-vec", "application/octet-stream")),
+            (
+                "extra_files",
+                (
+                    "checkpoint_metadata.json",
+                    b"{\"variant\":\"central_baseline\"}",
+                    "application/json",
+                ),
+            ),
+        ],
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "primary file" in detail
+    assert "model .zip" in detail
+
+
 def test_artifact_import_single_file_still_works_without_extra_files(tmp_path: Path) -> None:
     # Backwards-compat: SAC checkpoints, shared-PPO checkpoints, and playback
     # JSONs all ship as a single file. Adding ``extra_files`` to the endpoint

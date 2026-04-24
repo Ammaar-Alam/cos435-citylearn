@@ -137,12 +137,20 @@ def _validate_runner_bound_import(
     *,
     artifact_kind: ArtifactKind,
     spec: Any | None,
+    primary_name: str,
     extra_names: list[str],
 ) -> None:
     if spec is None or artifact_kind != "checkpoint":
         return
     if spec.algorithm != "ppo" or spec.variant != "central_baseline":
         return
+
+    if Path(primary_name).suffix.lower() != ".zip":
+        raise ValueError(
+            "centralized PPO dashboard imports require the primary file to be "
+            "the Stable-Baselines3 model .zip. Attach vec_normalize.pkl, "
+            "topology.json, and checkpoint_metadata.json as companion files."
+        )
 
     missing = sorted(_CENTRAL_PPO_REQUIRED_IMPORT_FILES.difference(extra_names))
     if missing:
@@ -223,6 +231,7 @@ class ArtifactStore:
         _validate_runner_bound_import(
             artifact_kind=artifact_kind,
             spec=spec,
+            primary_name=filename,
             extra_names=extra_names,
         )
 
