@@ -11,6 +11,8 @@ These files are the clean tracked summary of the raw outputs under `results/`. R
 - `sac_seed_inventory.csv` - per-seed SAC run inventory for the local phase-2 batch
 - `released_eval_main_results.csv` - released official-eval family summaries
 - `released_eval_seed_inventory.csv` - per-run released-eval inventory for RBC, PPO, and SAC where artifacts exist
+- `ppo_shared_sweep_summary.csv` - per-learning-rate shared-PPO sweep summary rows
+- `ppo_shared_sweep_inventory.csv` - per-run shared-PPO sweep inventory with KPI columns
 - `official_benchmark_reference.csv` - published CityLearn 2023 reference numbers
 - `figure_manifest.csv` - tracked report figure inventory
 
@@ -25,6 +27,17 @@ Lower is better.
 - Centralized SAC reward_v2: mean `0.535651`, std `0.015883`, 95% CI `0.019722`, seeds `5`
 - Centralized SAC baseline: mean `0.553964`, std `0.009170`, 95% CI `0.011386`, seeds `5`
 - Shared DTDE SAC reward_v2: mean `0.568877`, std `0.017638`, 95% CI `0.043814`, seeds `3`
+
+## PPO shared sweep detail
+
+Per-learning-rate breakdown behind the shared-PPO summary row above:
+
+- Shared DTDE PPO reward_v2 lr=`1e-4` on `public_dev`: mean `0.795652`, std `0.038388`, 95% CI `0.027461`, seeds `10`
+- Shared DTDE PPO reward_v2 lr=`3e-4` on `public_dev`: mean `0.783261`, std `0.037731`, 95% CI `0.026991`, seeds `10`
+- Shared DTDE PPO reward_v2 lr=`1e-4` across released `phase_3_*`: mean `0.847284`, std `0.031378`, 95% CI `0.011229`, eval jobs `30`
+- Shared DTDE PPO reward_v2 lr=`3e-4` across released `phase_3_*`: mean `0.847783`, std `0.032190`, 95% CI `0.011519`, eval jobs `30`
+
+The best shared-PPO local sweep setting is lr=`3e-4` at `0.783261` on `public_dev`.
 
 ## Local tuning headline
 

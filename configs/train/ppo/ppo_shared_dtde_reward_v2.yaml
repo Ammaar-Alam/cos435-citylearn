@@ -1,0 +1,50 @@
+env:
+  base_config: configs/env/citylearn_2023.yaml
+  split: public_dev
+
+algorithm:
+  name: ppo
+  control_mode: shared_dtde
+  variant: ppo_shared_dtde_reward_v2
+  policy: gaussian_mlp
+
+reward:
+  version: reward_v2
+
+features:
+  version: shared_district_context_v2
+  shared_context_dimension: 4
+  shared_context_version: v2
+
+training:
+  total_timesteps: 60000
+  seed: 0
+  rollout_steps: 2048
+  n_epochs: 10
+  minibatch_size: 64
+  learning_rate: 0.0003
+  clip_range: 0.2
+  gamma: 0.99
+  gae_lambda: 0.95
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  reward_scaling: 1.0
+  target_kl: 0.02
+  normalize_observations: true
+  normalize_rewards: true
+  hidden_dimension: [64, 64]
+  log_interval_steps: 2048
+
+evaluation:
+  deterministic: true
+  eval_episodes: 1
+  save_rollout_trace: true
+  trace_limit: 96
+  preview_stride: 12
+
+logging:
+  run_group: ppo_shared
+  output_root: results/runs
+  metrics_root: results/metrics
+  manifests_root: results/manifests
