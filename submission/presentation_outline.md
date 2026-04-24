@@ -96,22 +96,23 @@ Each slide is ~30 seconds. All five rubric questions (problem / importance / har
 
 **Headline numbers (from [released_eval_main_results.csv](submission/results/released_eval_main_results.csv)):**
 
-On `phase_2_online_eval` (3 buildings, held-out):
+On `phase_2_online_eval` (3 buildings, held-out, mean over 3 splits):
 - RBC baseline: 1.087
 - PPO central: 0.873
+- PPO DTDE: 0.793
 - **SAC central reward_v2: 0.653 (best)**
 - SAC DTDE: 0.677
 - CHESCA public reference (different eval): 0.562
 
 On `phase_3` (6 buildings, held-out — only portable methods):
 - RBC baseline: 1.114
-- PPO DTDE: 0.843
+- PPO DTDE: 0.848
 - **SAC DTDE: 0.774 (best)**
 
 **Speaker notes (Rubric Q5: "Key components + results + limitations"):**
-> The headline panel is the held-out `phase_2_online_eval` split — same 3-building setup as training but weather and demand the agent has never seen. RBC sits at 1.09, PPO central at 0.87, SAC variants cluster at 0.65-0.68. The dashed line at 0.562 is CHESCA's 2023 public-leaderboard score — benchmark context, not a head-to-head number, because CHESCA was scored on the original competition server we cannot re-run.
+> The headline panel is the held-out `phase_2_online_eval` split — same 3-building setup as training but weather and demand the agent has never seen. RBC sits at 1.09, PPO central at 0.87, PPO-DTDE at 0.79, SAC variants cluster at 0.65-0.68. The dashed line at 0.562 is CHESCA's 2023 public-leaderboard score — benchmark context, not a head-to-head number, because CHESCA was scored on the original competition server we cannot re-run.
 >
-> The harder test is `phase_3` — held-out AND a different 6-building cluster, not the 3 we trained on. Only the shared-DTDE variants can execute here: a centralized policy's input and output layers are wired for exactly 3 buildings, so feeding it a 6-building observation is a shape mismatch, not a degradation. SAC-DTDE generalizes best at 0.774, PPO-DTDE at 0.843. This is our cleanest architectural claim: **if deployment might see a different building count than training, choose shared-DTDE**.
+> The harder test is `phase_3` — held-out AND a different 6-building cluster, not the 3 we trained on. Only the shared-DTDE variants can execute here: a centralized policy's input and output layers are wired for exactly 3 buildings, so feeding it a 6-building observation is a shape mismatch, not a degradation. SAC-DTDE generalizes best at 0.774, PPO-DTDE at 0.848. This is our cleanest architectural claim: **if deployment might see a different building count than training, choose shared-DTDE**.
 >
 > Limitations: single `public_dev` tuning split was used to select reward variants (overfitting risk); compute-bound so we capped PPO-DTDE and SAC-DTDE at 10 and 3 seeds respectively; reward-variant ablation was run only on SAC-central, not on PPO-central. CHESCA's line is reference, not a competitive bar we're claiming to have cleared.
 
