@@ -14,7 +14,7 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_ROOT = REPO_ROOT / "results"
 FIGURES_OUT = REPO_ROOT / "submission" / "figures"
-TABLES_OUT = REPO_ROOT / "submission" / "tables"
+TABLES_OUT = REPO_ROOT / "submission" / "results"
 SUBMISSION_RESULTS = REPO_ROOT / "submission" / "results" / "local_main_results.csv"
 CROSS_SPLIT_CSV = REPO_ROOT / "submission" / "results" / "cross_split_scores.csv"
 RELEASED_MAIN_CSV = REPO_ROOT / "submission" / "results" / "released_eval_main_results.csv"
@@ -82,7 +82,11 @@ def _load_training_curve(run_dir: Path) -> tuple[np.ndarray, np.ndarray]:
 
 
 def _find_ppo_run() -> Path | None:
-    runs = sorted(RESULTS_ROOT.glob("*/runs/ppo__ppo_central_baseline__public_dev__*"))
+    runs = [
+        *RESULTS_ROOT.glob("runs/ppo__ppo_central_baseline__public_dev__*"),
+        *RESULTS_ROOT.glob("*/runs/ppo__ppo_central_baseline__public_dev__*"),
+    ]
+    runs = sorted({run.resolve() for run in runs})
     return runs[-1] if runs else None
 
 
@@ -427,6 +431,66 @@ def plot_cross_split_comparison() -> None:
         plt.close(fig)
 
 
+def plot_cross_split_kpi_breakdown() -> None:
+    """RBC-relative KPI breakdown for released phase_2 online eval rows."""
+    released = _load_released_phase2_rows()
+    if not released:
+        print("  skip cross_split_kpi_breakdown: released_eval_main_results.csv not found")
+        return
+
+    kpi_fields = [
+        ("district_cost_total_mean", "Cost"),
+        ("district_carbon_emissions_total_mean", "Carbon"),
+        ("district_daily_peak_average_mean", "Daily peak"),
+        ("district_discomfort_proportion_mean", "Discomfort"),
+        ("district_one_minus_thermal_resilience_proportion_mean", "Thermal\nresilience"),
+    ]
+    rbc = released.get("RBC baseline")
+    if rbc is None:
+        print("  skip cross_split_kpi_breakdown: RBC baseline row missing")
+        return
+
+    methods = [m for m in CROSS_SPLIT_METHODS if m[0] in released]
+    n_kpis = len(kpi_fields)
+    n_methods = len(methods)
+    x = np.arange(n_kpis)
+    width = 0.8 / n_methods
+    offsets = np.linspace(-(n_methods - 1) / 2, (n_methods - 1) / 2, n_methods) * width
+
+    with plt.rc_context(STYLE):
+        fig, ax = plt.subplots(figsize=(11, 5))
+        for method, offset in zip(methods, offsets):
+            method_label, short_label, color, _local_id = method
+            row = released[method_label]
+            values = []
+            for field, _label in kpi_fields:
+                raw = float(row[field]) if row.get(field) else 0.0
+                rbc_value = float(rbc[field]) if rbc.get(field) else 0.0
+                values.append(raw / rbc_value if rbc_value else 0.0)
+            ax.bar(
+                x + offset,
+                values,
+                width=width * 0.9,
+                color=color,
+                label=short_label.replace("\n", " "),
+                zorder=3,
+            )
+
+        ax.axhline(1.0, color="#888", linewidth=1.0, linestyle=":", zorder=2)
+        ax.set_xticks(x)
+        ax.set_xticklabels([label for _, label in kpi_fields], fontsize=10)
+        ax.set_ylabel("Normalized KPI (lower is better, 1.0 = RBC-equivalent)")
+        ax.set_title("Released Phase-2 KPI Breakdown — mean across 3 splits")
+        ax.legend(framealpha=0.9, fontsize=8, ncol=2)
+        fig.tight_layout()
+
+        FIGURES_OUT.mkdir(parents=True, exist_ok=True)
+        out = FIGURES_OUT / "cross_split_kpi_breakdown.png"
+        fig.savefig(out, bbox_inches="tight", dpi=200)
+        print(f"  wrote {out}")
+        plt.close(fig)
+
+
 def plot_generalization_gap(rows: dict[str, dict]) -> None:
     """Paired bars showing local public_dev (light) vs released phase_2
     (solid, with std error bars) for each method. Exposes the train→held-out
@@ -531,6 +595,9 @@ def main() -> None:
 
     print("Cross-split comparison (released phase_2 bars)...")
     plot_cross_split_comparison()
+
+    print("Cross-split KPI breakdown...")
+    plot_cross_split_kpi_breakdown()
 
     print("Generalization gap (public_dev vs phase_2)...")
     plot_generalization_gap(rows)
