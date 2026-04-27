@@ -5,11 +5,11 @@ import csv
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_ROOT = REPO_ROOT / "results"
@@ -127,7 +127,8 @@ def plot_method_comparison(rows: dict[str, dict]) -> None:
                       error_kw={"elinewidth": 1.2, "ecolor": "#444"}, width=0.6, zorder=3)
 
         ax.axhline(CHESCA_SCORE, color="#e53935", linewidth=1.5, linestyle="--",
-                   label=f"CHESCA winner ({CHESCA_SCORE:.3f})", zorder=4)
+                   label=f"CHESCA public ref ({CHESCA_SCORE:.3f}, diff. eval server)",
+                   zorder=4)
 
         for bar, mean in zip(bars, means):
             ax.text(bar.get_x() + bar.get_width() / 2, mean + 0.01,
@@ -158,11 +159,24 @@ def plot_kpi_breakdown(rows: dict[str, dict]) -> None:
 
     methods = [
         ("local_rbc", "RBC", COLORS["local_rbc"]),
-        ("ppo_central_baseline_public_dev", "PPO Central", COLORS["ppo_central_baseline_public_dev"]),
-        ("ppo_shared_dtde_reward_v2_public_dev", "PPO DTDE", COLORS["ppo_shared_dtde_reward_v2_public_dev"]),
-        ("sac_central_reward_v1_public_dev", "SAC rv1 (best)", COLORS["sac_central_reward_v1_public_dev"]),
+        (
+            "ppo_central_baseline_public_dev",
+            "PPO Central",
+            COLORS["ppo_central_baseline_public_dev"],
+        ),
+        (
+            "ppo_shared_dtde_reward_v2_public_dev",
+            "PPO DTDE",
+            COLORS["ppo_shared_dtde_reward_v2_public_dev"],
+        ),
+        (
+            "sac_central_reward_v1_public_dev",
+            "SAC rv1 (best)",
+            COLORS["sac_central_reward_v1_public_dev"],
+        ),
     ]
     methods = [(m, lbl, c) for m, lbl, c in methods if m in rows]
+    rbc_row = rows.get("local_rbc", {})
 
     n_kpis = len(kpi_fields)
     n_methods = len(methods)
@@ -174,7 +188,11 @@ def plot_kpi_breakdown(rows: dict[str, dict]) -> None:
         fig, ax = plt.subplots(figsize=(10, 5))
 
         for (method_id, label, color), offset in zip(methods, offsets):
-            values = [float(rows[method_id][field]) for field, _ in kpi_fields]
+            values = []
+            for field, _ in kpi_fields:
+                raw = float(rows[method_id][field])
+                rbc_value = float(rbc_row[field]) if rbc_row.get(field) else 0.0
+                values.append(raw / rbc_value if rbc_value else 0.0)
             ax.bar(x + offset, values, width=width * 0.9, color=color, label=label, zorder=3)
 
         ax.axhline(1.0, color="#888", linewidth=1.0, linestyle=":", zorder=2)
@@ -299,15 +317,46 @@ def plot_per_split_scores() -> None:
 
 
 # Canonical method display order shared between cross_split_comparison and
-# generalization_gap. (method_label in released_eval_main_results.csv) -> (short label, color, local_main_results method_id)
+# generalization_gap. Each tuple is:
+# (method_label in released_eval_main_results.csv, short label, color, local_main_results id).
 CROSS_SPLIT_METHODS = [
-    ("RBC baseline",                "RBC",         COLORS["local_rbc"],                            "local_rbc"),
-    ("PPO centralized baseline",    "PPO\nCentral",COLORS["ppo_central_baseline_public_dev"],      "ppo_central_baseline_public_dev"),
-    ("PPO shared DTDE reward_v2",   "PPO\nDTDE",   COLORS["ppo_shared_dtde_reward_v2_public_dev"], "ppo_shared_dtde_reward_v2_public_dev"),
-    ("Centralized SAC baseline",    "SAC\nCentral",COLORS["sac_central_baseline_public_dev"],      "sac_central_baseline_public_dev"),
-    ("Centralized SAC reward_v1",   "SAC\nrv1",    COLORS["sac_central_reward_v1_public_dev"],     "sac_central_reward_v1_public_dev"),
-    ("Centralized SAC reward_v2",   "SAC\nrv2",    COLORS["sac_central_reward_v2_public_dev"],     "sac_central_reward_v2_public_dev"),
-    ("Shared DTDE SAC reward_v2",   "SAC\nDTDE",   COLORS["sac_shared_dtde_reward_v2_public_dev"], "sac_shared_dtde_reward_v2_public_dev"),
+    ("RBC baseline", "RBC", COLORS["local_rbc"], "local_rbc"),
+    (
+        "PPO centralized baseline",
+        "PPO\nCentral",
+        COLORS["ppo_central_baseline_public_dev"],
+        "ppo_central_baseline_public_dev",
+    ),
+    (
+        "PPO shared DTDE reward_v2",
+        "PPO\nDTDE",
+        COLORS["ppo_shared_dtde_reward_v2_public_dev"],
+        "ppo_shared_dtde_reward_v2_public_dev",
+    ),
+    (
+        "Centralized SAC baseline",
+        "SAC\nCentral",
+        COLORS["sac_central_baseline_public_dev"],
+        "sac_central_baseline_public_dev",
+    ),
+    (
+        "Centralized SAC reward_v1",
+        "SAC\nrv1",
+        COLORS["sac_central_reward_v1_public_dev"],
+        "sac_central_reward_v1_public_dev",
+    ),
+    (
+        "Centralized SAC reward_v2",
+        "SAC\nrv2",
+        COLORS["sac_central_reward_v2_public_dev"],
+        "sac_central_reward_v2_public_dev",
+    ),
+    (
+        "Shared DTDE SAC reward_v2",
+        "SAC\nDTDE",
+        COLORS["sac_shared_dtde_reward_v2_public_dev"],
+        "sac_shared_dtde_reward_v2_public_dev",
+    ),
 ]
 
 
@@ -365,7 +414,8 @@ def plot_cross_split_comparison() -> None:
         ax.legend(loc="upper right", framealpha=0.95, fontsize=9)
         fig.text(
             0.01, -0.01,
-            "Published CHESCA is benchmark context; compare local/released runs within their own split group.",
+            "Published CHESCA is benchmark context; compare local/released runs "
+            "within their own split group.",
             ha="left", fontsize=8, color="#666666",
         )
         fig.tight_layout()

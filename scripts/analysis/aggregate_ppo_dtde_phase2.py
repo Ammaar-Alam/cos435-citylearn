@@ -191,7 +191,8 @@ def _aggregate_released_phase2_row(
     for m in sorted(phase2_metrics, key=lambda d: (d["split"], int(d["seed"]), d["run_id"])):
         inventory_rows.append({
             "run_id": m["run_id"],
-            "file_name": f"{m['run_dir_name']}.csv",  # seed inventory uses .csv sidecars; keep the convention
+            # Seed inventory uses .csv sidecars; keep the convention.
+            "file_name": f"{m['run_dir_name']}.csv",
             "algorithm": m["algorithm"],
             "variant": m["variant"],
             "split": m["split"],
@@ -200,9 +201,13 @@ def _aggregate_released_phase2_row(
             "dataset_name": m["dataset_name"],
             "average_score": f"{float(m['average_score']):.6f}",
             "district_cost_total": f"{float(m['district_kpis']['cost_total']):.6f}",
-            "district_carbon_emissions_total": f"{float(m['district_kpis']['carbon_emissions_total']):.6f}",
+            "district_carbon_emissions_total": (
+                f"{float(m['district_kpis']['carbon_emissions_total']):.6f}"
+            ),
             "district_daily_peak_average": f"{float(m['district_kpis']['daily_peak_average']):.6f}",
-            "district_discomfort_proportion": f"{float(m['district_kpis']['discomfort_proportion']):.6f}",
+            "district_discomfort_proportion": (
+                f"{float(m['district_kpis']['discomfort_proportion']):.6f}"
+            ),
             "district_one_minus_thermal_resilience_proportion": (
                 f"{float(m['district_kpis']['one_minus_thermal_resilience_proportion']):.6f}"
             ),
@@ -233,7 +238,11 @@ def _patch_released_main_csv(new_row: dict[str, str]) -> None:
     # Recompute delta_vs_released_phase2_winner_mean across all phase_2 rows.
     phase2 = [r for r in rows if r.get("eval_group") == "released_phase_2_online_eval"]
     try:
-        winner_mean = min(float(r["average_score_mean"]) for r in phase2 if r.get("average_score_mean"))
+        winner_mean = min(
+            float(r["average_score_mean"])
+            for r in phase2
+            if r.get("average_score_mean")
+        )
     except ValueError:
         winner_mean = None
     if winner_mean is not None:
@@ -271,7 +280,14 @@ def _patch_released_inventory_csv(new_rows: list[dict[str, str]]) -> None:
     # accidentally introduce new columns.
     projected = [{f: row.get(f, "") for f in fieldnames} for row in new_rows]
     merged = existing + projected
-    merged.sort(key=lambda r: (r.get("variant", ""), r.get("split", ""), int(r.get("seed", 0) or 0), r.get("run_id", "")))
+    merged.sort(
+        key=lambda r: (
+            r.get("variant", ""),
+            r.get("split", ""),
+            int(r.get("seed", 0) or 0),
+            r.get("run_id", ""),
+        )
+    )
 
     RELEASED_INVENTORY_CSV.write_text(
         ",".join(fieldnames) + "\n"
@@ -341,13 +357,13 @@ def _load_phase3_per_split_means(
 # released_eval_seed_inventory.csv and to the method_id used for the public_dev
 # column in local_main_results.csv.
 CROSS_SPLIT_METHOD_KEYS: list[tuple[str, str, str, str | None]] = [
-    ("RBC",          "rbc", "basic_rbc",              "local_rbc"),
-    ("PPO Central",  "ppo", "ppo_central_baseline",   "ppo_central_baseline_public_dev"),
-    ("PPO DTDE",     "ppo", "ppo_shared_dtde_reward_v2", "ppo_shared_dtde_reward_v2_public_dev"),
-    ("SAC Central",  "sac", "central_baseline",       "sac_central_baseline_public_dev"),
-    ("SAC rv1",      "sac", "central_reward_v1",      "sac_central_reward_v1_public_dev"),
-    ("SAC rv2",      "sac", "central_reward_v2",      "sac_central_reward_v2_public_dev"),
-    ("SAC DTDE",     "sac", "shared_dtde_reward_v2",  "sac_shared_dtde_reward_v2_public_dev"),
+    ("RBC", "rbc", "basic_rbc", "local_rbc"),
+    ("PPO Central", "ppo", "ppo_central_baseline", "ppo_central_baseline_public_dev"),
+    ("PPO DTDE", "ppo", "ppo_shared_dtde_reward_v2", "ppo_shared_dtde_reward_v2_public_dev"),
+    ("SAC Central", "sac", "central_baseline", "sac_central_baseline_public_dev"),
+    ("SAC rv1", "sac", "central_reward_v1", "sac_central_reward_v1_public_dev"),
+    ("SAC rv2", "sac", "central_reward_v2", "sac_central_reward_v2_public_dev"),
+    ("SAC DTDE", "sac", "shared_dtde_reward_v2", "sac_shared_dtde_reward_v2_public_dev"),
 ]
 
 SPLIT_TO_CROSS_COL = {

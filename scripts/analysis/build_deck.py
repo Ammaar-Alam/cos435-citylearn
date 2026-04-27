@@ -187,7 +187,8 @@ def _add_reward_table(slide) -> None:
         (
             "reward_v2",
             "reward_v1 + 0.05·|ΔSoC| + 0.05·1[sign_flip]",
-            "Battery smoothness penalties — discourages bang-bang charge/discharge; empirically improves cross-split generalization.",
+            "Battery smoothness penalties — discourages bang-bang charge/discharge; "
+            "empirically improves cross-split generalization.",
             True,
         ),
     ]
@@ -360,9 +361,18 @@ def build_presentation() -> Path:
         s2,
         [
             ("Buildings ≈ 28% of global CO₂ emissions", "  (IEA)"),
-            ("Distributed storage + PV", " is a key grid-decarbonization lever — shifts peak, absorbs renewables."),
-            ("CityLearn Challenge 2023", " — realistic, standardized benchmark for multi-building coordination."),
-            ("Better battery coordination", " → lower peak loads, cheaper bills, less carbon. Real-world stakes."),
+            (
+                "Distributed storage + PV",
+                " is a key grid-decarbonization lever — shifts peak, absorbs renewables.",
+            ),
+            (
+                "CityLearn Challenge 2023",
+                " — realistic, standardized benchmark for multi-building coordination.",
+            ),
+            (
+                "Better battery coordination",
+                " → lower peak loads, cheaper bills, less carbon. Real-world stakes.",
+            ),
         ],
         top=1.9,
         body_size=20,
@@ -385,8 +395,14 @@ def build_presentation() -> Path:
             ("Non-stationary demand + weather", " — distribution shifts across seasons and hours."),
             ("Partial observability", " — no perfect load forecast, imperfect thermal state."),
             ("Multi-building coordination, long horizons", " — credit assignment is brutal."),
-            ("Reward specification is not given", " — competition ships an evaluation rule, not a training signal."),
-            ("Naive RBC = 1.02 on public_dev", "  — strong non-RL baseline. Exploitable structure, little adaptivity."),
+            (
+                "Reward specification is not given",
+                " — competition ships an evaluation rule, not a training signal.",
+            ),
+            (
+                "Naive RBC = 1.02 on public_dev",
+                "  — strong non-RL baseline. Exploitable structure, little adaptivity.",
+            ),
         ],
         top=1.9,
         body_size=19,
@@ -404,12 +420,22 @@ def build_presentation() -> Path:
 
     # ---- Slide 4: Prior work + our differentiator ----
     s4 = prs.slides.add_slide(blank)
-    _add_title(s4, "Prior work  +  our differentiator", "Track 3 is already solved if the metric is leaderboard rank")
+    _add_title(
+        s4,
+        "Prior work  +  our differentiator",
+        "Track 3 is already solved if the metric is leaderboard rank",
+    )
     _add_bullets(
         s4,
         [
-            ("CityLearn 2023 winner: CHESCA", " — 0.562 public / 0.565 private (hierarchical optimization, not RL)."),
-            ("Most leaderboard entries", " are rule-based or MPC variants — RL is under-represented."),
+            (
+                "CityLearn 2023 winner: CHESCA",
+                " — 0.562 public / 0.565 private (hierarchical optimization, not RL).",
+            ),
+            (
+                "Most leaderboard entries",
+                " are rule-based or MPC variants — RL is under-represented.",
+            ),
             ("Our contribution: a systematic ablation, not a new algorithm.", ""),
             ("2 algorithms  ×  2 control topologies  ×  3 reward variants", ""),
             ("Multi-seed runs (n = 3–10) with 95% CI error bars", ""),
@@ -430,15 +456,34 @@ def build_presentation() -> Path:
 
     # ---- Slide 5: Approach - architecture + algorithms ----
     s5 = prs.slides.add_slide(blank)
-    _add_title(s5, "Approach — architecture + algorithms", "Two control topologies, two RL algorithms")
+    _add_title(
+        s5,
+        "Approach — architecture + algorithms",
+        "Two control topologies, two RL algorithms",
+    )
     _add_bullets(
         s5,
         [
-            ("Centralized", ": one controller observes all 3 buildings, emits a 3-vector action. Wired for exactly 3 buildings."),
-            ("Shared-DTDE", ": one policy network, per-building observation windows, decentralized rollout with shared parameters — size-agnostic."),
-            ("PPO", " — on-policy, clipped surrogate objective. From-scratch for DTDE; Stable-Baselines-3 for centralized."),
+            (
+                "Centralized",
+                ": one controller observes all 3 buildings, emits a 3-vector action. "
+                "Wired for exactly 3 buildings.",
+            ),
+            (
+                "Shared-DTDE",
+                ": one policy network, per-building observation windows, decentralized "
+                "rollout with shared parameters — size-agnostic.",
+            ),
+            (
+                "PPO",
+                " — on-policy, clipped surrogate objective. From-scratch for DTDE; "
+                "Stable-Baselines-3 for centralized.",
+            ),
             ("SAC", " — off-policy, entropy-regularized. Custom for both topologies."),
-            ("Only shared-DTDE transfers to the 6-building phase_3 held-out cluster", " — a centralized policy's input/output shapes are fundamentally non-portable."),
+            (
+                "Only shared-DTDE transfers to the 6-building phase_3 held-out cluster",
+                " — a centralized policy's input/output shapes are fundamentally non-portable.",
+            ),
         ],
         top=1.85,
         body_size=17,
