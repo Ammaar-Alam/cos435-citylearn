@@ -51,6 +51,7 @@ train-ppo-shared:
 
 submission-results:
 	$(PYTHON) scripts/analysis/export_submission_results.py
+	$(PYTHON) scripts/analysis/make_cross_split_table.py
 
 figures:
 	MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/analysis/make_figures.py

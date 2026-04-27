@@ -2,7 +2,7 @@ method_label,algorithm,seed_count,evidence_level,average_score_mean,average_scor
 Local RBC baseline,rbc,1,baseline,1.022619,0.0,0.0,0.0
 PPO centralized baseline,ppo,6,claim_run,0.882911,0.011102,0.011651,13.66
 PPO shared DTDE reward_v2,ppo,10,claim_run,0.776976,0.036542,0.026141,24.02
-SAC centralized baseline,sac,5,claim_run,0.553964,0.00917,0.011386,45.83
-SAC centralized reward_v1,sac,5,claim_run,0.527309,0.011312,0.014046,48.44
-SAC centralized reward_v2,sac,5,claim_run,0.535651,0.015883,0.019722,47.62
-SAC shared DTDE reward_v2,sac,3,pilot,0.568877,0.017638,0.043814,44.37
+Centralized SAC baseline,sac,5,claim_run,0.553964,0.00917,0.011386,45.83
+Centralized SAC reward_v1,sac,5,claim_run,0.527309,0.011312,0.014046,48.44
+Centralized SAC reward_v2,sac,5,claim_run,0.535651,0.015883,0.019722,47.62
+Shared DTDE SAC reward_v2,sac,3,pilot,0.568877,0.017638,0.043814,44.37

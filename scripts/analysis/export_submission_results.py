@@ -19,6 +19,9 @@ TRACKED_OUTPUT_FILES = [
     "ppo_shared_sweep_summary.csv",
     "ppo_shared_sweep_inventory.csv",
     "official_benchmark_reference.csv",
+    "cross_split_scores.csv",
+    "figure_manifest.csv",
+    "method_comparison.csv",
     "README.md",
 ]
 
