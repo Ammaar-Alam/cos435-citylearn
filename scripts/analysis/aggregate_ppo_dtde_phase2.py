@@ -282,17 +282,24 @@ def _patch_released_main_csv(new_row: dict[str, str]) -> None:
 
 
 def _patch_released_inventory_csv(new_rows: list[dict[str, str]]) -> None:
-    """Add or overwrite PPO DTDE reward_v2 phase_2 rows in
-    released_eval_seed_inventory.csv (keyed by run_id).
+    """Replace PPO DTDE reward_v2 phase_2 rows in released_eval_seed_inventory.csv.
+
+    Rerun batches get new timestamped run_ids, so dropping only matching run_ids
+    would preserve stale rows from earlier batches and double-count them in
+    downstream cross-split means.
     """
     existing: list[dict[str, str]] = []
     fieldnames: list[str] = []
-    drop_run_ids = {r["run_id"] for r in new_rows}
+    drop_keys = {
+        (r["algorithm"], r["variant"], r["eval_group"])
+        for r in new_rows
+    }
     with RELEASED_INVENTORY_CSV.open(newline="") as f:
         reader = csv.DictReader(f)
         fieldnames = list(reader.fieldnames or [])
         for row in reader:
-            if row.get("run_id") in drop_run_ids:
+            row_key = (row.get("algorithm", ""), row.get("variant", ""), row.get("eval_group", ""))
+            if row_key in drop_keys:
                 continue
             existing.append(row)
 
