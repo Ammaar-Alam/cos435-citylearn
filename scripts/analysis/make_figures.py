@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import csv
-import json
 from pathlib import Path
 
 import matplotlib
@@ -13,10 +12,9 @@ import numpy as np
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RUNS_ROOT = REPO_ROOT / "results" / "grace" / "runs"
-FIGURES_OUT = REPO_ROOT / "results" / "grace" / "figures"
-TABLES_OUT = REPO_ROOT / "results" / "grace" / "tables"
-SUBMISSION_FIGURES = REPO_ROOT / "submission" / "figures"
+RESULTS_ROOT = REPO_ROOT / "results"
+FIGURES_OUT = REPO_ROOT / "submission" / "figures"
+TABLES_OUT = REPO_ROOT / "submission" / "tables"
 SUBMISSION_RESULTS = REPO_ROOT / "submission" / "results" / "local_main_results.csv"
 CROSS_SPLIT_CSV = REPO_ROOT / "submission" / "results" / "cross_split_scores.csv"
 RELEASED_MAIN_CSV = REPO_ROOT / "submission" / "results" / "released_eval_main_results.csv"
@@ -84,7 +82,7 @@ def _load_training_curve(run_dir: Path) -> tuple[np.ndarray, np.ndarray]:
 
 
 def _find_ppo_run() -> Path | None:
-    runs = sorted(RUNS_ROOT.glob("ppo__ppo_central_baseline__public_dev__*"))
+    runs = sorted(RESULTS_ROOT.glob("*/runs/ppo__ppo_central_baseline__public_dev__*"))
     return runs[-1] if runs else None
 
 
@@ -230,8 +228,7 @@ def plot_per_split_scores() -> None:
     phase_3 (6-building) on the right with shaded background and a
     'centralized models not portable' annotation. CHESCA's 0.562 public
     leaderboard score is overlaid as a dashed reference line.
-    Reads cross_split_scores.csv and writes both the grace/figures tree
-    and submission/figures/per_split_scores.png (tracked).
+    Reads cross_split_scores.csv and writes to submission/figures/.
     """
     rows = _load_cross_split_rows()
     if not rows:
@@ -295,11 +292,9 @@ def plot_per_split_scores() -> None:
         fig.tight_layout()
 
         FIGURES_OUT.mkdir(parents=True, exist_ok=True)
-        SUBMISSION_FIGURES.mkdir(parents=True, exist_ok=True)
-        for out in (FIGURES_OUT / "per_split_scores.png",
-                    SUBMISSION_FIGURES / "per_split_scores.png"):
-            fig.savefig(out, bbox_inches="tight", dpi=200)
-            print(f"  wrote {out}")
+        out = FIGURES_OUT / "per_split_scores.png"
+        fig.savefig(out, bbox_inches="tight", dpi=200)
+        print(f"  wrote {out}")
         plt.close(fig)
 
 
@@ -332,7 +327,7 @@ def _load_released_phase2_rows() -> dict[str, dict[str, str]]:
 def plot_cross_split_comparison() -> None:
     """Bar chart of released phase_2 online-eval means with 95% CI error bars,
     one bar per method. Adds a dashed CHESCA reference line as benchmark context.
-    Writes to both FIGURES_OUT and SUBMISSION_FIGURES (dpi=200).
+    Writes to submission/figures/ (dpi=200).
     """
     released = _load_released_phase2_rows()
     if not released:
@@ -376,11 +371,9 @@ def plot_cross_split_comparison() -> None:
         fig.tight_layout()
 
         FIGURES_OUT.mkdir(parents=True, exist_ok=True)
-        SUBMISSION_FIGURES.mkdir(parents=True, exist_ok=True)
-        for out in (FIGURES_OUT / "cross_split_comparison.png",
-                    SUBMISSION_FIGURES / "cross_split_comparison.png"):
-            fig.savefig(out, bbox_inches="tight", dpi=200)
-            print(f"  wrote {out}")
+        out = FIGURES_OUT / "cross_split_comparison.png"
+        fig.savefig(out, bbox_inches="tight", dpi=200)
+        print(f"  wrote {out}")
         plt.close(fig)
 
 
@@ -437,11 +430,9 @@ def plot_generalization_gap(rows: dict[str, dict]) -> None:
         fig.tight_layout()
 
         FIGURES_OUT.mkdir(parents=True, exist_ok=True)
-        SUBMISSION_FIGURES.mkdir(parents=True, exist_ok=True)
-        for out in (FIGURES_OUT / "generalization_gap.png",
-                    SUBMISSION_FIGURES / "generalization_gap.png"):
-            fig.savefig(out, bbox_inches="tight", dpi=200)
-            print(f"  wrote {out}")
+        out = FIGURES_OUT / "generalization_gap.png"
+        fig.savefig(out, bbox_inches="tight", dpi=200)
+        print(f"  wrote {out}")
         plt.close(fig)
 
 
