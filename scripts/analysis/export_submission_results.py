@@ -10,6 +10,18 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 METRICS_ROOT = REPO_ROOT / "results" / "metrics"
 OUTPUT_ROOT = REPO_ROOT / "submission" / "results"
 
+TRACKED_OUTPUT_FILES = [
+    "local_main_results.csv",
+    "sac_ablation_summary.csv",
+    "sac_seed_inventory.csv",
+    "released_eval_main_results.csv",
+    "released_eval_seed_inventory.csv",
+    "ppo_shared_sweep_summary.csv",
+    "ppo_shared_sweep_inventory.csv",
+    "official_benchmark_reference.csv",
+    "README.md",
+]
+
 T_CRITICAL_95 = {
     2: 12.706205,
     3: 4.302653,
@@ -1017,8 +1029,29 @@ Lower is better.
     (OUTPUT_ROOT / "README.md").write_text(text)
 
 
+def _canonical_metrics_available() -> bool:
+    return any(METRICS_ROOT.glob("*.csv"))
+
+
+def _validate_tracked_outputs() -> None:
+    missing = [name for name in TRACKED_OUTPUT_FILES if not (OUTPUT_ROOT / name).exists()]
+    if missing:
+        raise FileNotFoundError(
+            "no canonical metrics found and tracked submission outputs are missing: "
+            + ", ".join(missing)
+        )
+
+
 def main() -> None:
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+    if not _canonical_metrics_available():
+        _validate_tracked_outputs()
+        print(
+            "No canonical metrics found under results/metrics; "
+            "leaving tracked submission/results outputs unchanged."
+        )
+        return
+
     rbc_row, sac_rows = _load_local_rows()
     released_rows = _load_released_rows()
     ppo_sweep_rows = _load_ppo_sweep_rows()
