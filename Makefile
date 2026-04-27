@@ -2,7 +2,7 @@ PYTHON := .venv/bin/python
 MPLCONFIGDIR := $(CURDIR)/.cache/matplotlib
 NPM_CACHE := $(CURDIR)/.npm-cache
 
-.PHONY: install install-benchmark test check env-info repo-tree download-citylearn download-citylearn-all env-schema smoke train-rbc train-sac train-sac-shared train-ppo train-ppo-shared submission-results figures check-ui-exports dashboard-install dashboard-build dashboard-check dashboard-backend dashboard-frontend ui ui-open
+.PHONY: install install-benchmark test check env-info repo-tree download-citylearn download-citylearn-all env-schema smoke train-rbc train-sac train-sac-shared train-ppo train-ppo-shared submission-results figures cross-figures cross-table check-ui-exports dashboard-install dashboard-build dashboard-check dashboard-backend dashboard-frontend ui ui-open
 
 install:
 	bash scripts/setup/install_env.sh
@@ -54,6 +54,12 @@ submission-results:
 
 figures:
 	MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/analysis/make_figures.py
+
+cross-figures:
+	MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/analysis/make_cross_split_figures.py
+
+cross-table:
+	$(PYTHON) scripts/analysis/make_cross_split_table.py
 
 check-ui-exports:
 	$(PYTHON) scripts/check/validate_official_ui_exports.py
