@@ -69,6 +69,26 @@ def _ci95(values: list[float]) -> float:
     return critical * _std(values) / math.sqrt(len(values))
 
 
+def _require_complete_split_coverage(
+    by_split: dict[str, list[float]],
+    expected_splits: list[str],
+    expected_count: int,
+    *,
+    label: str,
+) -> None:
+    missing_or_partial = {
+        split: len(by_split.get(split, []))
+        for split in expected_splits
+        if len(by_split.get(split, [])) != expected_count
+    }
+    if missing_or_partial:
+        details = ", ".join(
+            f"{split}={count}/{expected_count}"
+            for split, count in sorted(missing_or_partial.items())
+        )
+        raise SystemExit(f"incomplete {label} coverage; refusing to write summaries: {details}")
+
+
 def _load_public_dev_scores() -> dict[int, list[tuple[str, float]]]:
     """Return {seed: [(run_id, public_dev_score), ...]} for PPO DTDE reward_v2."""
     by_seed: dict[int, list[tuple[str, float]]] = {}
@@ -430,9 +450,7 @@ def _rebuild_cross_split_from_inventory() -> None:
         for split, col in SPLIT_TO_CROSS_COL.items():
             if col not in fieldnames:
                 continue
-            value = _per_split_mean(algo, variant, split)
-            if value:
-                row[col] = value
+            row[col] = _per_split_mean(algo, variant, split)
 
     CROSS_SPLIT_CSV.write_text(
         ",".join(fieldnames) + "\n"
@@ -466,6 +484,8 @@ def main() -> None:
     }
     best_run_ids = {rid for rid, _ in best_per_seed.values()}
     print(f"  selected {len(best_run_ids)} best-public_dev checkpoints across {len(public)} seeds")
+    if not best_run_ids:
+        raise SystemExit("no best-public_dev checkpoints found; cannot aggregate PPO DTDE results")
 
     # 3) Filter eval rows to only the selected checkpoints, group by split.
     by_split: dict[str, list[float]] = {}
@@ -478,6 +498,12 @@ def main() -> None:
         "phase_2_online_eval_2": "p2_eval2",
         "phase_2_online_eval_3": "p2_eval3",
     }
+    _require_complete_split_coverage(
+        by_split,
+        list(split_label_map),
+        len(best_run_ids),
+        label="phase_2 PPO DTDE eval",
+    )
 
     new_row: dict[str, str] = {"method": "PPO DTDE"}
     print("\n  phase_2 per-split results (best-lr-per-seed):")
@@ -523,10 +549,16 @@ def main() -> None:
     # 5) Backfill the released_eval_main_results.csv + seed inventory rows
     #    for PPO DTDE phase_2 with the same best-LR-per-seed selection.
     phase2_metrics = _load_phase2_eval_metrics_by_artifact(best_run_ids)
+    expected_phase2_jobs = len(best_run_ids) * len(split_label_map)
     print(
         f"\n  matched {len(phase2_metrics)} phase_2 eval run dirs to best-LR "
-        f"checkpoints (expected {len(best_run_ids) * 3})"
+        f"checkpoints (expected {expected_phase2_jobs})"
     )
+    if len(phase2_metrics) != expected_phase2_jobs:
+        raise SystemExit(
+            "incomplete phase_2 PPO DTDE metrics coverage; refusing to write summaries: "
+            f"{len(phase2_metrics)}/{expected_phase2_jobs}"
+        )
     main_row, inventory_rows = _aggregate_released_phase2_row(phase2_metrics)
     print(
         f"  released phase_2: mean={main_row['average_score_mean']} "
