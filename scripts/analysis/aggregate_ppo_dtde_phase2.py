@@ -230,7 +230,7 @@ def _aggregate_released_phase2_row(
     mean = st.fmean(scores)
     main_row: dict[str, str] = {
         "method_id": "ppo_shared_dtde_reward_v2_released_phase_2_online_eval",
-        "method_label": "PPO shared DTDE reward_v2",
+        "method_label": "Shared DTDE PPO reward_v2",
         "algorithm": "ppo",
         "variant": "ppo_shared_dtde_reward_v2",
         "eval_group": "released_phase_2_online_eval",

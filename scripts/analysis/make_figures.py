@@ -97,7 +97,7 @@ def plot_training_curve(run_dir: Path) -> None:
         fig, ax = plt.subplots(figsize=(8, 4.5))
 
         ax.plot(steps / 1_000, rewards / 1_000, color=COLORS["ppo_central_baseline_public_dev"],
-                linewidth=1.8, label="PPO centralized baseline")
+                linewidth=1.8, label="Centralized PPO baseline")
 
         ax.set_xlabel("Training steps (thousands)")
         ax.set_ylabel("Mean episode reward (thousands)")
@@ -322,41 +322,41 @@ def plot_per_split_scores() -> None:
 
 # Canonical method display order shared between cross_split_comparison and
 # generalization_gap. Each tuple is:
-# (method_label in released_eval_main_results.csv, short label, color, local_main_results id).
+# (method_id in released_eval_main_results.csv, short label, color, local_main_results id).
 CROSS_SPLIT_METHODS = [
-    ("RBC baseline", "RBC", COLORS["local_rbc"], "local_rbc"),
+    ("rbc_basic_rbc_released_phase_2_online_eval", "RBC", COLORS["local_rbc"], "local_rbc"),
     (
-        "PPO centralized baseline",
+        "ppo_central_baseline_released_phase_2_online_eval",
         "PPO\nCentral",
         COLORS["ppo_central_baseline_public_dev"],
         "ppo_central_baseline_public_dev",
     ),
     (
-        "PPO shared DTDE reward_v2",
+        "ppo_shared_dtde_reward_v2_released_phase_2_online_eval",
         "PPO\nDTDE",
         COLORS["ppo_shared_dtde_reward_v2_public_dev"],
         "ppo_shared_dtde_reward_v2_public_dev",
     ),
     (
-        "Centralized SAC baseline",
+        "sac_central_baseline_released_phase_2_online_eval",
         "SAC\nCentral",
         COLORS["sac_central_baseline_public_dev"],
         "sac_central_baseline_public_dev",
     ),
     (
-        "Centralized SAC reward_v1",
+        "sac_central_reward_v1_released_phase_2_online_eval",
         "SAC\nrv1",
         COLORS["sac_central_reward_v1_public_dev"],
         "sac_central_reward_v1_public_dev",
     ),
     (
-        "Centralized SAC reward_v2",
+        "sac_central_reward_v2_released_phase_2_online_eval",
         "SAC\nrv2",
         COLORS["sac_central_reward_v2_public_dev"],
         "sac_central_reward_v2_public_dev",
     ),
     (
-        "Shared DTDE SAC reward_v2",
+        "sac_shared_dtde_reward_v2_released_phase_2_online_eval",
         "SAC\nDTDE",
         COLORS["sac_shared_dtde_reward_v2_public_dev"],
         "sac_shared_dtde_reward_v2_public_dev",
@@ -365,7 +365,7 @@ CROSS_SPLIT_METHODS = [
 
 
 def _load_released_phase2_rows() -> dict[str, dict[str, str]]:
-    """Return {method_label: row_dict} from released_eval_main_results.csv,
+    """Return {method_id: row_dict} from released_eval_main_results.csv,
     filtered to eval_group == released_phase_2_online_eval."""
     out: dict[str, dict[str, str]] = {}
     if not RELEASED_MAIN_CSV.exists():
@@ -373,7 +373,7 @@ def _load_released_phase2_rows() -> dict[str, dict[str, str]]:
     with RELEASED_MAIN_CSV.open(newline="") as f:
         for row in csv.DictReader(f):
             if row.get("eval_group") == "released_phase_2_online_eval":
-                out[row["method_label"].strip()] = row
+                out[row["method_id"].strip()] = row
     return out
 
 
@@ -445,7 +445,7 @@ def plot_cross_split_kpi_breakdown() -> None:
         ("district_discomfort_proportion_mean", "Discomfort"),
         ("district_one_minus_thermal_resilience_proportion_mean", "Thermal\nresilience"),
     ]
-    rbc = released.get("RBC baseline")
+    rbc = released.get("rbc_basic_rbc_released_phase_2_online_eval")
     if rbc is None:
         print("  skip cross_split_kpi_breakdown: RBC baseline row missing")
         return
@@ -460,8 +460,8 @@ def plot_cross_split_kpi_breakdown() -> None:
     with plt.rc_context(STYLE):
         fig, ax = plt.subplots(figsize=(11, 5))
         for method, offset in zip(methods, offsets):
-            method_label, short_label, color, _local_id = method
-            row = released[method_label]
+            method_id, short_label, color, _local_id = method
+            row = released[method_id]
             values = []
             for field, _label in kpi_fields:
                 raw = float(row[field]) if row.get(field) else 0.0
