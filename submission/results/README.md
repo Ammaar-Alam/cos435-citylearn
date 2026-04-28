@@ -21,8 +21,8 @@ These files are the clean tracked summary of the raw outputs under `results/`. R
 Lower is better.
 
 - Local RBC baseline: mean `1.022619`, std `0.000000`, 95% CI `0.000000`, seeds `1`
-- PPO centralized baseline: mean `0.882911`, std `0.011102`, 95% CI `0.011651`, seeds `6`
-- PPO shared DTDE reward_v2: mean `0.776976`, std `0.036542`, 95% CI `0.026141`, seeds `10`
+- Centralized PPO baseline: mean `0.882911`, std `0.011102`, 95% CI `0.011651`, seeds `6`
+- Shared DTDE PPO reward_v2: mean `0.776976`, std `0.036542`, 95% CI `0.026141`, seeds `10`
 - Centralized SAC reward_v1: mean `0.527309`, std `0.011312`, 95% CI `0.014046`, seeds `5`
 - Centralized SAC reward_v2: mean `0.535651`, std `0.015883`, 95% CI `0.019722`, seeds `5`
 - Centralized SAC baseline: mean `0.553964`, std `0.009170`, 95% CI `0.011386`, seeds `5`
@@ -49,9 +49,9 @@ Lower is better.
 
 - RBC baseline on `released_phase_2_online_eval`: mean `1.087092`, std `0.020621`, 95% CI `0.051225`, eval jobs `3`, seeds `1`
 - RBC baseline on `released_phase_3`: mean `1.113710`, std `0.012142`, 95% CI `0.030161`, eval jobs `3`, seeds `1`
-- PPO centralized baseline on `released_phase_2_online_eval`: mean `0.872718`, std `0.006820`, 95% CI `0.016942`, eval jobs `3`, seeds `1`
-- PPO shared DTDE reward_v2 on `released_phase_2_online_eval`: mean `0.793176`, std `0.054182`, 95% CI `0.019389`, eval jobs `30`, seeds `10`
-- PPO shared DTDE reward_v2 on `released_phase_3`: mean `0.843221`, std `0.030263`, 95% CI `0.010829`, eval jobs `30`, seeds `10`
+- Centralized PPO baseline on `released_phase_2_online_eval`: mean `0.872718`, std `0.006820`, 95% CI `0.016942`, eval jobs `3`, seeds `1`
+- Shared DTDE PPO reward_v2 on `released_phase_2_online_eval`: mean `0.793176`, std `0.054182`, 95% CI `0.019389`, eval jobs `30`, seeds `10`
+- Shared DTDE PPO reward_v2 on `released_phase_3`: mean `0.843221`, std `0.030263`, 95% CI `0.010829`, eval jobs `30`, seeds `10`
 - Centralized SAC reward_v2 on `released_phase_2_online_eval`: mean `0.652703`, std `0.042913`, 95% CI `0.021717`, eval jobs `15`, seeds `5`
 - Centralized SAC baseline on `released_phase_2_online_eval`: mean `0.662064`, std `0.036729`, 95% CI `0.018588`, eval jobs `15`, seeds `5`
 - Centralized SAC reward_v1 on `released_phase_2_online_eval`: mean `0.667699`, std `0.045280`, 95% CI `0.022915`, eval jobs `15`, seeds `5`
