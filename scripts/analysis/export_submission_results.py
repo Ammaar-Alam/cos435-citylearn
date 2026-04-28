@@ -51,20 +51,58 @@ REQUIRED_LOCAL_SAC_VARIANTS = (
     "central_reward_v2",
     "shared_dtde_reward_v2",
 )
-REQUIRED_RELEASED_ALGORITHM_VARIANTS = (
-    ("rbc", "basic_rbc"),
-    ("ppo", "ppo_central_baseline"),
-    ("ppo", "ppo_shared_dtde_reward_v2"),
-    ("sac", "central_baseline"),
-    ("sac", "central_reward_v1"),
-    ("sac", "central_reward_v2"),
-    ("sac", "shared_dtde_reward_v2"),
-)
-REQUIRED_RELEASED_PHASE_3_ALGORITHM_VARIANTS = (
-    ("rbc", "basic_rbc"),
-    ("ppo", "ppo_shared_dtde_reward_v2"),
-    ("sac", "shared_dtde_reward_v2"),
-)
+REQUIRED_RELEASED_COVERAGE = {
+    ("rbc", "basic_rbc", "released_phase_2_online_eval"): (
+        ("phase_2_online_eval_1", 1),
+        ("phase_2_online_eval_2", 1),
+        ("phase_2_online_eval_3", 1),
+    ),
+    ("rbc", "basic_rbc", "released_phase_3"): (
+        ("phase_3_1", 1),
+        ("phase_3_2", 1),
+        ("phase_3_3", 1),
+    ),
+    ("ppo", "ppo_central_baseline", "released_phase_2_online_eval"): (
+        ("phase_2_online_eval_1", 1),
+        ("phase_2_online_eval_2", 1),
+        ("phase_2_online_eval_3", 1),
+    ),
+    ("ppo", "ppo_shared_dtde_reward_v2", "released_phase_2_online_eval"): (
+        ("phase_2_online_eval_1", 10),
+        ("phase_2_online_eval_2", 10),
+        ("phase_2_online_eval_3", 10),
+    ),
+    ("ppo", "ppo_shared_dtde_reward_v2", "released_phase_3"): (
+        ("phase_3_1", 10),
+        ("phase_3_2", 10),
+        ("phase_3_3", 10),
+    ),
+    ("sac", "central_baseline", "released_phase_2_online_eval"): (
+        ("phase_2_online_eval_1", 5),
+        ("phase_2_online_eval_2", 5),
+        ("phase_2_online_eval_3", 5),
+    ),
+    ("sac", "central_reward_v1", "released_phase_2_online_eval"): (
+        ("phase_2_online_eval_1", 5),
+        ("phase_2_online_eval_2", 5),
+        ("phase_2_online_eval_3", 5),
+    ),
+    ("sac", "central_reward_v2", "released_phase_2_online_eval"): (
+        ("phase_2_online_eval_1", 5),
+        ("phase_2_online_eval_2", 5),
+        ("phase_2_online_eval_3", 5),
+    ),
+    ("sac", "shared_dtde_reward_v2", "released_phase_2_online_eval"): (
+        ("phase_2_online_eval_1", 3),
+        ("phase_2_online_eval_2", 3),
+        ("phase_2_online_eval_3", 3),
+    ),
+    ("sac", "shared_dtde_reward_v2", "released_phase_3"): (
+        ("phase_3_1", 3),
+        ("phase_3_2", 3),
+        ("phase_3_3", 3),
+    ),
+}
 
 OFFICIAL_REFERENCES = [
     {
@@ -1113,14 +1151,15 @@ def _missing_canonical_metric_requirements() -> list[str]:
         missing.append("rbc__basic_rbc__public_dev__seed0__*.csv")
 
     local_keys: set[tuple[str, str, int]] = set()
-    released_keys: set[tuple[str, str, str]] = set()
+    released_seeds: dict[tuple[str, str, str, str], set[int]] = {}
     for algorithm in ("ppo", "rbc", "sac"):
         for path in sorted(METRICS_ROOT.glob(f"{algorithm}__*.csv")):
             row = _read_metric_row(path)
             if row.split == "public_dev":
                 local_keys.add((row.algorithm, row.variant, row.seed))
             elif row.split.startswith("phase_"):
-                released_keys.add((row.algorithm, row.variant, _released_group(row.split)))
+                key = (row.algorithm, row.variant, _released_group(row.split), row.split)
+                released_seeds.setdefault(key, set()).add(row.seed)
 
     for variant in REQUIRED_LOCAL_SAC_VARIANTS:
         seeds = {
@@ -1155,12 +1194,14 @@ def _missing_canonical_metric_requirements() -> list[str]:
             f"found {len(ppo_shared_seeds)}"
         )
 
-    for algorithm, variant in REQUIRED_RELEASED_ALGORITHM_VARIANTS:
-        if (algorithm, variant, "released_phase_2_online_eval") not in released_keys:
-            missing.append(f"{algorithm}__{variant} released phase_2_online_eval metrics")
-    for algorithm, variant in REQUIRED_RELEASED_PHASE_3_ALGORITHM_VARIANTS:
-        if (algorithm, variant, "released_phase_3") not in released_keys:
-            missing.append(f"{algorithm}__{variant} released phase_3 metrics")
+    for (algorithm, variant, eval_group), split_requirements in REQUIRED_RELEASED_COVERAGE.items():
+        for split, expected_count in split_requirements:
+            count = len(released_seeds.get((algorithm, variant, eval_group, split), set()))
+            if count != expected_count:
+                missing.append(
+                    f"{algorithm}__{variant} {split} needs "
+                    f"{expected_count} seeds, found {count}"
+                )
 
     sweep_summary_path = REPO_ROOT / "results" / "sweep" / "summary.csv"
     if sweep_summary_path.exists():
