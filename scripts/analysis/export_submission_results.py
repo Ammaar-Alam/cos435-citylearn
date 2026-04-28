@@ -10,6 +10,21 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 METRICS_ROOT = REPO_ROOT / "results" / "metrics"
 OUTPUT_ROOT = REPO_ROOT / "submission" / "results"
 
+TRACKED_OUTPUT_FILES = [
+    "local_main_results.csv",
+    "sac_ablation_summary.csv",
+    "sac_seed_inventory.csv",
+    "released_eval_main_results.csv",
+    "released_eval_seed_inventory.csv",
+    "ppo_shared_sweep_summary.csv",
+    "ppo_shared_sweep_inventory.csv",
+    "official_benchmark_reference.csv",
+    "cross_split_scores.csv",
+    "figure_manifest.csv",
+    "method_comparison.csv",
+    "README.md",
+]
+
 T_CRITICAL_95 = {
     2: 12.706205,
     3: 4.302653,
@@ -29,6 +44,64 @@ VARIANT_LABELS = {
     "shared_dtde_reward_v2": "Shared DTDE SAC reward_v2",
     "ppo_central_baseline": "Centralized PPO baseline",
     "ppo_shared_dtde_reward_v2": "Shared DTDE PPO reward_v2",
+}
+REQUIRED_LOCAL_SAC_VARIANTS = (
+    "central_baseline",
+    "central_reward_v1",
+    "central_reward_v2",
+    "shared_dtde_reward_v2",
+)
+REQUIRED_RELEASED_COVERAGE = {
+    ("rbc", "basic_rbc", "released_phase_2_online_eval"): (
+        ("phase_2_online_eval_1", 1),
+        ("phase_2_online_eval_2", 1),
+        ("phase_2_online_eval_3", 1),
+    ),
+    ("rbc", "basic_rbc", "released_phase_3"): (
+        ("phase_3_1", 1),
+        ("phase_3_2", 1),
+        ("phase_3_3", 1),
+    ),
+    ("ppo", "ppo_central_baseline", "released_phase_2_online_eval"): (
+        ("phase_2_online_eval_1", 1),
+        ("phase_2_online_eval_2", 1),
+        ("phase_2_online_eval_3", 1),
+    ),
+    ("ppo", "ppo_shared_dtde_reward_v2", "released_phase_2_online_eval"): (
+        ("phase_2_online_eval_1", 10),
+        ("phase_2_online_eval_2", 10),
+        ("phase_2_online_eval_3", 10),
+    ),
+    ("ppo", "ppo_shared_dtde_reward_v2", "released_phase_3"): (
+        ("phase_3_1", 10),
+        ("phase_3_2", 10),
+        ("phase_3_3", 10),
+    ),
+    ("sac", "central_baseline", "released_phase_2_online_eval"): (
+        ("phase_2_online_eval_1", 5),
+        ("phase_2_online_eval_2", 5),
+        ("phase_2_online_eval_3", 5),
+    ),
+    ("sac", "central_reward_v1", "released_phase_2_online_eval"): (
+        ("phase_2_online_eval_1", 5),
+        ("phase_2_online_eval_2", 5),
+        ("phase_2_online_eval_3", 5),
+    ),
+    ("sac", "central_reward_v2", "released_phase_2_online_eval"): (
+        ("phase_2_online_eval_1", 5),
+        ("phase_2_online_eval_2", 5),
+        ("phase_2_online_eval_3", 5),
+    ),
+    ("sac", "shared_dtde_reward_v2", "released_phase_2_online_eval"): (
+        ("phase_2_online_eval_1", 3),
+        ("phase_2_online_eval_2", 3),
+        ("phase_2_online_eval_3", 3),
+    ),
+    ("sac", "shared_dtde_reward_v2", "released_phase_3"): (
+        ("phase_3_1", 3),
+        ("phase_3_2", 3),
+        ("phase_3_3", 3),
+    ),
 }
 
 OFFICIAL_REFERENCES = [
@@ -162,21 +235,40 @@ def _latest_metric(pattern: str) -> MetricRow:
     return _read_metric_row(matches[-1])
 
 
-def _load_local_rows() -> tuple[MetricRow, list[MetricRow]]:
+def _load_local_rows(ppo_sweep_rows: list[PpoSweepRow]) -> tuple[MetricRow, list[MetricRow]]:
     rbc_row = _latest_metric("rbc__basic_rbc__public_dev__seed0__*.csv")
     latest_rows: dict[tuple[str, str, int], MetricRow] = {}
-    for path in sorted(METRICS_ROOT.glob("sac__*.csv")):
-        if "__public_dev__" not in path.name:
+    for algorithm in ("ppo", "sac"):
+        for path in sorted(METRICS_ROOT.glob(f"{algorithm}__*.csv")):
+            if "__public_dev__" not in path.name:
+                continue
+            row = _read_metric_row(path)
+            latest_rows[(row.algorithm, row.variant, row.seed)] = row
+
+    best_sweep_rows: dict[int, MetricRow] = {}
+    for sweep_row in ppo_sweep_rows:
+        metric = sweep_row.metric
+        if metric.split != "public_dev" or metric.variant != "ppo_shared_dtde_reward_v2":
             continue
-        row = _read_metric_row(path)
-        latest_rows[(row.variant, row.split, row.seed)] = row
-    sac_rows = sorted(
+        current = best_sweep_rows.get(metric.seed)
+        if current is None or metric.average_score < current.average_score:
+            best_sweep_rows[metric.seed] = metric
+    if best_sweep_rows:
+        latest_rows = {
+            key: row
+            for key, row in latest_rows.items()
+            if key[:2] != ("ppo", "ppo_shared_dtde_reward_v2")
+        }
+        for row in best_sweep_rows.values():
+            latest_rows[(row.algorithm, row.variant, row.seed)] = row
+
+    local_rows = sorted(
         latest_rows.values(),
-        key=lambda row: (row.variant, row.seed, row.run_id),
+        key=lambda row: (row.algorithm, row.variant, row.seed, row.run_id),
     )
-    if not sac_rows:
-        raise FileNotFoundError("no sac metrics found under results/metrics")
-    return rbc_row, sac_rows
+    if not local_rows:
+        raise FileNotFoundError("no local public_dev metrics found under results/metrics")
+    return rbc_row, local_rows
 
 
 def _released_group(split: str) -> str:
@@ -189,15 +281,23 @@ def _released_group(split: str) -> str:
 
 def _load_released_rows() -> list[MetricRow]:
     latest_rows: dict[tuple[str, str, int], MetricRow] = {}
-    for path in sorted(METRICS_ROOT.glob("sac__*.csv")):
-        row = _read_metric_row(path)
-        if not row.split.startswith("phase_"):
-            continue
-        latest_rows[(row.variant, row.split, row.seed)] = row
+    for algorithm in ("ppo", "rbc", "sac"):
+        for path in sorted(METRICS_ROOT.glob(f"{algorithm}__*.csv")):
+            row = _read_metric_row(path)
+            if not row.split.startswith("phase_"):
+                continue
+            latest_rows[(row.algorithm, row.variant, row.split, row.seed)] = row
 
     return sorted(
         latest_rows.values(),
-        key=lambda row: (_released_group(row.split), row.variant, row.split, row.seed, row.run_id),
+        key=lambda row: (
+            _released_group(row.split),
+            row.algorithm,
+            row.variant,
+            row.split,
+            row.seed,
+            row.run_id,
+        ),
     )
 
 
@@ -267,6 +367,18 @@ def _variant_label(variant: str) -> str:
     return VARIANT_LABELS.get(variant, variant.replace("_", " "))
 
 
+def _local_method_id(algorithm: str, variant: str, split: str) -> str:
+    if algorithm == "ppo" and variant.startswith("ppo_"):
+        return f"{variant}_{split}"
+    return f"{algorithm}_{variant}_{split}"
+
+
+def _released_method_id(algorithm: str, variant: str, scope: str) -> str:
+    if algorithm == "ppo" and variant.startswith("ppo_"):
+        return f"{variant}_{scope}"
+    return f"{algorithm}_{variant}_{scope}"
+
+
 def _summarize_rows(rows: list[MetricRow]) -> MetricSummary:
     ordered_rows = tuple(sorted(rows, key=lambda row: row.seed))
     scores = [row.average_score for row in ordered_rows]
@@ -328,25 +440,29 @@ def _summarize_released_rows(scope: str, rows: list[MetricRow]) -> ReleasedSumma
     )
 
 
-def _build_sac_summaries(sac_rows: list[MetricRow]) -> list[MetricSummary]:
-    grouped: dict[tuple[str, str], list[MetricRow]] = {}
-    for row in sac_rows:
-        grouped.setdefault((row.variant, row.split), []).append(row)
+def _build_method_summaries(rows: list[MetricRow]) -> list[MetricSummary]:
+    grouped: dict[tuple[str, str, str], list[MetricRow]] = {}
+    for row in rows:
+        grouped.setdefault((row.algorithm, row.variant, row.split), []).append(row)
 
     return sorted(
         (_summarize_rows(rows) for rows in grouped.values()),
-        key=lambda summary: (summary.average_score_mean, summary.variant),
+        key=lambda summary: (summary.average_score_mean, summary.algorithm, summary.variant),
     )
 
 
+def _build_sac_summaries(rows: list[MetricRow]) -> list[MetricSummary]:
+    return [summary for summary in _build_method_summaries(rows) if summary.algorithm == "sac"]
+
+
 def _build_released_group_summaries(rows: list[MetricRow]) -> list[ReleasedSummary]:
-    grouped: dict[tuple[str, str], list[MetricRow]] = {}
+    grouped: dict[tuple[str, str, str], list[MetricRow]] = {}
     for row in rows:
-        grouped.setdefault((row.variant, _released_group(row.split)), []).append(row)
+        grouped.setdefault((row.algorithm, row.variant, _released_group(row.split)), []).append(row)
 
     summaries = (
         _summarize_released_rows(scope, grouped_rows)
-        for (_, scope), grouped_rows in grouped.items()
+        for (_, _, scope), grouped_rows in grouped.items()
     )
     return sorted(
         summaries,
@@ -355,13 +471,13 @@ def _build_released_group_summaries(rows: list[MetricRow]) -> list[ReleasedSumma
 
 
 def _build_released_split_summaries(rows: list[MetricRow]) -> list[ReleasedSummary]:
-    grouped: dict[tuple[str, str], list[MetricRow]] = {}
+    grouped: dict[tuple[str, str, str], list[MetricRow]] = {}
     for row in rows:
-        grouped.setdefault((row.variant, row.split), []).append(row)
+        grouped.setdefault((row.algorithm, row.variant, row.split), []).append(row)
 
     summaries = (
         _summarize_released_rows(scope, grouped_rows)
-        for (_, scope), grouped_rows in grouped.items()
+        for (_, _, scope), grouped_rows in grouped.items()
     )
     return sorted(
         summaries,
@@ -370,7 +486,7 @@ def _build_released_split_summaries(rows: list[MetricRow]) -> list[ReleasedSumma
 
 
 def _build_local_results_rows(
-    rbc_row: MetricRow, sac_summaries: list[MetricSummary]
+    rbc_row: MetricRow, method_summaries: list[MetricSummary]
 ) -> list[dict[str, object]]:
     rbc_score = rbc_row.average_score
     rows: list[dict[str, object]] = [
@@ -406,38 +522,19 @@ def _build_local_results_rows(
             "best_run_id": rbc_row.run_id,
             "worst_run_id": rbc_row.run_id,
             "notes": "single-seed local phase_2 evaluation baseline",
-        },
-        {
-            "method_id": "ppo_baseline_missing",
-            "method_label": "PPO baseline",
-            "status": "missing_artifact",
-            "evidence_level": "missing",
-            "algorithm": "ppo",
-            "variant": "central_baseline",
-            "split": "public_dev",
-            "seed_count": 0,
-            "average_score_mean": "",
-            "average_score_std": "",
-            "average_score_ci95": "",
-            "best_average_score": "",
-            "worst_average_score": "",
-            "delta_vs_local_rbc_mean": "",
-            "pct_improvement_vs_local_rbc_mean": "",
-            "district_cost_total_mean": "",
-            "district_carbon_emissions_total_mean": "",
-            "district_daily_peak_average_mean": "",
-            "district_discomfort_proportion_mean": "",
-            "district_one_minus_thermal_resilience_proportion_mean": "",
-            "best_run_id": "",
-            "worst_run_id": "",
-            "notes": "no PPO result artifact found locally yet",
-        },
+        }
     ]
 
-    for summary in sac_summaries:
+    for summary in method_summaries:
         delta = rbc_score - summary.average_score_mean
         evidence_level = _evidence_level(len(summary.rows))
-        if evidence_level == "claim_run":
+        if summary.algorithm == "ppo" and summary.variant == "ppo_shared_dtde_reward_v2":
+            note = (
+                "PPO DTDE learning-rate sweep; best public_dev learning rate selected per seed"
+            )
+        elif summary.algorithm == "ppo" and summary.variant == "ppo_central_baseline":
+            note = "local phase_2 PPO baseline run"
+        elif evidence_level == "claim_run":
             note = "multi-seed local phase_2 claim run"
         elif evidence_level == "pilot":
             note = "multi-seed local phase_2 pilot run"
@@ -449,7 +546,11 @@ def _build_local_results_rows(
 
         rows.append(
             {
-                "method_id": f"sac_{summary.variant}_{summary.split}",
+                "method_id": _local_method_id(
+                    summary.algorithm,
+                    summary.variant,
+                    summary.split,
+                ),
                 "method_label": _variant_label(summary.variant),
                 "status": "measured",
                 "evidence_level": evidence_level,
@@ -588,7 +689,11 @@ def _build_released_main_rows(
             )
 
         if summary.scope == "released_phase_2_online_eval":
-            if phase_2_winner is not None and summary.variant == phase_2_winner.variant:
+            if (
+                phase_2_winner is not None
+                and summary.algorithm == phase_2_winner.algorithm
+                and summary.variant == phase_2_winner.variant
+            ):
                 note = "best released phase_2 result among saved checkpoints"
             else:
                 note = "released phase_2 checkpoint evaluation summary"
@@ -597,7 +702,11 @@ def _build_released_main_rows(
 
         rows.append(
             {
-                "method_id": f"sac_{summary.variant}_{summary.scope}",
+                "method_id": _released_method_id(
+                    summary.algorithm,
+                    summary.variant,
+                    summary.scope,
+                ),
                 "method_label": _variant_label(summary.variant),
                 "algorithm": summary.algorithm,
                 "variant": summary.variant,
@@ -767,6 +876,7 @@ def _build_reference_rows() -> list[dict[str, object]]:
 
 def _write_status_markdown(
     rbc_row: MetricRow,
+    method_summaries: list[MetricSummary],
     sac_summaries: list[MetricSummary],
     released_group_summaries: list[ReleasedSummary],
     released_split_summaries: list[ReleasedSummary],
@@ -786,6 +896,10 @@ def _write_status_markdown(
     reward_v2 = by_variant["central_reward_v2"]
     released_by_key = {
         (summary.variant, summary.scope): summary for summary in released_group_summaries
+    }
+    local_by_key = {
+        (summary.algorithm, summary.variant, summary.split): summary
+        for summary in method_summaries
     }
     released_split_by_key = {
         (summary.variant, summary.scope): summary for summary in released_split_summaries
@@ -896,9 +1010,20 @@ def _write_status_markdown(
             f"The best shared-PPO local sweep setting is lr=`{best_ppo_public['lr']}` at "
             f"`{best_ppo_public['average_score_mean']:.6f}` on `public_dev`."
         )
+    ppo_central = local_by_key.get(("ppo", "ppo_central_baseline", "public_dev"))
+    ppo_central_line = (
+        f"- centralized PPO baseline: `{ppo_central.average_score_mean:.6f}` across "
+        f"`{len(ppo_central.rows)}` seeds"
+        if ppo_central is not None
+        else "- centralized PPO baseline artifact: missing locally"
+    )
     ppo_artifact_caveat = (
-        "the centralized PPO baseline artifact is still missing locally, so the repo has "
-        "shared-PPO sweep evidence but not the fixed-topology PPO baseline row yet"
+        "the centralized PPO baseline is included from canonical metrics"
+        if ppo_central is not None
+        else (
+            "the centralized PPO baseline artifact is still missing locally, so the repo has "
+            "shared-PPO sweep evidence but not the fixed-topology PPO baseline row yet"
+        )
     )
     ppo_public_block = (
         ppo_public_text
@@ -961,7 +1086,7 @@ These files are the clean tracked summary of the raw outputs under `results/`.
 ## Local public_dev snapshot
 
 - local RBC baseline: `{rbc_score:.6f}`
-- PPO baseline artifact: missing locally
+{ppo_central_line}
 {line(by_variant['central_baseline'])}
 {line(by_variant['central_reward_v1'])}
 {line(by_variant['central_reward_v2'])}
@@ -971,7 +1096,7 @@ Lower is better.
 
 ## PPO shared sweep snapshot
 
-- centralized PPO baseline artifact: still missing locally
+{ppo_central_line}
 {ppo_public_block}
 {ppo_public_headline}
 {ppo_phase3_block}
@@ -1017,18 +1142,112 @@ Lower is better.
     (OUTPUT_ROOT / "README.md").write_text(text)
 
 
+def _missing_canonical_metric_requirements() -> list[str]:
+    if not any(METRICS_ROOT.glob("*.csv")):
+        return ["no metric CSVs under results/metrics"]
+
+    missing: list[str] = []
+    if not list(METRICS_ROOT.glob("rbc__basic_rbc__public_dev__seed0__*.csv")):
+        missing.append("rbc__basic_rbc__public_dev__seed0__*.csv")
+
+    local_keys: set[tuple[str, str, int]] = set()
+    released_seeds: dict[tuple[str, str, str, str], set[int]] = {}
+    for algorithm in ("ppo", "rbc", "sac"):
+        for path in sorted(METRICS_ROOT.glob(f"{algorithm}__*.csv")):
+            row = _read_metric_row(path)
+            if row.split == "public_dev":
+                local_keys.add((row.algorithm, row.variant, row.seed))
+            elif row.split.startswith("phase_"):
+                key = (row.algorithm, row.variant, _released_group(row.split), row.split)
+                released_seeds.setdefault(key, set()).add(row.seed)
+
+    for variant in REQUIRED_LOCAL_SAC_VARIANTS:
+        seeds = {
+            seed
+            for algorithm, row_variant, seed in local_keys
+            if algorithm == "sac" and row_variant == variant
+        }
+        if not seeds:
+            missing.append(f"sac__{variant}__public_dev__*.csv")
+        elif len(seeds) < 5:
+            missing.append(f"sac__{variant}__public_dev__ needs 5 seeds, found {len(seeds)}")
+
+    ppo_central_seeds = {
+        seed
+        for algorithm, variant, seed in local_keys
+        if algorithm == "ppo" and variant == "ppo_central_baseline"
+    }
+    if len(ppo_central_seeds) < 5:
+        missing.append(
+            "ppo__ppo_central_baseline__public_dev__ needs 5 seeds, "
+            f"found {len(ppo_central_seeds)}"
+        )
+
+    ppo_shared_seeds = {
+        seed
+        for algorithm, variant, seed in local_keys
+        if algorithm == "ppo" and variant == "ppo_shared_dtde_reward_v2"
+    }
+    if len(ppo_shared_seeds) < 10:
+        missing.append(
+            "ppo__ppo_shared_dtde_reward_v2__public_dev__ needs 10 seeds, "
+            f"found {len(ppo_shared_seeds)}"
+        )
+
+    for (algorithm, variant, eval_group), split_requirements in REQUIRED_RELEASED_COVERAGE.items():
+        for split, expected_count in split_requirements:
+            count = len(released_seeds.get((algorithm, variant, eval_group, split), set()))
+            if count != expected_count:
+                missing.append(
+                    f"{algorithm}__{variant} {split} needs "
+                    f"{expected_count} seeds, found {count}"
+                )
+
+    sweep_summary_path = REPO_ROOT / "results" / "sweep" / "summary.csv"
+    if sweep_summary_path.exists():
+        with sweep_summary_path.open(newline="") as handle:
+            for row in csv.DictReader(handle):
+                if row["algo"] != "ppo":
+                    continue
+                metric_path = METRICS_ROOT / f"{row['run_id']}.csv"
+                if not metric_path.exists():
+                    missing.append(f"PPO sweep metric {metric_path.relative_to(REPO_ROOT)}")
+
+    return missing
+
+
+def _validate_tracked_outputs() -> None:
+    missing = [name for name in TRACKED_OUTPUT_FILES if not (OUTPUT_ROOT / name).exists()]
+    if missing:
+        raise FileNotFoundError(
+            "no canonical metrics found and tracked submission outputs are missing: "
+            + ", ".join(missing)
+        )
+
+
 def main() -> None:
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
-    rbc_row, sac_rows = _load_local_rows()
-    released_rows = _load_released_rows()
+    missing_canonical = _missing_canonical_metric_requirements()
+    if missing_canonical:
+        _validate_tracked_outputs()
+        print(
+            "Canonical metrics under results/metrics are missing or partial "
+            f"({'; '.join(missing_canonical)}); "
+            "leaving tracked submission/results outputs unchanged."
+        )
+        return
+
     ppo_sweep_rows = _load_ppo_sweep_rows()
-    sac_summaries = _build_sac_summaries(sac_rows)
+    rbc_row, method_rows = _load_local_rows(ppo_sweep_rows)
+    released_rows = _load_released_rows()
+    method_summaries = _build_method_summaries(method_rows)
+    sac_summaries = _build_sac_summaries(method_rows)
     released_group_summaries = _build_released_group_summaries(released_rows)
     released_split_summaries = _build_released_split_summaries(released_rows)
 
-    local_rows = _build_local_results_rows(rbc_row, sac_summaries)
+    local_rows = _build_local_results_rows(rbc_row, method_summaries)
     ablation_rows = _build_sac_ablation_rows(rbc_row, sac_summaries)
-    seed_rows = _build_seed_inventory_rows(sac_rows)
+    seed_rows = _build_seed_inventory_rows([row for row in method_rows if row.algorithm == "sac"])
     released_main_rows = _build_released_main_rows(released_group_summaries)
     released_seed_rows = _build_released_seed_inventory_rows(released_rows)
     ppo_sweep_summary_rows = _build_ppo_sweep_summary_rows(ppo_sweep_rows)
@@ -1206,6 +1425,7 @@ def main() -> None:
     )
     _write_status_markdown(
         rbc_row,
+        method_summaries,
         sac_summaries,
         released_group_summaries,
         released_split_summaries,
