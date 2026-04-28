@@ -129,6 +129,14 @@ def _require_complete_metric_coverage(
         )
 
 
+def _write_csv_rows(path: Path, fieldnames: list[str], rows: list[dict[str, str]]) -> None:
+    with path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames, lineterminator="\n")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row.get(field, "") for field in fieldnames})
+
+
 def _load_public_dev_scores() -> dict[int, list[tuple[str, float]]]:
     """Return {seed: [(run_id, public_dev_score), ...]} for PPO DTDE reward_v2."""
     by_seed: dict[int, list[tuple[str, float]]] = {}
@@ -314,10 +322,7 @@ def _patch_released_main_csv(new_row: dict[str, str]) -> None:
     # Preserve original row order (with the PPO DTDE row slotted where the
     # old PPO phase_3 row used to appear — but since we don't have a stable
     # group ordering beyond insertion, just keep insertion order).
-    RELEASED_MAIN_CSV.write_text(
-        ",".join(fieldnames) + "\n"
-        + "".join(",".join(row.get(f, "") for f in fieldnames) + "\n" for row in rows)
-    )
+    _write_csv_rows(RELEASED_MAIN_CSV, fieldnames, rows)
     print(f"  updated {RELEASED_MAIN_CSV.relative_to(REPO_ROOT)}")
 
 
@@ -356,10 +361,7 @@ def _patch_released_inventory_csv(new_rows: list[dict[str, str]]) -> None:
         )
     )
 
-    RELEASED_INVENTORY_CSV.write_text(
-        ",".join(fieldnames) + "\n"
-        + "".join(",".join(row.get(f, "") for f in fieldnames) + "\n" for row in merged)
-    )
+    _write_csv_rows(RELEASED_INVENTORY_CSV, fieldnames, merged)
     print(f"  updated {RELEASED_INVENTORY_CSV.relative_to(REPO_ROOT)}")
 
 
@@ -498,13 +500,7 @@ def _rebuild_cross_split_from_inventory() -> None:
                 continue
             row[col] = _per_split_mean(algo, variant, split)
 
-    CROSS_SPLIT_CSV.write_text(
-        ",".join(fieldnames) + "\n"
-        + "".join(
-            ",".join(row.get(f, "") for f in fieldnames) + "\n"
-            for row in existing
-        )
-    )
+    _write_csv_rows(CROSS_SPLIT_CSV, fieldnames, existing)
     print(f"  rebuilt {CROSS_SPLIT_CSV.relative_to(REPO_ROOT)} from inventory")
 
 
@@ -586,10 +582,7 @@ def main() -> None:
                         row[col] = new_row[col]
             rows.append(row)
 
-    CROSS_SPLIT_CSV.write_text(
-        ",".join(fieldnames) + "\n"
-        + "".join(",".join(row.get(f, "") for f in fieldnames) + "\n" for row in rows)
-    )
+    _write_csv_rows(CROSS_SPLIT_CSV, fieldnames, rows)
     print(f"\n  updated {CROSS_SPLIT_CSV.relative_to(REPO_ROOT)}")
 
     # 5) Backfill the released_eval_main_results.csv + seed inventory rows
