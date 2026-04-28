@@ -45,6 +45,12 @@ VARIANT_LABELS = {
     "ppo_central_baseline": "Centralized PPO baseline",
     "ppo_shared_dtde_reward_v2": "Shared DTDE PPO reward_v2",
 }
+REQUIRED_LOCAL_SAC_VARIANTS = (
+    "central_baseline",
+    "central_reward_v1",
+    "central_reward_v2",
+    "shared_dtde_reward_v2",
+)
 
 OFFICIAL_REFERENCES = [
     {
@@ -1032,8 +1038,46 @@ Lower is better.
     (OUTPUT_ROOT / "README.md").write_text(text)
 
 
-def _canonical_metrics_available() -> bool:
-    return any(METRICS_ROOT.glob("*.csv"))
+def _missing_canonical_metric_requirements() -> list[str]:
+    if not any(METRICS_ROOT.glob("*.csv")):
+        return ["no metric CSVs under results/metrics"]
+
+    missing: list[str] = []
+    if not list(METRICS_ROOT.glob("rbc__basic_rbc__public_dev__seed0__*.csv")):
+        missing.append("rbc__basic_rbc__public_dev__seed0__*.csv")
+
+    local_sac_keys: set[tuple[str, int]] = set()
+    released_groups: set[str] = set()
+    for path in sorted(METRICS_ROOT.glob("sac__*.csv")):
+        row = _read_metric_row(path)
+        if row.split == "public_dev":
+            local_sac_keys.add((row.variant, row.seed))
+        elif row.split.startswith("phase_"):
+            released_groups.add(_released_group(row.split))
+
+    for variant in REQUIRED_LOCAL_SAC_VARIANTS:
+        seeds = {seed for row_variant, seed in local_sac_keys if row_variant == variant}
+        if not seeds:
+            missing.append(f"sac__{variant}__public_dev__*.csv")
+        elif len(seeds) < 5:
+            missing.append(f"sac__{variant}__public_dev__ needs 5 seeds, found {len(seeds)}")
+
+    if "released_phase_2_online_eval" not in released_groups:
+        missing.append("SAC released phase_2_online_eval metrics")
+    if "released_phase_3" not in released_groups:
+        missing.append("SAC released phase_3 metrics")
+
+    sweep_summary_path = REPO_ROOT / "results" / "sweep" / "summary.csv"
+    if sweep_summary_path.exists():
+        with sweep_summary_path.open(newline="") as handle:
+            for row in csv.DictReader(handle):
+                if row["algo"] != "ppo":
+                    continue
+                metric_path = METRICS_ROOT / f"{row['run_id']}.csv"
+                if not metric_path.exists():
+                    missing.append(f"PPO sweep metric {metric_path.relative_to(REPO_ROOT)}")
+
+    return missing
 
 
 def _validate_tracked_outputs() -> None:
@@ -1047,10 +1091,12 @@ def _validate_tracked_outputs() -> None:
 
 def main() -> None:
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
-    if not _canonical_metrics_available():
+    missing_canonical = _missing_canonical_metric_requirements()
+    if missing_canonical:
         _validate_tracked_outputs()
         print(
-            "No canonical metrics found under results/metrics; "
+            "Canonical metrics under results/metrics are missing or partial "
+            f"({'; '.join(missing_canonical)}); "
             "leaving tracked submission/results outputs unchanged."
         )
         return
