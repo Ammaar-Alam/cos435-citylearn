@@ -488,11 +488,10 @@ def _rebuild_cross_split_from_inventory() -> None:
         if row is None:
             # Row absent from CSV — skip rather than invent new rows.
             continue
-        # public_dev from local_main_results.csv (if available).
-        if local_method_id and local_method_id in local_rows:
-            mean = local_rows[local_method_id].get("average_score_mean")
-            if mean:
-                row["public_dev"] = f"{float(mean):.4f}"
+        # public_dev from local_main_results.csv. Always overwrite with either
+        # the current mean or blank so stale values cannot survive rebuilds.
+        mean = local_rows.get(local_method_id, {}).get("average_score_mean")
+        row["public_dev"] = f"{float(mean):.4f}" if mean else ""
         # per-split columns from inventory.
         for split, col in SPLIT_TO_CROSS_COL.items():
             if col not in fieldnames:
