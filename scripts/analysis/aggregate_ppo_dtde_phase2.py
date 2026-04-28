@@ -89,6 +89,46 @@ def _require_complete_split_coverage(
         raise SystemExit(f"incomplete {label} coverage; refusing to write summaries: {details}")
 
 
+def _require_complete_metric_coverage(
+    metrics: list[dict],
+    expected_splits: list[str],
+    expected_seeds: set[int],
+    *,
+    label: str,
+) -> None:
+    seen: set[tuple[str, int]] = set()
+    duplicates: list[tuple[str, int]] = []
+    for metric in metrics:
+        key = (str(metric.get("split", "")), int(metric.get("seed", -1)))
+        if key in seen:
+            duplicates.append(key)
+        seen.add(key)
+
+    expected = {
+        (split, seed)
+        for split in expected_splits
+        for seed in expected_seeds
+    }
+    missing = sorted(expected - seen)
+    unexpected = sorted(seen - expected)
+    if missing or unexpected or duplicates:
+        parts = []
+        if missing:
+            parts.append("missing " + ", ".join(f"{split}/seed{seed}" for split, seed in missing))
+        if unexpected:
+            parts.append(
+                "unexpected " + ", ".join(f"{split}/seed{seed}" for split, seed in unexpected)
+            )
+        if duplicates:
+            parts.append(
+                "duplicate " + ", ".join(f"{split}/seed{seed}" for split, seed in duplicates)
+            )
+        details = "; ".join(parts)
+        raise SystemExit(
+            f"incomplete {label} coverage; refusing to write summaries: {details}"
+        )
+
+
 def _load_public_dev_scores() -> dict[int, list[tuple[str, float]]]:
     """Return {seed: [(run_id, public_dev_score), ...]} for PPO DTDE reward_v2."""
     by_seed: dict[int, list[tuple[str, float]]] = {}
@@ -566,6 +606,12 @@ def main() -> None:
             "incomplete phase_2 PPO DTDE metrics coverage; refusing to write summaries: "
             f"{len(phase2_metrics)}/{expected_phase2_jobs}"
         )
+    _require_complete_metric_coverage(
+        phase2_metrics,
+        list(split_label_map),
+        set(best_per_seed),
+        label="phase_2 PPO DTDE metrics",
+    )
     main_row, inventory_rows = _aggregate_released_phase2_row(phase2_metrics)
     print(
         f"  released phase_2: mean={main_row['average_score_mean']} "
