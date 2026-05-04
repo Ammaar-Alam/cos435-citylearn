@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=cos435-sweep
-#SBATCH --array=0-39
+#SBATCH --array=0-59
 #SBATCH --partition=all
 #SBATCH --time=03:00:00
 #SBATCH --cpus-per-task=4
@@ -8,9 +8,9 @@
 #SBATCH --output=/u/%u/cos435-citylearn/results/sweep/slurm-%A_%a.out
 #SBATCH --error=/u/%u/cos435-citylearn/results/sweep/slurm-%A_%a.out
 
-# 40-cell sweep: 2 algos x 2 lrs x 10 seeds.
+# 60-cell sweep: 3 shared algos x 2 lrs x 10 seeds.
 # array id decomposes as:
-#   algo_idx = id / 20         (0 = ppo, 1 = sac)
+#   algo_idx = id / 20         (0 = ppo, 1 = sac, 2 = td3)
 #   lr_idx   = (id % 20) / 10  (0 = 1e-4, 1 = 3e-4)
 #   seed     = id % 10
 #
@@ -23,7 +23,7 @@ set -euo pipefail
 ROOT_DIR="${ROOT_DIR:-/u/${USER}/cos435-citylearn}"
 mkdir -p "$ROOT_DIR/results/sweep"
 
-ALGOS=(ppo sac)
+ALGOS=(ppo sac td3)
 LRS=(1e-4 3e-4)
 
 TASK_ID=$SLURM_ARRAY_TASK_ID

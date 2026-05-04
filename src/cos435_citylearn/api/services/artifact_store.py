@@ -60,6 +60,24 @@ def _load_ppo_checkpoint_tools():
     )
 
 
+def _load_td3_checkpoint_tools():
+    from cos435_citylearn.algorithms.sac.checkpoints import (
+        resolve_imported_checkpoint_path,
+    )
+    from cos435_citylearn.algorithms.td3 import (
+        safe_load_td3_checkpoint_payload,
+        validate_td3_checkpoint_env_compatibility,
+        validate_td3_checkpoint_runner_compatibility,
+    )
+
+    return (
+        resolve_imported_checkpoint_path,
+        safe_load_td3_checkpoint_payload,
+        validate_td3_checkpoint_env_compatibility,
+        validate_td3_checkpoint_runner_compatibility,
+    )
+
+
 def _load_central_ppo_sidecar_tools():
     from cos435_citylearn.baselines.ppo import (
         _load_central_ppo_sidecar,
@@ -69,6 +87,15 @@ def _load_central_ppo_sidecar_tools():
     return _load_central_ppo_sidecar, _validate_central_ppo_sidecar
 
 
+def _load_central_td3_sidecar_tools():
+    from cos435_citylearn.baselines.td3 import (
+        _load_central_td3_sidecar,
+        _validate_central_td3_sidecar,
+    )
+
+    return _load_central_td3_sidecar, _validate_central_td3_sidecar
+
+
 def _load_central_ppo_topology_tools():
     from cos435_citylearn.baselines.ppo import (
         _load_central_ppo_topology,
@@ -76,6 +103,15 @@ def _load_central_ppo_topology_tools():
     )
 
     return _load_central_ppo_topology, _validate_ppo_topology
+
+
+def _load_central_td3_topology_tools():
+    from cos435_citylearn.baselines.td3 import (
+        _load_central_td3_topology,
+        _validate_td3_topology,
+    )
+
+    return _load_central_td3_topology, _validate_td3_topology
 
 
 def _load_citylearn_env_factory():
@@ -101,7 +137,7 @@ class ImportedArtifactRecord:
     simulation_dir: str | None = None
 
 
-_CENTRAL_PPO_REQUIRED_IMPORT_FILES = {
+_CENTRAL_SB3_REQUIRED_IMPORT_FILES = {
     "vec_normalize.pkl",
     "topology.json",
     "checkpoint_metadata.json",
@@ -142,21 +178,22 @@ def _validate_runner_bound_import(
 ) -> None:
     if spec is None or artifact_kind != "checkpoint":
         return
-    if spec.algorithm != "ppo" or spec.variant != "central_baseline":
+    if spec.algorithm not in {"ppo", "td3"} or spec.variant != "central_baseline":
         return
 
     if Path(primary_name).suffix.lower() != ".zip":
         raise ValueError(
-            "centralized PPO dashboard imports require the primary file to be "
+            f"centralized {spec.algorithm.upper()} dashboard imports require "
+            "the primary file to be "
             "the Stable-Baselines3 model .zip. Attach vec_normalize.pkl, "
             "topology.json, and checkpoint_metadata.json as companion files."
         )
 
-    missing = sorted(_CENTRAL_PPO_REQUIRED_IMPORT_FILES.difference(extra_names))
+    missing = sorted(_CENTRAL_SB3_REQUIRED_IMPORT_FILES.difference(extra_names))
     if missing:
         missing_text = ", ".join(missing)
         raise ValueError(
-            "centralized PPO dashboard imports require companion files "
+            f"centralized {spec.algorithm.upper()} dashboard imports require companion files "
             "vec_normalize.pkl, topology.json, and checkpoint_metadata.json. "
             f"Missing: {missing_text}."
         )
@@ -447,6 +484,82 @@ class ArtifactStore:
                     central_agent=False,
                 )
                 validate_ppo_checkpoint_env_compatibility(
+                    checkpoint_payload,
+                    observation_names=env_bundle.env.observation_names,
+                    action_names=env_bundle.env.action_names,
+                )
+        elif spec.algorithm == "td3" and record.artifact_kind == "checkpoint":
+            config = load_yaml(spec.config_path)
+            if request.seed is not None:
+                config["training"]["seed"] = int(request.seed)
+            if request.split is not None:
+                config["env"]["split"] = request.split
+
+            (
+                resolve_imported_checkpoint_path,
+                safe_load_td3_checkpoint_payload,
+                validate_td3_checkpoint_env_compatibility,
+                validate_td3_checkpoint_runner_compatibility,
+            ) = _load_td3_checkpoint_tools()
+            checkpoint_path = resolve_imported_checkpoint_path(
+                artifact_id=artifact_id,
+                imported_artifacts_root=self.settings.imported_artifacts_root,
+                artifacts_root=self.settings.artifacts_root,
+            )
+
+            control_mode = config["algorithm"]["control_mode"]
+            if control_mode == "centralized":
+                vec_normalize_path = checkpoint_path.parent / "vec_normalize.pkl"
+                if not vec_normalize_path.exists():
+                    raise FileNotFoundError(
+                        "VecNormalize stats (vec_normalize.pkl) not found alongside imported "
+                        f"central TD3 model at {checkpoint_path.parent}. Re-import via the "
+                        "dashboard and attach vec_normalize.pkl as a companion file on the "
+                        "upload form (the 'extra_files' field); centralized TD3 cannot "
+                        "evaluate without the observation normalization stats."
+                    )
+                (
+                    _load_central_td3_sidecar,
+                    _validate_central_td3_sidecar,
+                ) = _load_central_td3_sidecar_tools()
+                sidecar = _load_central_td3_sidecar(checkpoint_path)
+                _validate_central_td3_sidecar(
+                    sidecar,
+                    config,
+                    allow_cross_reward_eval=request.allow_cross_reward_eval,
+                    artifact_id=artifact_id,
+                )
+                (
+                    _load_central_td3_topology,
+                    _validate_td3_topology,
+                ) = _load_central_td3_topology_tools()
+                make_citylearn_env = _load_citylearn_env_factory()
+                artifact_topology = _load_central_td3_topology(
+                    checkpoint_path,
+                    artifact_id=artifact_id,
+                )
+                env_bundle = make_citylearn_env(
+                    config["env"]["base_config"],
+                    f"configs/splits/{config['env']['split']}.yaml",
+                    seed=config["training"]["seed"],
+                    central_agent=True,
+                )
+                _validate_td3_topology(artifact_topology, env_bundle.env)
+            else:
+                make_citylearn_env = _load_citylearn_env_factory()
+                checkpoint_payload = safe_load_td3_checkpoint_payload(checkpoint_path)
+                validate_td3_checkpoint_runner_compatibility(
+                    checkpoint_payload,
+                    config,
+                    allow_cross_reward_eval=request.allow_cross_reward_eval,
+                )
+                env_bundle = make_citylearn_env(
+                    config["env"]["base_config"],
+                    f"configs/splits/{config['env']['split']}.yaml",
+                    seed=config["training"]["seed"],
+                    central_agent=False,
+                )
+                validate_td3_checkpoint_env_compatibility(
                     checkpoint_payload,
                     observation_names=env_bundle.env.observation_names,
                     action_names=env_bundle.env.action_names,

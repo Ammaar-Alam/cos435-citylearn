@@ -44,6 +44,8 @@ VARIANT_LABELS = {
     "shared_dtde_reward_v2": "Shared DTDE SAC reward_v2",
     "ppo_central_baseline": "Centralized PPO baseline",
     "ppo_shared_dtde_reward_v2": "Shared DTDE PPO reward_v2",
+    "td3_central_baseline": "Centralized TD3 baseline",
+    "td3_shared_dtde_reward_v2": "Shared DTDE TD3 reward_v2",
 }
 REQUIRED_LOCAL_SAC_VARIANTS = (
     "central_baseline",
@@ -200,7 +202,7 @@ class ReleasedSummary:
 
 
 @dataclass(frozen=True)
-class PpoSweepRow:
+class SharedSweepRow:
     lr: str
     metric: MetricRow
 
@@ -235,29 +237,39 @@ def _latest_metric(pattern: str) -> MetricRow:
     return _read_metric_row(matches[-1])
 
 
-def _load_local_rows(ppo_sweep_rows: list[PpoSweepRow]) -> tuple[MetricRow, list[MetricRow]]:
+def _is_submission_metric_path(path: Path) -> bool:
+    return "_smoke__" not in path.name
+
+
+def _load_local_rows(shared_sweep_rows: list[SharedSweepRow]) -> tuple[MetricRow, list[MetricRow]]:
     rbc_row = _latest_metric("rbc__basic_rbc__public_dev__seed0__*.csv")
     latest_rows: dict[tuple[str, str, int], MetricRow] = {}
-    for algorithm in ("ppo", "sac"):
+    for algorithm in ("ppo", "sac", "td3"):
         for path in sorted(METRICS_ROOT.glob(f"{algorithm}__*.csv")):
+            if not _is_submission_metric_path(path):
+                continue
             if "__public_dev__" not in path.name:
                 continue
             row = _read_metric_row(path)
             latest_rows[(row.algorithm, row.variant, row.seed)] = row
 
-    best_sweep_rows: dict[int, MetricRow] = {}
-    for sweep_row in ppo_sweep_rows:
+    best_sweep_rows: dict[tuple[str, str, int], MetricRow] = {}
+    shared_variants = {
+        ("ppo", "ppo_shared_dtde_reward_v2"),
+        ("sac", "shared_dtde_reward_v2"),
+        ("td3", "td3_shared_dtde_reward_v2"),
+    }
+    for sweep_row in shared_sweep_rows:
         metric = sweep_row.metric
-        if metric.split != "public_dev" or metric.variant != "ppo_shared_dtde_reward_v2":
+        key = (metric.algorithm, metric.variant, metric.seed)
+        if metric.split != "public_dev" or key[:2] not in shared_variants:
             continue
-        current = best_sweep_rows.get(metric.seed)
+        current = best_sweep_rows.get(key)
         if current is None or metric.average_score < current.average_score:
-            best_sweep_rows[metric.seed] = metric
+            best_sweep_rows[key] = metric
     if best_sweep_rows:
         latest_rows = {
-            key: row
-            for key, row in latest_rows.items()
-            if key[:2] != ("ppo", "ppo_shared_dtde_reward_v2")
+            key: row for key, row in latest_rows.items() if key[:2] not in shared_variants
         }
         for row in best_sweep_rows.values():
             latest_rows[(row.algorithm, row.variant, row.seed)] = row
@@ -281,8 +293,10 @@ def _released_group(split: str) -> str:
 
 def _load_released_rows() -> list[MetricRow]:
     latest_rows: dict[tuple[str, str, int], MetricRow] = {}
-    for algorithm in ("ppo", "rbc", "sac"):
+    for algorithm in ("ppo", "rbc", "sac", "td3"):
         for path in sorted(METRICS_ROOT.glob(f"{algorithm}__*.csv")):
+            if not _is_submission_metric_path(path):
+                continue
             row = _read_metric_row(path)
             if not row.split.startswith("phase_"):
                 continue
@@ -301,23 +315,24 @@ def _load_released_rows() -> list[MetricRow]:
     )
 
 
-def _load_ppo_sweep_rows() -> list[PpoSweepRow]:
+def _load_shared_sweep_rows() -> list[SharedSweepRow]:
     sweep_summary_path = REPO_ROOT / "results" / "sweep" / "summary.csv"
     if not sweep_summary_path.exists():
         return []
 
-    rows: list[PpoSweepRow] = []
+    rows: list[SharedSweepRow] = []
     with sweep_summary_path.open(newline="") as handle:
         for row in csv.DictReader(handle):
-            if row["algo"] != "ppo":
+            if row["algo"] not in {"ppo", "sac", "td3"}:
                 continue
             run_id = row["run_id"]
             metric_path = METRICS_ROOT / f"{run_id}.csv"
             if not metric_path.exists():
                 raise FileNotFoundError(
-                    f"missing metric row for PPO sweep run_id {run_id}: expected {metric_path}"
+                    f"missing metric row for {row['algo'].upper()} sweep run_id "
+                    f"{run_id}: expected {metric_path}"
                 )
-            rows.append(PpoSweepRow(lr=row["lr"], metric=_read_metric_row(metric_path)))
+            rows.append(SharedSweepRow(lr=row["lr"], metric=_read_metric_row(metric_path)))
 
     return sorted(
         rows,
@@ -750,8 +765,8 @@ def _build_released_seed_inventory_rows(
     return rows
 
 
-def _build_ppo_sweep_summary_rows(ppo_rows: list[PpoSweepRow]) -> list[dict[str, object]]:
-    grouped: dict[tuple[str, str], list[PpoSweepRow]] = {}
+def _build_ppo_sweep_summary_rows(ppo_rows: list[SharedSweepRow]) -> list[dict[str, object]]:
+    grouped: dict[tuple[str, str], list[SharedSweepRow]] = {}
     for row in ppo_rows:
         grouped.setdefault((row.lr, row.metric.split), []).append(row)
 
@@ -802,7 +817,61 @@ def _build_ppo_sweep_summary_rows(ppo_rows: list[PpoSweepRow]) -> list[dict[str,
     return rows
 
 
-def _build_ppo_sweep_inventory_rows(ppo_rows: list[PpoSweepRow]) -> list[dict[str, object]]:
+def _build_shared_sweep_summary_rows(shared_rows: list[SharedSweepRow]) -> list[dict[str, object]]:
+    grouped: dict[tuple[str, str, str], list[SharedSweepRow]] = {}
+    for row in shared_rows:
+        grouped.setdefault((row.metric.algorithm, row.lr, row.metric.split), []).append(row)
+
+    rows: list[dict[str, object]] = []
+    for (algorithm, lr, split), grouped_rows in sorted(grouped.items()):
+        summary = _summarize_rows([row.metric for row in grouped_rows])
+        best_row = min(grouped_rows, key=lambda row: row.metric.average_score).metric
+        worst_row = max(grouped_rows, key=lambda row: row.metric.average_score).metric
+        if split == "public_dev":
+            note = f"10-seed shared {algorithm.upper()} sweep on local phase_2"
+        else:
+            note = (
+                f"10-seed shared {algorithm.upper()} checkpoint evaluation " "on released phase_3"
+            )
+
+        rows.append(
+            {
+                "method_id": f"{algorithm}_{summary.variant}_{lr}_{split}",
+                "method_label": _variant_label(summary.variant),
+                "algorithm": summary.algorithm,
+                "variant": summary.variant,
+                "lr": lr,
+                "split": split,
+                "seed_count": len(summary.rows),
+                "evidence_level": _evidence_level(len(summary.rows)),
+                "average_score_mean": round(summary.average_score_mean, 6),
+                "average_score_std": round(summary.average_score_std, 6),
+                "average_score_ci95": round(summary.average_score_ci95, 6),
+                "best_average_score": round(summary.best_average_score, 6),
+                "worst_average_score": round(summary.worst_average_score, 6),
+                "district_cost_total_mean": round(summary.district_cost_total_mean, 6),
+                "district_carbon_emissions_total_mean": round(
+                    summary.district_carbon_emissions_total_mean, 6
+                ),
+                "district_daily_peak_average_mean": round(
+                    summary.district_daily_peak_average_mean, 6
+                ),
+                "district_discomfort_proportion_mean": round(
+                    summary.district_discomfort_proportion_mean, 6
+                ),
+                "district_one_minus_thermal_resilience_proportion_mean": round(
+                    summary.district_one_minus_thermal_resilience_proportion_mean, 6
+                ),
+                "best_run_id": best_row.run_id,
+                "worst_run_id": worst_row.run_id,
+                "notes": note,
+            }
+        )
+
+    return rows
+
+
+def _build_ppo_sweep_inventory_rows(ppo_rows: list[SharedSweepRow]) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for row in ppo_rows:
         metric = row.metric
@@ -829,6 +898,12 @@ def _build_ppo_sweep_inventory_rows(ppo_rows: list[PpoSweepRow]) -> list[dict[st
     return rows
 
 
+def _build_shared_sweep_inventory_rows(
+    shared_rows: list[SharedSweepRow],
+) -> list[dict[str, object]]:
+    return _build_ppo_sweep_inventory_rows(shared_rows)
+
+
 def _build_reference_rows() -> list[dict[str, object]]:
     return [
         {
@@ -848,7 +923,7 @@ def _write_status_markdown(
     sac_summaries: list[MetricSummary],
     released_group_summaries: list[ReleasedSummary],
     released_split_summaries: list[ReleasedSummary],
-    ppo_sweep_rows: list[PpoSweepRow],
+    ppo_sweep_rows: list[SharedSweepRow],
     ppo_sweep_summary_rows: list[dict[str, object]],
 ) -> None:
     by_variant = {summary.variant: summary for summary in sac_summaries}
@@ -1044,6 +1119,8 @@ These files are the clean tracked summary of the raw outputs under `results/`.
 - `sac_seed_inventory.csv` — per-seed SAC run inventory for the local phase-2 batch
 - `released_eval_main_results.csv` — released official-eval family summaries
 - `released_eval_seed_inventory.csv` — per-seed released-eval checkpoint inventory
+- `shared_sweep_summary.csv` — per-learning-rate shared PPO/SAC/TD3 sweep summary rows
+- `shared_sweep_inventory.csv` — per-run shared PPO/SAC/TD3 sweep inventory with KPI columns
 - `ppo_shared_sweep_summary.csv` — per-learning-rate shared-PPO sweep summary rows
 - `ppo_shared_sweep_inventory.csv` — per-run shared-PPO sweep inventory with KPI columns
 - `official_benchmark_reference.csv` — published CityLearn 2023 reference numbers
@@ -1119,6 +1196,8 @@ def _missing_canonical_metric_requirements() -> list[str]:
     released_seeds: dict[tuple[str, str, str, str], set[int]] = {}
     for algorithm in ("ppo", "rbc", "sac"):
         for path in sorted(METRICS_ROOT.glob(f"{algorithm}__*.csv")):
+            if not _is_submission_metric_path(path):
+                continue
             row = _read_metric_row(path)
             if row.split == "public_dev":
                 local_keys.add((row.algorithm, row.variant, row.seed))
@@ -1172,11 +1251,14 @@ def _missing_canonical_metric_requirements() -> list[str]:
     if sweep_summary_path.exists():
         with sweep_summary_path.open(newline="") as handle:
             for row in csv.DictReader(handle):
-                if row["algo"] != "ppo":
+                if row["algo"] not in {"ppo", "sac", "td3"}:
                     continue
                 metric_path = METRICS_ROOT / f"{row['run_id']}.csv"
                 if not metric_path.exists():
-                    missing.append(f"PPO sweep metric {metric_path.relative_to(REPO_ROOT)}")
+                    missing.append(
+                        f"{row['algo'].upper()} sweep metric "
+                        f"{metric_path.relative_to(REPO_ROOT)}"
+                    )
 
     return missing
 
@@ -1202,8 +1284,9 @@ def main() -> None:
         )
         return
 
-    ppo_sweep_rows = _load_ppo_sweep_rows()
-    rbc_row, method_rows = _load_local_rows(ppo_sweep_rows)
+    shared_sweep_rows = _load_shared_sweep_rows()
+    ppo_sweep_rows = [row for row in shared_sweep_rows if row.metric.algorithm == "ppo"]
+    rbc_row, method_rows = _load_local_rows(shared_sweep_rows)
     released_rows = _load_released_rows()
     method_summaries = _build_method_summaries(method_rows)
     sac_summaries = _build_sac_summaries(method_rows)
@@ -1215,6 +1298,8 @@ def main() -> None:
     seed_rows = _build_seed_inventory_rows([row for row in method_rows if row.algorithm == "sac"])
     released_main_rows = _build_released_main_rows(released_group_summaries)
     released_seed_rows = _build_released_seed_inventory_rows(released_rows)
+    shared_sweep_summary_rows = _build_shared_sweep_summary_rows(shared_sweep_rows)
+    shared_sweep_inventory_rows = _build_shared_sweep_inventory_rows(shared_sweep_rows)
     ppo_sweep_summary_rows = _build_ppo_sweep_summary_rows(ppo_sweep_rows)
     ppo_sweep_inventory_rows = _build_ppo_sweep_inventory_rows(ppo_sweep_rows)
     reference_rows = _build_reference_rows()
@@ -1340,6 +1425,53 @@ def main() -> None:
         OUTPUT_ROOT / "official_benchmark_reference.csv",
         ["method_id", "method_label", "split_type", "average_score", "source_note"],
         reference_rows,
+    )
+    _write_csv(
+        OUTPUT_ROOT / "shared_sweep_summary.csv",
+        [
+            "method_id",
+            "method_label",
+            "algorithm",
+            "variant",
+            "lr",
+            "split",
+            "seed_count",
+            "evidence_level",
+            "average_score_mean",
+            "average_score_std",
+            "average_score_ci95",
+            "best_average_score",
+            "worst_average_score",
+            "district_cost_total_mean",
+            "district_carbon_emissions_total_mean",
+            "district_daily_peak_average_mean",
+            "district_discomfort_proportion_mean",
+            "district_one_minus_thermal_resilience_proportion_mean",
+            "best_run_id",
+            "worst_run_id",
+            "notes",
+        ],
+        shared_sweep_summary_rows,
+    )
+    _write_csv(
+        OUTPUT_ROOT / "shared_sweep_inventory.csv",
+        [
+            "run_id",
+            "file_name",
+            "algorithm",
+            "variant",
+            "lr",
+            "split",
+            "seed",
+            "dataset_name",
+            "average_score",
+            "district_cost_total",
+            "district_carbon_emissions_total",
+            "district_daily_peak_average",
+            "district_discomfort_proportion",
+            "district_one_minus_thermal_resilience_proportion",
+        ],
+        shared_sweep_inventory_rows,
     )
     _write_csv(
         OUTPUT_ROOT / "ppo_shared_sweep_summary.csv",

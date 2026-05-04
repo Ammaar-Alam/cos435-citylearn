@@ -26,6 +26,7 @@ documentation. The ignored local-output boundaries are:
 - `results/ui_exports/` CityLearn UI upload bundles, playback payloads, and media
 - `results/dashboard/` local dashboard job state
 - `results/sweep/` Princeton/Neuronic sweep JSONs, summary CSVs, and Slurm logs
+- `results/sweep/summary.csv` is the raw shared PPO/SAC/TD3 sweep manifest consumed by the submission exporter; commit only normalized copies under `submission/results/`
 - `results/*_tmp/` temporary staging directories
 
 Commit final report artifacts only after they are normalized under
