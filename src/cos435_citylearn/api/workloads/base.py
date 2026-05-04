@@ -74,9 +74,7 @@ class WorkloadContext:
             "heartbeat_at": utc_now_iso(),
             "latest_run_id": run_id or state.get("latest_run_id"),
             "latest_preview_path": (
-                str(preview_path)
-                if preview_path is not None
-                else state.get("latest_preview_path")
+                str(preview_path) if preview_path is not None else state.get("latest_preview_path")
             ),
             "latest_checkpoint_id": state.get("latest_checkpoint_id"),
             "latest_log_offset": state.get("latest_log_offset"),

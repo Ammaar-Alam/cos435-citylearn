@@ -45,10 +45,11 @@ class ConsoleProgress:
         elapsed = now - self.started_at
         pct = (100.0 * current / total) if total else None
         pct_text = f"{pct:6.2f}%" if pct is not None else "   n/a"
-        print(
-            f"[progress] phase={phase} step={current}/{total} pct={pct_text} elapsed={elapsed:7.1f}s label={label}",
-            flush=True,
+        message = (
+            f"[progress] phase={phase} step={current}/{total} "
+            f"pct={pct_text} elapsed={elapsed:7.1f}s label={label}"
         )
+        print(message, flush=True)
         self.last_step = current
         self.last_print_at = now
 
@@ -131,7 +132,8 @@ def main() -> None:
                 and split_name.startswith("phase_3_")
             ):
                 raise ValueError(
-                    "centralized SAC checkpoints trained on three-building public_dev are not portable to the released six-building phase_3 splits"
+                    "centralized SAC checkpoints trained on three-building public_dev "
+                    "are not portable to the released six-building phase_3 splits"
                 ) from exc
             raise
 

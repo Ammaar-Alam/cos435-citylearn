@@ -90,7 +90,8 @@ class JobManager:
                         "progress_total": None,
                         "progress_label": "backend restarted before the job finished",
                         "heartbeat_at": utc_now_iso(),
-                        "latest_run_id": previous_state.get("latest_run_id") or payload.get("run_id"),
+                        "latest_run_id": previous_state.get("latest_run_id")
+                        or payload.get("run_id"),
                         "latest_preview_path": None,
                         "latest_checkpoint_id": previous_state.get("latest_checkpoint_id"),
                         "latest_log_offset": previous_state.get("latest_log_offset"),
@@ -382,8 +383,7 @@ class JobManager:
         with self._lock:
             self.refresh()
             jobs = [
-                json.loads(path.read_text())
-                for path in self.settings.jobs_root.glob("*/job.json")
+                json.loads(path.read_text()) for path in self.settings.jobs_root.glob("*/job.json")
             ]
             jobs = [self._merge_live_state(job) for job in jobs]
             jobs.sort(key=lambda item: item["submitted_at"], reverse=True)
@@ -453,9 +453,7 @@ class JobManager:
             "progress_total": job.get("progress_total"),
             "progress_label": job.get("progress_label"),
             "heartbeat_at": (
-                job.get("heartbeat_at")
-                or job.get("finished_at")
-                or job["submitted_at"]
+                job.get("heartbeat_at") or job.get("finished_at") or job["submitted_at"]
             ),
             "latest_run_id": job.get("run_id"),
             "latest_preview_path": job.get("latest_preview_path"),

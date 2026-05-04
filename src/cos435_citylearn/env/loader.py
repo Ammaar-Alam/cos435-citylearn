@@ -80,8 +80,7 @@ def make_citylearn_env(
 
     if not schema_path.exists():
         raise FileNotFoundError(
-            f"CityLearn schema not found at {schema_path}. "
-            "run `make download-citylearn` first"
+            f"CityLearn schema not found at {schema_path}. " "run `make download-citylearn` first"
         )
 
     resolved_seed = int(env_settings["seed"] if seed is None else seed)

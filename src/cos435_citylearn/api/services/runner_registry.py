@@ -70,7 +70,9 @@ RUNNERS: dict[str, RunnerSpec] = {
         label="Shared SAC Reward v2",
         algorithm="sac",
         variant="shared_dtde_reward_v2",
-        description="Parameter-shared decentralized SAC with district-context features and reward_v2",
+        description=(
+            "Parameter-shared decentralized SAC with district-context features " "and reward_v2"
+        ),
         callable_path="cos435_citylearn.baselines.sac.run_sac",
         workload_id="eval_sac_checkpoint",
         config_path="configs/train/sac/sac_shared_dtde_reward_v2.yaml",
@@ -82,7 +84,10 @@ RUNNERS: dict[str, RunnerSpec] = {
         label="Shared PPO Reward v2",
         algorithm="ppo",
         variant="ppo_shared_dtde_reward_v2",
-        description="Parameter-shared decentralized PPO with count-invariant district context and reward_v2",
+        description=(
+            "Parameter-shared decentralized PPO with count-invariant district "
+            "context and reward_v2"
+        ),
         callable_path="cos435_citylearn.baselines.ppo.run_ppo",
         workload_id="eval_ppo_checkpoint",
         config_path="configs/train/ppo/ppo_shared_dtde_reward_v2.yaml",

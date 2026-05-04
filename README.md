@@ -2,7 +2,7 @@
 
 Generalizable RL for neighborhood battery control in CityLearn.
 
-This repository contains the shared benchmark foundation for the COS435 / ECE433 final project. The CityLearn environment, official 2023 dataset download flow, schema export, smoke path, built-in RBC baseline, a repo-local PPO baseline entrypoint, and repo-local SAC runners are wired here. The dashboard still focuses on the RBC and SAC launch paths.
+This repository contains the shared benchmark foundation for the COS435 / ECE433 final project. The CityLearn environment, official 2023 dataset download flow, schema export, smoke path, built-in RBC baseline, repo-local PPO runners, repo-local SAC runners, tracked final-result summaries, and local dashboard are wired here.
 
 ## overview
 
@@ -21,6 +21,7 @@ Foundation in this repo now has:
 - random rollout smoke coverage
 - built-in RBC evaluation path with metric export
 - centralized PPO baseline runner with local artifact export
+- shared-parameter PPO runner for cross-topology evaluation
 - centralized native-SAC baseline with checkpoint export
 - parameter-shared decentralized SAC with shared district context
 - repo-local reward ladder for SAC (`reward_v0` through `reward_v3`)
@@ -107,8 +108,13 @@ make env-schema
 make smoke
 make train-rbc
 make train-ppo
+make train-ppo-shared
 make train-sac
 make train-sac-shared
+make submission-results
+make figures
+make cross-figures
+make cross-table
 make dashboard-install
 make dashboard-build
 make dashboard-backend
@@ -127,7 +133,31 @@ src/        shared Python package, dataset/env utilities, and baseline code
 tests/      scaffold checks plus benchmark smoke tests
 data/       dataset manifests are tracked, raw benchmark files stay out of git
 results/    generated manifests, metrics, and run artifacts stay out of git
+submission/ tracked final report tables, figures, and presentation artifacts
 ```
+
+## final submission artifacts
+
+The clean, grader-facing artifacts are tracked under [`submission/`](submission/):
+
+- [`submission/results/`](submission/results/) has the CSV tables backing the final report claims.
+- [`submission/figures/`](submission/figures/) has the PNG figures copied into the final report and deck.
+- [`submission/presentation.pptx`](submission/presentation.pptx) is the generated presentation deck.
+
+The canonical local result refresh is:
+
+```bash
+make submission-results
+make figures
+make cross-figures
+make cross-table
+```
+
+`make submission-results` reads normalized metrics and sweep summaries from
+`results/` and refreshes the tracked CSV summaries. Figure targets then rebuild
+the tracked report-facing PNGs. Raw datasets, checkpoints, sweep JSONs, Slurm
+logs, playback payloads, and downloaded Drive bundles stay out of git; see
+[`results/README.md`](results/README.md) for the boundary.
 
 ## benchmark flow
 
@@ -138,7 +168,9 @@ results/    generated manifests, metrics, and run artifacts stay out of git
 5. `make smoke`
 6. `make train-rbc`
 7. `make train-ppo`
-8. `make train-sac`
+8. `make train-ppo-shared`
+9. `make train-sac`
+10. `make train-sac-shared`
 
 If you want the full released 2023 dataset family instead of just the default
 local-evaluation package, run:

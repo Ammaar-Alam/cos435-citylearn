@@ -373,7 +373,7 @@ def test_validate_checkpoint_env_compatibility_allows_shared_building_count_chan
     )
 
 
-def test_validate_shared_checkpoint_env_compatibility_allows_more_buildings_with_matching_schema() -> None:
+def test_validate_shared_checkpoint_env_compatibility_allows_topology_expansion() -> None:
     """Shared checkpoints must pass when moving from 1 to 6 buildings (phase_3 size)."""
     payload = _minimal_shared_checkpoint_payload()
 
@@ -407,7 +407,6 @@ def test_shared_checkpoint_rejects_non_first_building_action_drift() -> None:
         validate_checkpoint_env_compatibility(
             payload, observation_names=env_obs, action_names=env_act
         )
-
 
 
 def test_validate_checkpoint_payload_structure_rejects_missing_shared_context_dimension() -> None:

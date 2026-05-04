@@ -12,9 +12,7 @@ class LinearSchedule:
 
     def __post_init__(self) -> None:
         if not 0.0 < self.anneal_fraction <= 1.0:
-            raise ValueError(
-                f"anneal_fraction must be in (0, 1]; got {self.anneal_fraction}"
-            )
+            raise ValueError(f"anneal_fraction must be in (0, 1]; got {self.anneal_fraction}")
 
     def value_at(self, progress: float) -> float:
         # linearly decay from start -> end over [0, anneal_fraction], then hold at end

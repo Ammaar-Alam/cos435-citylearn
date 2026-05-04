@@ -29,7 +29,9 @@ def test_write_json_atomic_uses_unique_temp_files_for_concurrent_writes(
         except Exception as exc:  # pragma: no cover - exercised on failure
             errors.append(exc)
 
-    threads = [threading.Thread(target=writer, args=(payload,), daemon=True) for payload in payloads]
+    threads = [
+        threading.Thread(target=writer, args=(payload,), daemon=True) for payload in payloads
+    ]
     for thread in threads:
         thread.start()
     for thread in threads:

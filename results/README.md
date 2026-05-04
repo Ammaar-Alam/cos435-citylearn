@@ -13,3 +13,20 @@ Actual run outputs stay out of git, but the directory structure is tracked so ev
 Downloaded shared-drive bundles should be treated as local intake only. Normalize
 their contents into the directories above, then commit only clean summaries and
 report assets under `submission/`.
+
+## git policy
+
+The tracked files in this directory should normally be only `.gitkeep` files and
+documentation. The ignored local-output boundaries are:
+
+- `results/runs/` checkpoints, rollout traces, and run-local metadata
+- `results/metrics/` flat per-run metric rows consumed by the submission exporter
+- `results/tables/` and `results/figures/` scratch report outputs
+- `results/manifests/` regenerated environment/schema manifests
+- `results/ui_exports/` CityLearn UI upload bundles, playback payloads, and media
+- `results/dashboard/` local dashboard job state
+- `results/sweep/` Princeton/Neuronic sweep JSONs, summary CSVs, and Slurm logs
+- `results/*_tmp/` temporary staging directories
+
+Commit final report artifacts only after they are normalized under
+`submission/results/`, `submission/figures/`, or `submission/presentation.pptx`.

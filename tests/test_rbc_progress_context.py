@@ -52,7 +52,10 @@ def test_run_rbc_emits_live_preview_updates(tmp_path: Path) -> None:
     assert len(preview_payload["trace"]) <= 96
     assert preview_payload["episode_total_steps"] >= preview_payload["decision_steps"]
     assert preview_payload["trace"][-1]["step"] == preview_payload["preview_step"]
-    assert preview_payload["window_start_step"] == preview_payload["preview_step"] + 1 - preview_payload["decision_steps"]
+    assert (
+        preview_payload["window_start_step"]
+        == preview_payload["preview_step"] + 1 - preview_payload["decision_steps"]
+    )
 
     artifact_kinds = {artifact["kind"] for artifact in progress.artifacts}
     assert {"playback", "simulation_export"} <= artifact_kinds
@@ -79,7 +82,10 @@ def test_run_rbc_bounds_preview_trace_when_export_disabled(tmp_path: Path) -> No
     assert last_update["trace"]
     assert len(last_update["trace"]) <= 96
     assert last_update["trace"][-1]["step"] == last_update["preview_step"]
-    assert last_update["window_start_step"] == last_update["preview_step"] + 1 - last_update["decision_steps"]
+    assert (
+        last_update["window_start_step"]
+        == last_update["preview_step"] + 1 - last_update["decision_steps"]
+    )
     assert "simulation_dir" not in payload
     assert not progress.artifacts
 

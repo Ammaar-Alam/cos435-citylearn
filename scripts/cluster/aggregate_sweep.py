@@ -57,26 +57,30 @@ def main() -> None:
         train = _read(cell_dir / "train.json")
         if train is None:
             continue
-        rows.append({
-            "algo": algo,
-            "lr": lr,
-            "seed": seed,
-            "split": "public_dev",
-            "run_id": train.get("run_id"),
-            "average_score": train.get("average_score"),
-        })
+        rows.append(
+            {
+                "algo": algo,
+                "lr": lr,
+                "seed": seed,
+                "split": "public_dev",
+                "run_id": train.get("run_id"),
+                "average_score": train.get("average_score"),
+            }
+        )
         for split in ("phase_3_1", "phase_3_2", "phase_3_3"):
             eval_payload = _read(cell_dir / f"eval_{split}.json")
             if eval_payload is None:
                 continue
-            rows.append({
-                "algo": algo,
-                "lr": lr,
-                "seed": seed,
-                "split": split,
-                "run_id": eval_payload.get("run_id"),
-                "average_score": eval_payload.get("average_score"),
-            })
+            rows.append(
+                {
+                    "algo": algo,
+                    "lr": lr,
+                    "seed": seed,
+                    "split": split,
+                    "run_id": eval_payload.get("run_id"),
+                    "average_score": eval_payload.get("average_score"),
+                }
+            )
 
     expected_algos = [a for a in args.algos.split(",") if a]
     expected_lrs = [lr for lr in args.lrs.split(",") if lr]
@@ -94,7 +98,7 @@ def main() -> None:
     }
     missing_cells = sorted(expected_cells - found_cells)
     missing_splits: list[tuple[str, str, int, str]] = []
-    for (algo, lr, seed) in sorted(expected_cells & found_cells):
+    for algo, lr, seed in sorted(expected_cells & found_cells):
         cell_dir = sweep_root / f"{algo}_lr{lr}_seed{seed}"
         if _read(cell_dir / "train.json") is None:
             missing_splits.append((algo, lr, seed, "public_dev (train.json)"))
