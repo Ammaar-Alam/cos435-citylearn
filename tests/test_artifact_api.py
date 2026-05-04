@@ -136,7 +136,7 @@ def test_artifact_import_stores_extra_files_alongside_primary(tmp_path: Path) ->
                 "extra_files",
                 (
                     "checkpoint_metadata.json",
-                    b"{\"variant\":\"central_baseline\"}",
+                    b'{"variant":"central_baseline"}',
                     "application/json",
                 ),
             ),
@@ -206,7 +206,7 @@ def test_artifact_import_rejects_bound_central_ppo_sidecar_as_primary(
                 "extra_files",
                 (
                     "checkpoint_metadata.json",
-                    b"{\"variant\":\"central_baseline\"}",
+                    b'{"variant":"central_baseline"}',
                     "application/json",
                 ),
             ),

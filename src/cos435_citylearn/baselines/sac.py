@@ -188,9 +188,7 @@ def _load_imported_checkpoint(
             raise FileNotFoundError(f"SAC checkpoint not found for artifact: {checkpoint_path}")
     else:
         if artifacts_root is None:
-            raise ValueError(
-                "artifacts_root must be set when imported_artifacts_root is provided"
-            )
+            raise ValueError("artifacts_root must be set when imported_artifacts_root is provided")
         checkpoint_path = resolve_imported_checkpoint_path(
             artifact_id=artifact_id,
             imported_artifacts_root=imported_artifacts_root,
@@ -492,7 +490,9 @@ def run_sac(
     training_curve_path = run_dir / "training_curve.csv"
 
     if artifact_id is not None and requested_checkpoint_path is not None:
-        raise ValueError("checkpoint evaluation accepts either artifact_id or checkpoint_path, not both")
+        raise ValueError(
+            "checkpoint evaluation accepts either artifact_id or checkpoint_path, not both"
+        )
 
     label_mismatches: dict[str, tuple[Any, Any]] = {}
     if artifact_id is None and requested_checkpoint_path is None:

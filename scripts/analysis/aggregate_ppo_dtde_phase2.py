@@ -104,11 +104,7 @@ def _require_complete_metric_coverage(
             duplicates.append(key)
         seen.add(key)
 
-    expected = {
-        (split, seed)
-        for split in expected_splits
-        for seed in expected_seeds
-    }
+    expected = {(split, seed) for split in expected_splits for seed in expected_seeds}
     missing = sorted(expected - seen)
     unexpected = sorted(seen - expected)
     if missing or unexpected or duplicates:
@@ -124,9 +120,7 @@ def _require_complete_metric_coverage(
                 "duplicate " + ", ".join(f"{split}/seed{seed}" for split, seed in duplicates)
             )
         details = "; ".join(parts)
-        raise SystemExit(
-            f"incomplete {label} coverage; refusing to write summaries: {details}"
-        )
+        raise SystemExit(f"incomplete {label} coverage; refusing to write summaries: {details}")
 
 
 def _write_csv_rows(path: Path, fieldnames: list[str], rows: list[dict[str, str]]) -> None:
@@ -220,8 +214,7 @@ def _aggregate_released_phase2_row(
     peaks = [float(m["district_kpis"]["daily_peak_average"]) for m in phase2_metrics]
     discomforts = [float(m["district_kpis"]["discomfort_proportion"]) for m in phase2_metrics]
     resiliences = [
-        float(m["district_kpis"]["one_minus_thermal_resilience_proportion"])
-        for m in phase2_metrics
+        float(m["district_kpis"]["one_minus_thermal_resilience_proportion"]) for m in phase2_metrics
     ]
 
     splits = sorted({m["split"] for m in phase2_metrics})
@@ -257,29 +250,33 @@ def _aggregate_released_phase2_row(
 
     inventory_rows: list[dict[str, str]] = []
     for m in sorted(phase2_metrics, key=lambda d: (d["split"], int(d["seed"]), d["run_id"])):
-        inventory_rows.append({
-            "run_id": m["run_id"],
-            # Seed inventory uses .csv sidecars; keep the convention.
-            "file_name": f"{m['run_dir_name']}.csv",
-            "algorithm": m["algorithm"],
-            "variant": m["variant"],
-            "split": m["split"],
-            "eval_group": "released_phase_2_online_eval",
-            "seed": str(m["seed"]),
-            "dataset_name": m["dataset_name"],
-            "average_score": f"{float(m['average_score']):.6f}",
-            "district_cost_total": f"{float(m['district_kpis']['cost_total']):.6f}",
-            "district_carbon_emissions_total": (
-                f"{float(m['district_kpis']['carbon_emissions_total']):.6f}"
-            ),
-            "district_daily_peak_average": f"{float(m['district_kpis']['daily_peak_average']):.6f}",
-            "district_discomfort_proportion": (
-                f"{float(m['district_kpis']['discomfort_proportion']):.6f}"
-            ),
-            "district_one_minus_thermal_resilience_proportion": (
-                f"{float(m['district_kpis']['one_minus_thermal_resilience_proportion']):.6f}"
-            ),
-        })
+        inventory_rows.append(
+            {
+                "run_id": m["run_id"],
+                # Seed inventory uses .csv sidecars; keep the convention.
+                "file_name": f"{m['run_dir_name']}.csv",
+                "algorithm": m["algorithm"],
+                "variant": m["variant"],
+                "split": m["split"],
+                "eval_group": "released_phase_2_online_eval",
+                "seed": str(m["seed"]),
+                "dataset_name": m["dataset_name"],
+                "average_score": f"{float(m['average_score']):.6f}",
+                "district_cost_total": f"{float(m['district_kpis']['cost_total']):.6f}",
+                "district_carbon_emissions_total": (
+                    f"{float(m['district_kpis']['carbon_emissions_total']):.6f}"
+                ),
+                "district_daily_peak_average": (
+                    f"{float(m['district_kpis']['daily_peak_average']):.6f}"
+                ),
+                "district_discomfort_proportion": (
+                    f"{float(m['district_kpis']['discomfort_proportion']):.6f}"
+                ),
+                "district_one_minus_thermal_resilience_proportion": (
+                    f"{float(m['district_kpis']['one_minus_thermal_resilience_proportion']):.6f}"
+                ),
+            }
+        )
 
     return main_row, inventory_rows
 
@@ -307,9 +304,7 @@ def _patch_released_main_csv(new_row: dict[str, str]) -> None:
     phase2 = [r for r in rows if r.get("eval_group") == "released_phase_2_online_eval"]
     try:
         winner_mean = min(
-            float(r["average_score_mean"])
-            for r in phase2
-            if r.get("average_score_mean")
+            float(r["average_score_mean"]) for r in phase2 if r.get("average_score_mean")
         )
     except ValueError:
         winner_mean = None
@@ -335,10 +330,7 @@ def _patch_released_inventory_csv(new_rows: list[dict[str, str]]) -> None:
     """
     existing: list[dict[str, str]] = []
     fieldnames: list[str] = []
-    drop_keys = {
-        (r["algorithm"], r["variant"], r["eval_group"])
-        for r in new_rows
-    }
+    drop_keys = {(r["algorithm"], r["variant"], r["eval_group"]) for r in new_rows}
     with RELEASED_INVENTORY_CSV.open(newline="") as f:
         reader = csv.DictReader(f)
         fieldnames = list(reader.fieldnames or [])
@@ -384,6 +376,7 @@ def _load_phase3_per_split_means(
     queries).
     """
     from collections import defaultdict
+
     # Map (split, seed) -> first score seen, to dedupe re-run eval artifacts
     # that share an artifact_id with identical scores.
     seen: dict[tuple[str, int], float] = {}
@@ -414,11 +407,7 @@ def _load_phase3_per_split_means(
         by_split[split].append(score)
 
     label = {"phase_3_1": "p3_1", "phase_3_2": "p3_2", "phase_3_3": "p3_3"}
-    return {
-        label[s]: sum(v) / len(v)
-        for s, v in by_split.items()
-        if s in label
-    }
+    return {label[s]: sum(v) / len(v) for s, v in by_split.items() if s in label}
 
 
 # Cross-split row identity for every tracked method. Each entry maps a display
@@ -465,6 +454,7 @@ def _rebuild_cross_split_from_inventory() -> None:
 
     # Group inventory by (algorithm, variant, split) -> list of scores.
     from collections import defaultdict
+
     by_key: dict[tuple[str, str, str], list[float]] = defaultdict(list)
     for r in inv_rows:
         try:

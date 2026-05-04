@@ -2,6 +2,27 @@
 
 These files are the clean tracked summary of the raw outputs under `results/`. Raw run directories, checkpoints, rollout traces, and downloaded Drive bundles remain outside git.
 
+## Canonical refresh path
+
+Regenerate this directory from normalized local outputs with:
+
+```bash
+make submission-results
+```
+
+Then refresh report figures with:
+
+```bash
+make figures
+make cross-figures
+make cross-table
+```
+
+The exporter expects the raw metric CSVs, released-eval metric rows, and sweep
+summary inputs to already exist under ignored `results/` directories. It should
+fail rather than silently writing incomplete final tables when required coverage
+is missing.
+
 ## Files in this directory
 
 - `local_main_results.csv` - tracked method-level summary rows for local `public_dev`
@@ -15,6 +36,16 @@ These files are the clean tracked summary of the raw outputs under `results/`. R
 - `ppo_shared_sweep_inventory.csv` - per-run shared-PPO sweep inventory with KPI columns
 - `official_benchmark_reference.csv` - published CityLearn 2023 reference numbers
 - `figure_manifest.csv` - tracked report figure inventory
+
+## Report claim map
+
+- `method_comparison.csv` backs the local method comparison headline and final report method table.
+- `local_main_results.csv` backs seed counts, means, standard deviations, and confidence intervals on `public_dev`.
+- `released_eval_main_results.csv` backs released phase-2 and phase-3 held-out claims.
+- `cross_split_scores.csv` backs the public-dev versus released-eval generalization comparison.
+- `sac_ablation_summary.csv` and `sac_seed_inventory.csv` back SAC reward and seed ablations.
+- `ppo_shared_sweep_summary.csv` and `ppo_shared_sweep_inventory.csv` back the shared-PPO learning-rate sweep discussion.
+- `official_benchmark_reference.csv` is context only; it is not mixed into local or released-eval means.
 
 ## Local public_dev snapshot
 

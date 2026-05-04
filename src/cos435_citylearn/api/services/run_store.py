@@ -57,7 +57,8 @@ class RunStore:
             "rollout_trace": trace_path.exists(),
             "trace_steps": trace_steps,
             "checkpoint": checkpoint_path.exists() or bool(manifest.get("checkpoint_path")),
-            "training_curve": training_curve_path.exists() or bool(manifest.get("training_curve_path")),
+            "training_curve": training_curve_path.exists()
+            or bool(manifest.get("training_curve_path")),
             "playback": bool(manifest.get("playback_path")),
             "simulation_export": bool(simulation_dir),
             "gif": bool(media.get("gif_path")),

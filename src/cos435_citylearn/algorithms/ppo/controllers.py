@@ -42,9 +42,7 @@ def assert_minibatch_fits_rollout(
         )
 
 
-def normalize_rollout_advantages(
-    advantages: np.ndarray, *, enabled: bool
-) -> np.ndarray:
+def normalize_rollout_advantages(advantages: np.ndarray, *, enabled: bool) -> np.ndarray:
     """Zero-center and unit-variance scale a flat advantage array when enabled.
 
     PPO additionally normalizes per-minibatch inside
@@ -222,9 +220,7 @@ class SharedPPOController(RLC):
         observation: Sequence[float],
         shared_context: np.ndarray,
     ) -> np.ndarray:
-        stacked = np.hstack(
-            self.encoders[index] * np.asarray(observation, dtype="float32")
-        )
+        stacked = np.hstack(self.encoders[index] * np.asarray(observation, dtype="float32"))
         encoded = np.asarray(
             [value for value in stacked if value is not None],
             dtype="float32",

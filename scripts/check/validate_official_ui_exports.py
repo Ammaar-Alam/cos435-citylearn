@@ -41,9 +41,7 @@ def _read_csv_rows(path: Path) -> list[dict[str, str]]:
 
 def _validate_simulation_dir(simulation_dir: Path) -> dict[str, object]:
     if simulation_dir.parent.name != "SimulationData":
-        raise ValueError(
-            f"{simulation_dir} is not directly under a SimulationData root"
-        )
+        raise ValueError(f"{simulation_dir} is not directly under a SimulationData root")
 
     grouped_files: dict[str, dict[str, Path]] = {}
     for file_path in sorted(simulation_dir.iterdir()):

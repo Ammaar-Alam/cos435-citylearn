@@ -98,9 +98,7 @@ def test_iter_minibatches_normalize_advantage_true_zero_centers_unit_variance() 
     buffer = _populate_buffer_with_constant_advantages(advantages)
 
     batch = next(
-        iter(
-            buffer.iter_minibatches(batch_size=4, shuffle=False, normalize_advantage=True)
-        )
+        iter(buffer.iter_minibatches(batch_size=4, shuffle=False, normalize_advantage=True))
     )
     adv = batch["advantages"].cpu().numpy()
     assert np.isclose(adv.mean(), 0.0, atol=1e-5)
@@ -112,9 +110,7 @@ def test_iter_minibatches_normalize_advantage_false_preserves_raw_values() -> No
     buffer = _populate_buffer_with_constant_advantages(advantages)
 
     batch = next(
-        iter(
-            buffer.iter_minibatches(batch_size=4, shuffle=False, normalize_advantage=False)
-        )
+        iter(buffer.iter_minibatches(batch_size=4, shuffle=False, normalize_advantage=False))
     )
     adv = batch["advantages"].cpu().numpy().reshape(-1)
     np.testing.assert_allclose(adv, advantages.reshape(-1), atol=1e-6)

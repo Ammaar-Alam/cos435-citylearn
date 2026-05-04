@@ -10,9 +10,16 @@ These files are the shared config surface for the implemented benchmark paths.
 The files here are live inputs to the repo runners:
 
 - `train/rbc/rbc_builtin.yaml` drives the built-in RBC path
+- `train/ppo/*.yaml` drives the centralized and shared-parameter PPO runners
+- `train/ppo/*_smoke.yaml` are intentionally tiny configs for test coverage only
 - `train/sac/*.yaml` drives the centralized and shared SAC runners
 - `train/sac/*_smoke.yaml` are intentionally tiny configs for test coverage only
 - `eval/default.yaml` is the normal full-eval path
-- `eval/sac_smoke.yaml` disables simulation export and caps evaluation steps for fast SAC smoke runs
+- `eval/official_released.yaml` is the released phase-2 and phase-3 evaluation path
+- `eval/sac_smoke.yaml` disables simulation export and caps evaluation steps for fast PPO/SAC smoke runs
 
-PPO remains a placeholder config contract. SAC configs are real and are launchable either through `scripts/train/run_sac.py`, the Make targets, or the dashboard runner registry for the exposed variants.
+RBC, PPO, and SAC configs are live runner inputs. They are launchable through
+the scripts under `scripts/train/`, the Make targets in the repo root, and the
+dashboard runner registry for the exposed variants. Centralized PPO/SAC configs
+are fixed-topology references for `public_dev`; shared PPO/SAC configs are the
+portable variants used for released phase-3 cross-topology evaluation.

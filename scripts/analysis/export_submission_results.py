@@ -386,9 +386,7 @@ def _summarize_rows(rows: list[MetricRow]) -> MetricSummary:
     carbons = [row.district_carbon_emissions_total for row in ordered_rows]
     peaks = [row.district_daily_peak_average for row in ordered_rows]
     discomforts = [row.district_discomfort_proportion for row in ordered_rows]
-    resiliences = [
-        row.district_one_minus_thermal_resilience_proportion for row in ordered_rows
-    ]
+    resiliences = [row.district_one_minus_thermal_resilience_proportion for row in ordered_rows]
 
     return MetricSummary(
         algorithm=ordered_rows[0].algorithm,
@@ -416,9 +414,7 @@ def _summarize_released_rows(scope: str, rows: list[MetricRow]) -> ReleasedSumma
     carbons = [row.district_carbon_emissions_total for row in ordered_rows]
     peaks = [row.district_daily_peak_average for row in ordered_rows]
     discomforts = [row.district_discomfort_proportion for row in ordered_rows]
-    resiliences = [
-        row.district_one_minus_thermal_resilience_proportion for row in ordered_rows
-    ]
+    resiliences = [row.district_one_minus_thermal_resilience_proportion for row in ordered_rows]
 
     return ReleasedSummary(
         algorithm=ordered_rows[0].algorithm,
@@ -510,12 +506,8 @@ def _build_local_results_rows(
             "district_carbon_emissions_total_mean": round(
                 rbc_row.district_carbon_emissions_total, 6
             ),
-            "district_daily_peak_average_mean": round(
-                rbc_row.district_daily_peak_average, 6
-            ),
-            "district_discomfort_proportion_mean": round(
-                rbc_row.district_discomfort_proportion, 6
-            ),
+            "district_daily_peak_average_mean": round(rbc_row.district_daily_peak_average, 6),
+            "district_discomfort_proportion_mean": round(rbc_row.district_discomfort_proportion, 6),
             "district_one_minus_thermal_resilience_proportion_mean": round(
                 rbc_row.district_one_minus_thermal_resilience_proportion, 6
             ),
@@ -529,9 +521,7 @@ def _build_local_results_rows(
         delta = rbc_score - summary.average_score_mean
         evidence_level = _evidence_level(len(summary.rows))
         if summary.algorithm == "ppo" and summary.variant == "ppo_shared_dtde_reward_v2":
-            note = (
-                "PPO DTDE learning-rate sweep; best public_dev learning rate selected per seed"
-            )
+            note = "PPO DTDE learning-rate sweep; best public_dev learning rate selected per seed"
         elif summary.algorithm == "ppo" and summary.variant == "ppo_central_baseline":
             note = "local phase_2 PPO baseline run"
         elif evidence_level == "claim_run":
@@ -564,9 +554,7 @@ def _build_local_results_rows(
                 "best_average_score": round(summary.best_average_score, 6),
                 "worst_average_score": round(summary.worst_average_score, 6),
                 "delta_vs_local_rbc_mean": round(delta, 6),
-                "pct_improvement_vs_local_rbc_mean": round(
-                    delta / rbc_score * 100.0, 2
-                ),
+                "pct_improvement_vs_local_rbc_mean": round(delta / rbc_score * 100.0, 2),
                 "district_cost_total_mean": round(summary.district_cost_total_mean, 6),
                 "district_carbon_emissions_total_mean": round(
                     summary.district_carbon_emissions_total_mean, 6
@@ -596,9 +584,7 @@ def _build_sac_ablation_rows(
 
     rows = []
     for summary in sac_summaries:
-        delta_vs_baseline = (
-            central_baseline.average_score_mean - summary.average_score_mean
-        )
+        delta_vs_baseline = central_baseline.average_score_mean - summary.average_score_mean
         rows.append(
             {
                 "variant": summary.variant,
@@ -649,15 +635,9 @@ def _build_seed_inventory_rows(sac_rows: list[MetricRow]) -> list[dict[str, obje
                 "dataset_name": row.dataset_name,
                 "average_score": round(row.average_score, 6),
                 "district_cost_total": round(row.district_cost_total, 6),
-                "district_carbon_emissions_total": round(
-                    row.district_carbon_emissions_total, 6
-                ),
-                "district_daily_peak_average": round(
-                    row.district_daily_peak_average, 6
-                ),
-                "district_discomfort_proportion": round(
-                    row.district_discomfort_proportion, 6
-                ),
+                "district_carbon_emissions_total": round(row.district_carbon_emissions_total, 6),
+                "district_daily_peak_average": round(row.district_daily_peak_average, 6),
+                "district_discomfort_proportion": round(row.district_discomfort_proportion, 6),
                 "district_one_minus_thermal_resilience_proportion": round(
                     row.district_one_minus_thermal_resilience_proportion, 6
                 ),
@@ -759,15 +739,9 @@ def _build_released_seed_inventory_rows(
                 "dataset_name": row.dataset_name,
                 "average_score": round(row.average_score, 6),
                 "district_cost_total": round(row.district_cost_total, 6),
-                "district_carbon_emissions_total": round(
-                    row.district_carbon_emissions_total, 6
-                ),
-                "district_daily_peak_average": round(
-                    row.district_daily_peak_average, 6
-                ),
-                "district_discomfort_proportion": round(
-                    row.district_discomfort_proportion, 6
-                ),
+                "district_carbon_emissions_total": round(row.district_carbon_emissions_total, 6),
+                "district_daily_peak_average": round(row.district_daily_peak_average, 6),
+                "district_discomfort_proportion": round(row.district_discomfort_proportion, 6),
                 "district_one_minus_thermal_resilience_proportion": round(
                     row.district_one_minus_thermal_resilience_proportion, 6
                 ),
@@ -844,15 +818,9 @@ def _build_ppo_sweep_inventory_rows(ppo_rows: list[PpoSweepRow]) -> list[dict[st
                 "dataset_name": metric.dataset_name,
                 "average_score": round(metric.average_score, 6),
                 "district_cost_total": round(metric.district_cost_total, 6),
-                "district_carbon_emissions_total": round(
-                    metric.district_carbon_emissions_total, 6
-                ),
-                "district_daily_peak_average": round(
-                    metric.district_daily_peak_average, 6
-                ),
-                "district_discomfort_proportion": round(
-                    metric.district_discomfort_proportion, 6
-                ),
+                "district_carbon_emissions_total": round(metric.district_carbon_emissions_total, 6),
+                "district_daily_peak_average": round(metric.district_daily_peak_average, 6),
+                "district_discomfort_proportion": round(metric.district_discomfort_proportion, 6),
                 "district_one_minus_thermal_resilience_proportion": round(
                     metric.district_one_minus_thermal_resilience_proportion, 6
                 ),
@@ -898,8 +866,7 @@ def _write_status_markdown(
         (summary.variant, summary.scope): summary for summary in released_group_summaries
     }
     local_by_key = {
-        (summary.algorithm, summary.variant, summary.split): summary
-        for summary in method_summaries
+        (summary.algorithm, summary.variant, summary.split): summary for summary in method_summaries
     }
     released_split_by_key = {
         (summary.variant, summary.scope): summary for summary in released_split_summaries
@@ -975,9 +942,7 @@ def _write_status_markdown(
             f"`{len(shared_phase_3.rows)}` eval jobs."
         )
 
-    ppo_public_rows = [
-        row for row in ppo_sweep_summary_rows if row["split"] == "public_dev"
-    ]
+    ppo_public_rows = [row for row in ppo_sweep_summary_rows if row["split"] == "public_dev"]
     ppo_public_rows.sort(key=lambda row: row["lr"])
     ppo_public_text = "\n".join(
         (
