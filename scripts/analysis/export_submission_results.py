@@ -378,7 +378,11 @@ def _evidence_level(seed_count: int) -> str:
     return "single_seed"
 
 
-def _variant_label(variant: str) -> str:
+def _variant_label(variant: str, algorithm: str | None = None) -> str:
+    if algorithm is not None:
+        algorithm_label = VARIANT_LABELS.get(f"{algorithm}_{variant}")
+        if algorithm_label is not None:
+            return algorithm_label
     return VARIANT_LABELS.get(variant, variant.replace("_", " "))
 
 
@@ -556,7 +560,7 @@ def _build_local_results_rows(
                     summary.variant,
                     summary.split,
                 ),
-                "method_label": _variant_label(summary.variant),
+                "method_label": _variant_label(summary.variant, summary.algorithm),
                 "status": "measured",
                 "evidence_level": evidence_level,
                 "algorithm": summary.algorithm,
@@ -603,7 +607,7 @@ def _build_sac_ablation_rows(
         rows.append(
             {
                 "variant": summary.variant,
-                "method_label": _variant_label(summary.variant),
+                "method_label": _variant_label(summary.variant, summary.algorithm),
                 "seed_count": len(summary.rows),
                 "evidence_level": _evidence_level(len(summary.rows)),
                 "average_score_mean": round(summary.average_score_mean, 6),
@@ -702,7 +706,7 @@ def _build_released_main_rows(
                     summary.variant,
                     summary.scope,
                 ),
-                "method_label": _variant_label(summary.variant),
+                "method_label": _variant_label(summary.variant, summary.algorithm),
                 "algorithm": summary.algorithm,
                 "variant": summary.variant,
                 "eval_group": summary.scope,
@@ -783,7 +787,7 @@ def _build_ppo_sweep_summary_rows(ppo_rows: list[SharedSweepRow]) -> list[dict[s
         rows.append(
             {
                 "method_id": f"ppo_{summary.variant}_{lr}_{split}",
-                "method_label": _variant_label(summary.variant),
+                "method_label": _variant_label(summary.variant, summary.algorithm),
                 "algorithm": summary.algorithm,
                 "variant": summary.variant,
                 "lr": lr,
@@ -837,7 +841,7 @@ def _build_shared_sweep_summary_rows(shared_rows: list[SharedSweepRow]) -> list[
         rows.append(
             {
                 "method_id": f"{algorithm}_{summary.variant}_{lr}_{split}",
-                "method_label": _variant_label(summary.variant),
+                "method_label": _variant_label(summary.variant, summary.algorithm),
                 "algorithm": summary.algorithm,
                 "variant": summary.variant,
                 "lr": lr,
@@ -971,15 +975,17 @@ def _write_status_markdown(
         )
 
     def line(summary: MetricSummary) -> str:
+        label = _variant_label(summary.variant, summary.algorithm)
         return (
-            f"- {_variant_label(summary.variant)}: mean `{summary.average_score_mean:.6f}`, std "
+            f"- {label}: mean `{summary.average_score_mean:.6f}`, std "
             f"`{summary.average_score_std:.6f}`, 95% CI `{summary.average_score_ci95:.6f}`, "
             f"seeds `{len(summary.rows)}`"
         )
 
     def released_line(summary: ReleasedSummary) -> str:
+        label = _variant_label(summary.variant, summary.algorithm)
         return (
-            f"- {_variant_label(summary.variant)} on `{summary.scope}`: mean "
+            f"- {label} on `{summary.scope}`: mean "
             f"`{summary.average_score_mean:.6f}`, std `{summary.average_score_std:.6f}`, "
             f"95% CI `{summary.average_score_ci95:.6f}`, eval jobs `{len(summary.rows)}`, "
             f"seeds `{len({row.seed for row in summary.rows})}`"
