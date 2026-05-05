@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import logging
 from pathlib import Path
 
@@ -10,6 +11,10 @@ from cos435_citylearn.algorithms.td3.checkpoints import (
     validate_td3_checkpoint_env_compatibility,
     validate_td3_checkpoint_payload_structure,
     validate_td3_checkpoint_runner_compatibility,
+)
+from cos435_citylearn.algorithms.td3.controllers import (
+    SharedTD3Controller,
+    _restore_time_state,
 )
 
 
@@ -71,6 +76,23 @@ def _matching_runner_config() -> dict[str, object]:
         "reward": {"version": "reward_v2"},
         "features": {"version": "shared_district_context_v2"},
     }
+
+
+def test_restore_time_state_resets_citylearn_private_state() -> None:
+    class DummyController:
+        action_space = [object(), object()]
+
+    controller = DummyController()
+
+    _restore_time_state(controller, restored_time_step=3)
+
+    assert controller._Environment__time_step == 3
+    assert controller._Agent__actions == [[[], [], [], []], [[], [], [], []]]
+
+
+def test_shared_td3_checkpoint_load_restores_time_step() -> None:
+    source = inspect.getsource(SharedTD3Controller.load_checkpoint_state)
+    assert '_restore_time_state(self, restored_time_step=int(payload["time_step"]))' in source
 
 
 def test_safe_load_td3_checkpoint_payload_uses_weights_only(monkeypatch, tmp_path: Path) -> None:

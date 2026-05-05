@@ -33,6 +33,13 @@ def _soft_update(target: nn.Module, source: nn.Module, tau: float) -> None:
         target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau)
 
 
+def _restore_time_state(controller: Any, *, restored_time_step: int) -> None:
+    controller._Environment__time_step = restored_time_step
+    controller._Agent__actions = [
+        [[] for _ in range(restored_time_step + 1)] for _ in controller.action_space
+    ]
+
+
 class SharedTD3Controller(RLC):
     def __init__(
         self,
@@ -417,6 +424,7 @@ class SharedTD3Controller(RLC):
         }
 
     def load_checkpoint_state(self, payload: dict[str, Any]) -> None:
+        _restore_time_state(self, restored_time_step=int(payload["time_step"]))
         self.normalized = bool(payload["normalized"])
         self.total_updates = int(payload["total_updates"])
         self.norm_mean = (

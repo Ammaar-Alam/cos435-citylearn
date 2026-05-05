@@ -499,6 +499,7 @@ def _run_central_td3(
     max_steps = eval_config["evaluation"].get("max_steps")
     max_steps = None if max_steps is None else int(max_steps)
     trace_limit = int(config["evaluation"].get("trace_limit", 96))
+    save_rollout_trace = bool(config["evaluation"].get("save_rollout_trace", True))
     rollout_trace: list[dict[str, Any]] = []
     obs, _ = raw_eval_env.reset()
     done = False
@@ -509,7 +510,7 @@ def _run_central_td3(
         normalized = np.clip((obs - obs_mean) / np.sqrt(obs_var + obs_eps), -clip_obs, clip_obs)
         action, _ = model.predict(normalized, deterministic=deterministic)
         obs, _, terminated, truncated, info = raw_eval_env.step(action)
-        if len(rollout_trace) < trace_limit:
+        if save_rollout_trace and len(rollout_trace) < trace_limit:
             rollout_trace.append(
                 {
                     "step": step_index,
@@ -561,7 +562,8 @@ def _run_central_td3(
         manifest["job_dir"] = str(Path(job_dir))
     write_json(run_dir / "manifest.json", manifest)
     write_json(run_dir / "metrics.json", metrics_payload)
-    write_json(run_dir / "rollout_trace.json", rollout_trace)
+    if save_rollout_trace:
+        write_json(run_dir / "rollout_trace.json", rollout_trace)
     write_csv_row(metrics_dir / f"{run_id}.csv", row)
     write_json(
         manifests_dir / "environment_lock.json",

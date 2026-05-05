@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import inspect
 from types import SimpleNamespace
 
 import pytest
 
+import cos435_citylearn.baselines.td3 as td3_module
 from cos435_citylearn.baselines.td3 import (
     _build_central_td3_sidecar,
     _validate_central_td3_sidecar,
@@ -33,6 +35,19 @@ def test_central_td3_sidecar_captures_runtime_labels() -> None:
     assert sidecar["reward_version"] == "reward_v2"
     assert sidecar["features_version"] == "base_central_obs"
     assert sidecar["format_version"] == 1
+
+
+def test_central_td3_respects_save_rollout_trace_flag() -> None:
+    source = inspect.getsource(td3_module._run_central_td3)
+    assert (
+        'save_rollout_trace = bool(config["evaluation"].get("save_rollout_trace", True))'
+        in source
+    )
+    assert "if save_rollout_trace and len(rollout_trace) < trace_limit:" in source
+    assert (
+        'if save_rollout_trace:\n        write_json(run_dir / "rollout_trace.json", rollout_trace)'
+        in source
+    )
 
 
 def test_central_td3_sidecar_rejects_label_mismatch_without_flag() -> None:
