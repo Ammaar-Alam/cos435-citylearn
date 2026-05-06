@@ -30,8 +30,20 @@ def main() -> None:
         default="ppo,sac,td3",
         help="comma-separated algos expected in the sweep",
     )
-    parser.add_argument("--lrs", default="1e-4,3e-4", help="comma-separated lrs expected per algo")
-    parser.add_argument("--seeds", default="0-9", help="seed range (e.g. 0-9) or comma list")
+    parser.add_argument(
+        "--lrs",
+        default="1e-5,3e-5,1e-4,2e-4,3e-4,5e-4,1e-3,3e-3",
+        help="comma-separated lrs expected per algo",
+    )
+    parser.add_argument("--seeds", default="0-2", help="seed range (e.g. 0-2) or comma list")
+    parser.add_argument(
+        "--eval-splits",
+        default=(
+            "phase_2_online_eval_1,phase_2_online_eval_2,phase_2_online_eval_3,"
+            "phase_3_1,phase_3_2,phase_3_3"
+        ),
+        help="comma-separated held-out splits expected for every trained cell",
+    )
     parser.add_argument(
         "--allow-missing",
         action="store_true",
@@ -68,7 +80,7 @@ def main() -> None:
                 "average_score": train.get("average_score"),
             }
         )
-        for split in ("phase_3_1", "phase_3_2", "phase_3_3"):
+        for split in [s for s in args.eval_splits.split(",") if s]:
             eval_payload = _read(cell_dir / f"eval_{split}.json")
             if eval_payload is None:
                 continue
@@ -85,6 +97,7 @@ def main() -> None:
 
     expected_algos = [a for a in args.algos.split(",") if a]
     expected_lrs = [lr for lr in args.lrs.split(",") if lr]
+    expected_splits = [split for split in args.eval_splits.split(",") if split]
     if "-" in args.seeds:
         lo, hi = (int(x) for x in args.seeds.split("-", 1))
         expected_seeds = list(range(lo, hi + 1))
@@ -103,7 +116,7 @@ def main() -> None:
         cell_dir = sweep_root / f"{algo}_lr{lr}_seed{seed}"
         if _read(cell_dir / "train.json") is None:
             missing_splits.append((algo, lr, seed, "public_dev (train.json)"))
-        for split in ("phase_3_1", "phase_3_2", "phase_3_3"):
+        for split in expected_splits:
             if _read(cell_dir / f"eval_{split}.json") is None:
                 missing_splits.append((algo, lr, seed, split))
 

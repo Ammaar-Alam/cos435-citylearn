@@ -42,6 +42,8 @@ def test_aggregate_sweep_ignores_unexpected_cells_for_missing_split_checks(tmp_p
             "1e-4",
             "--seeds",
             "0-0",
+            "--eval-splits",
+            "phase_3_1,phase_3_2,phase_3_3",
         ],
         capture_output=True,
         text=True,

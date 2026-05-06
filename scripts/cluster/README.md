@@ -1,8 +1,9 @@
 # cluster sweep scripts (Neuronic)
 
-60-cell robust sweep for the final project: 3 algos x 2 lrs x 10 seeds.
+72-cell hyperparameter-first sweep for the final project: 3 algos x 8 lrs x 3 seeds.
 Trains shared-parameter PPO, shared-parameter SAC, and shared-parameter TD3 on `public_dev`,
-then cross-topology evaluates each checkpoint on `phase_3_{1,2,3}`.
+then evaluates each checkpoint on the released `phase_2_online_eval_{1,2,3}` and
+`phase_3_{1,2,3}` splits.
 
 ## one-time setup
 
@@ -17,29 +18,22 @@ bash scripts/cluster/setup_neuronic.sh
 ```
 
 `setup_neuronic.sh` clones the repo (if needed), installs the venv via
-`uv`, pulls the CityLearn 2023 phase_2_local_evaluation (public_dev
-training) and phase_3_{1,2,3} (cross-topology eval) datasets, validates
-the env schema, and, importantly, provisions `results/sweep/` before
-any `sbatch` call so SLURM's `--output`/`--error` paths resolve on a
-fresh checkout.
+`uv`, pulls the CityLearn 2023 `public_dev`, released phase-2, and phase-3
+datasets, validates the env schema, and provisions `results/sweep/` before any
+direct `sbatch` call so SLURM's fallback `--output`/`--error` paths resolve on
+a fresh checkout.
 
 Override branches with `BRANCH=<branch-name> bash scripts/cluster/setup_neuronic.sh`.
 
-Override the install root with `ROOT_DIR=/some/other/path bash scripts/cluster/setup_neuronic.sh`. The
-shell-level pieces (`setup_neuronic.sh`, `submit_sweep.sh`, the body of
-`sweep.slurm` / `rerun_evals.slurm`, `run_cell.sh`, `rerun_eval_cell.sh`)
-honor `${ROOT_DIR:-/u/${USER}/cos435-citylearn}`, so the checkout and
-the per-cell JSON outputs track the override.
+Override the install root with `ROOT_DIR=/some/other/path bash scripts/cluster/setup_neuronic.sh`.
+The shell-level pieces honor `${ROOT_DIR:-/u/${USER}/cos435-citylearn}` for
+the checkout and `${SWEEP_ROOT}` for sweep artifacts.
 
-**One caveat:** `#SBATCH --output=` / `--error=` are parsed by SLURM
-*before* the job body runs, and SLURM does not expand shell variables
-there; only its own format codes (`%u`, `%A`, `%a`, `%j`). The two
-`.slurm` drivers therefore hardcode
-`/u/%u/cos435-citylearn/results/sweep/slurm-%A_%a.out` for stdout/stderr
-even when `$ROOT_DIR` points elsewhere. If you're running from a
-non-default root, either create a symlink (`ln -s $ROOT_DIR/results/sweep
-/u/$USER/cos435-citylearn/results/sweep`) or edit the `#SBATCH`
-directives to hardcode the new path.
+`submit_sweep.sh` writes durable artifacts to
+`/n/fs/pvl-lidar/cache/$USER/citylearn/sweeps/$SWEEP_ID` by default and
+overrides SLURM stdout/stderr paths to land under that same sweep root. Direct
+`sbatch scripts/cluster/sweep.slurm` still works, but then outputs fall back to
+`$ROOT_DIR/results/sweep`.
 
 Note: we use `/u/$USER/` (NFS-shared home) instead of `/scratch/` because
 `/scratch` is node-local on Neuronic, so compute nodes can't see files
@@ -52,40 +46,38 @@ cd /u/$USER/cos435-citylearn
 bash scripts/cluster/submit_sweep.sh
 ```
 
-The wrapper is the canonical entry point: it runs `mkdir -p
-"$ROOT_DIR/results/sweep"` (redundant with `setup_neuronic.sh` but safe
-on re-submits) and forwards to `sbatch scripts/cluster/sweep.slurm`. You
-can pass extra flags through, eg. `bash scripts/cluster/submit_sweep.sh
---export=ALGO=sac,ALL JOB=rerun_evals`.
+The wrapper is the canonical entry point: it creates the pvl-lidar sweep root,
+exports `ROOT_DIR`/`SWEEP_ROOT`, and forwards to `sbatch scripts/cluster/sweep.slurm`.
+Set `SWEEP_ID=lr-screen-r1` to choose a stable output directory. You can pass
+extra flags through, eg. `JOB=rerun_evals ALGO=sac bash scripts/cluster/submit_sweep.sh`.
 
 Calling `sbatch scripts/cluster/sweep.slurm` directly still works once
 `results/sweep/` exists.
 
-The array dispatches **60 tasks** (3 algos x 2 lrs x 10 seeds), each
-requesting 4 CPUs and 8 GB RAM (no GPU; this workload is CPU-bound).
+The array dispatches **72 tasks** (3 algos x 8 lrs x 3 seeds), capped at 72
+concurrent tasks. Each task requests 4 CPUs and 12 GB RAM (no GPU; this
+workload is mostly CPU-bound).
 Array id decomposes as:
 
-- `algo_idx = id / 20` -> 0=ppo, 1=sac, 2=td3
-- `lr_idx   = (id%20)/10` -> 0=1e-4, 1=3e-4
-- `seed     = id % 10` -> 0..9
+- `algo_idx = id / 24` -> 0=ppo, 1=sac, 2=td3
+- `lr_idx   = (id%24)/3` -> `1e-5,3e-5,1e-4,2e-4,3e-4,5e-4,1e-3,3e-3`
+- `seed_idx = id % 3` -> seeds `0,1,2`
 
-Each cell trains on `public_dev` (~50 min), saves a checkpoint, then
-cross-topology evals on `phase_3_{1,2,3}`. Per-cell outputs land in
-`results/sweep/<algo>_lr<lr>_seed<n>/{train,eval_phase_3_*}.json`.
+Each cell trains on `public_dev`, saves a checkpoint, then evaluates released
+phase-2 and phase-3 splits. Per-cell outputs land in
+`$SWEEP_ROOT/<algo>_lr<lr>_seed<n>/{train,eval_phase_*}.json`; checkpoints and
+metrics land under `$SWEEP_ROOT/{runs,metrics,manifests}`.
 
-`results/sweep/` is gitignored; the shared source of truth for sweep
-outputs is the `COS 435/erik/...` Google Drive folder. Mirror each run's
-JSONs and `summary.csv` there after aggregation. Commit only normalized
-summary rows under `submission/results/`.
+`results/sweep/` and pvl-lidar sweep roots are untracked raw artifacts. Commit
+only normalized summary rows under `submission/results/`.
 
-Total wall time should be ~50 min if enough CPUs are free
-(60 x 4 = 240 CPUs; the cluster usually has >1000 idle).
+The full cap is 72 x 4 = 288 active CPUs.
 
 ## monitor
 
 ```bash
 squeue -u $USER
-tail -f results/sweep/slurm-<jobid>_<taskid>.out
+tail -f /n/fs/pvl-lidar/cache/$USER/citylearn/sweeps/<sweep-id>/logs/slurm-<jobid>_<taskid>.out
 ```
 
 ## aggregate
@@ -93,8 +85,10 @@ tail -f results/sweep/slurm-<jobid>_<taskid>.out
 When the array completes:
 
 ```bash
-python scripts/cluster/aggregate_sweep.py
-cat results/sweep/summary.csv
+python scripts/cluster/aggregate_sweep.py \
+  --sweep-root "$SWEEP_ROOT" \
+  --out "$SWEEP_ROOT/summary.csv"
+cat "$SWEEP_ROOT/summary.csv"
 ```
 
 This fails loudly if any expected cell or split is missing. To force
@@ -103,8 +97,8 @@ a partial aggregation pass `--allow-missing`.
 The CSV has one row per (algo, lr, seed, split) with the
 `average_score` from that cell. Group by `(algo, lr, split)` for
 mean +/- std across seeds. Pick the best `lr` per algo on `public_dev`,
-then report the `phase_3_*` numbers of that configuration in the
-final writeup.
+then report the released phase-2 and phase-3 numbers of that configuration in
+the final writeup.
 
 ## artifact boundary
 
