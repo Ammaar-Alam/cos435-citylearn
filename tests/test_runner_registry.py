@@ -45,3 +45,8 @@ def test_td3_runners_are_launchable_and_checkpoint_evaluable() -> None:
     assert RUNNERS["td3_central_baseline"].supports_checkpoint_eval is True
     assert RUNNERS["td3_shared_dtde_reward_v2"].launchable is True
     assert RUNNERS["td3_shared_dtde_reward_v2"].supports_checkpoint_eval is True
+
+
+def test_mappo_runner_is_launchable_and_checkpoint_evaluable() -> None:
+    assert RUNNERS["mappo_shared_ctde_reward_v2"].launchable is True
+    assert RUNNERS["mappo_shared_ctde_reward_v2"].supports_checkpoint_eval is True

@@ -1,0 +1,21 @@
+env:
+  base_config: configs/env/citylearn_2023.yaml
+  split: public_dev
+
+evaluation:
+  controller_ref: null
+  eval_episodes: 1
+  deterministic: true
+  max_steps: 64
+  save_rollout_trace: true
+  save_raw_kpis: true
+  save_challenge_metrics: true
+  export_simulation_data: false
+  capture_render_frames: false
+  max_render_frames: 8
+  render_frame_width: 640
+
+logging:
+  metrics_root: results/metrics
+  tables_root: results/tables
+  manifests_root: results/manifests

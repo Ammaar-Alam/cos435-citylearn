@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from cos435_citylearn.api.workloads.eval_builtin_rbc import run as run_eval_builtin_rbc
+from cos435_citylearn.api.workloads.eval_mappo_checkpoint import run as run_eval_mappo_checkpoint
 from cos435_citylearn.api.workloads.eval_ppo_checkpoint import run as run_eval_ppo_checkpoint
 from cos435_citylearn.api.workloads.eval_sac_checkpoint import run as run_eval_sac_checkpoint
 from cos435_citylearn.api.workloads.eval_td3_checkpoint import run as run_eval_td3_checkpoint
 
 WORKLOADS = {
     "eval_builtin_rbc": run_eval_builtin_rbc,
+    "eval_mappo_checkpoint": run_eval_mappo_checkpoint,
     "eval_ppo_checkpoint": run_eval_ppo_checkpoint,
     "eval_sac_checkpoint": run_eval_sac_checkpoint,
     "eval_td3_checkpoint": run_eval_td3_checkpoint,

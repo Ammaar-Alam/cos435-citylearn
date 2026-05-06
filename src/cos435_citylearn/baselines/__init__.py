@@ -19,4 +19,10 @@ def run_td3(*args, **kwargs):
     return _run_td3(*args, **kwargs)
 
 
-__all__ = ["run_rbc", "run_sac", "run_ppo", "run_td3"]
+def run_mappo(*args, **kwargs):
+    from cos435_citylearn.baselines.mappo import run_mappo as _run_mappo
+
+    return _run_mappo(*args, **kwargs)
+
+
+__all__ = ["run_rbc", "run_sac", "run_ppo", "run_td3", "run_mappo"]

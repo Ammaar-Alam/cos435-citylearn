@@ -142,3 +142,17 @@ python scripts/cluster/aggregate_final_sweep.py \
   --sweep-root "$SWEEP_ROOT" \
   --out "$SWEEP_ROOT/summary.csv"
 ```
+
+## MAPPO prototype smoke
+
+Before adding MAPPO to any broad matrix, run one CPU-only smoke job:
+
+```bash
+cd /u/$USER/cos435-citylearn
+JOB=mappo_smoke SWEEP_ID=mappo-prototype-YYYYMMDD-r1 bash scripts/cluster/submit_sweep.sh
+```
+
+This uses `configs/train/mappo/mappo_shared_ctde_smoke.yaml` and writes the
+checkpoint, metrics, and manifest under the selected `/n/fs/pvl-lidar` sweep
+root. It requests 4 CPUs and 12 GB RAM, matching the existing CPU-bound sweep
+cell shape.

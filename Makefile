@@ -2,7 +2,7 @@ PYTHON := .venv/bin/python
 MPLCONFIGDIR := $(CURDIR)/.cache/matplotlib
 NPM_CACHE := $(CURDIR)/.npm-cache
 
-.PHONY: install install-benchmark test check env-info repo-tree download-citylearn download-citylearn-all env-schema smoke train-rbc train-sac train-sac-shared train-td3 train-td3-shared train-ppo train-ppo-shared submission-results figures cross-figures cross-table check-ui-exports dashboard-install dashboard-build dashboard-check dashboard-backend dashboard-frontend ui ui-open
+.PHONY: install install-benchmark test check env-info repo-tree download-citylearn download-citylearn-all env-schema smoke train-rbc train-sac train-sac-shared train-td3 train-td3-shared train-ppo train-ppo-shared train-mappo train-mappo-smoke submission-results figures cross-figures cross-table check-ui-exports dashboard-install dashboard-build dashboard-check dashboard-backend dashboard-frontend ui ui-open
 
 install:
 	bash scripts/setup/install_env.sh
@@ -54,6 +54,12 @@ train-td3-shared:
 
 train-ppo-shared:
 	COS435_REQUIRE_DATA=1 MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/train/run_ppo.py --config configs/train/ppo/ppo_shared_dtde_reward_v2.yaml --eval-config configs/eval/default.yaml
+
+train-mappo:
+	COS435_REQUIRE_DATA=1 MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/train/run_mappo.py --config configs/train/mappo/mappo_shared_ctde_reward_v2.yaml --eval-config configs/eval/default.yaml
+
+train-mappo-smoke:
+	COS435_REQUIRE_DATA=1 MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/train/run_mappo.py --config configs/train/mappo/mappo_shared_ctde_smoke.yaml --eval-config configs/eval/mappo_smoke.yaml
 
 submission-results:
 	$(PYTHON) scripts/analysis/export_submission_results.py

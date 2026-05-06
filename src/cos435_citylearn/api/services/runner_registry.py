@@ -121,6 +121,21 @@ RUNNERS: dict[str, RunnerSpec] = {
         eval_config_path="configs/eval/default.yaml",
         supports_checkpoint_eval=True,
     ),
+    "mappo_shared_ctde_reward_v2": RunnerSpec(
+        runner_id="mappo_shared_ctde_reward_v2",
+        label="Shared CTDE MAPPO Reward v2",
+        algorithm="mappo",
+        variant="mappo_shared_ctde_reward_v2",
+        description=(
+            "Parameter-shared MAPPO with decentralized actor, centralized critic, "
+            "forecast observations, and reward_v2"
+        ),
+        callable_path="cos435_citylearn.baselines.mappo.run_mappo",
+        workload_id="eval_mappo_checkpoint",
+        config_path="configs/train/mappo/mappo_shared_ctde_reward_v2.yaml",
+        eval_config_path="configs/eval/default.yaml",
+        supports_checkpoint_eval=True,
+    ),
 }
 
 

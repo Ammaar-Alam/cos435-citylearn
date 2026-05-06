@@ -1,0 +1,58 @@
+env:
+  base_config: configs/env/citylearn_2023.yaml
+  split: public_dev
+
+algorithm:
+  name: mappo
+  control_mode: shared_ctde
+  variant: mappo_shared_ctde_reward_v2
+  policy: gaussian_mlp
+
+reward:
+  version: reward_v2
+
+features:
+  version: centralized_critic_context_v1
+  shared_context_dimension: 4
+  shared_context_version: v2
+  critic_context_version: centralized_critic_context_v1
+
+training:
+  total_timesteps: 20000
+  seed: 0
+  rollout_steps: 512
+  n_epochs: 4
+  minibatch_size: 256
+  learning_rate: 0.0003
+  clip_range: 0.2
+  gamma: 0.99
+  gae_lambda: 0.95
+  ent_coef:
+    schedule: linear
+    start: 0.02
+    end: 0.005
+    anneal_fraction: 0.6
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  reward_scaling: 1.0
+  target_kl: 0.03
+  normalize_observations: true
+  normalize_critic_observations: true
+  normalize_rewards: true
+  normalize_advantage: true
+  hidden_dimension: [128, 128]
+  critic_hidden_dimension: [256, 256]
+  log_interval_steps: 128
+
+evaluation:
+  deterministic: true
+  eval_episodes: 1
+  save_rollout_trace: true
+  trace_limit: 96
+  preview_stride: 12
+
+logging:
+  run_group: mappo_shared_ctde_reward_v2
+  output_root: results/runs
+  metrics_root: results/metrics
+  manifests_root: results/manifests
