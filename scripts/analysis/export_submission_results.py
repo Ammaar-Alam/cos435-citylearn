@@ -9,6 +9,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 METRICS_ROOT = REPO_ROOT / "results" / "metrics"
 OUTPUT_ROOT = REPO_ROOT / "submission" / "results"
+SHARED_SWEEP_SUMMARY_RELATIVE_PATHS = (
+    Path("results/sweep/summary.csv"),
+    Path("results/mappo_sweep/summary.csv"),
+)
 
 TRACKED_OUTPUT_FILES = [
     "local_main_results.csv",
@@ -317,24 +321,33 @@ def _load_released_rows() -> list[MetricRow]:
     )
 
 
-def _load_shared_sweep_rows() -> list[SharedSweepRow]:
-    sweep_summary_path = REPO_ROOT / "results" / "sweep" / "summary.csv"
-    if not sweep_summary_path.exists():
-        return []
+def _shared_sweep_summary_paths() -> list[Path]:
+    return [REPO_ROOT / path for path in SHARED_SWEEP_SUMMARY_RELATIVE_PATHS]
 
+
+def _load_shared_sweep_rows() -> list[SharedSweepRow]:
     rows: list[SharedSweepRow] = []
-    with sweep_summary_path.open(newline="") as handle:
-        for row in csv.DictReader(handle):
-            if row["algo"] not in {"ppo", "sac", "td3", "mappo"}:
-                continue
-            run_id = row["run_id"]
-            metric_path = METRICS_ROOT / f"{run_id}.csv"
-            if not metric_path.exists():
-                raise FileNotFoundError(
-                    f"missing metric row for {row['algo'].upper()} sweep run_id "
-                    f"{run_id}: expected {metric_path}"
-                )
-            rows.append(SharedSweepRow(lr=row["lr"], metric=_read_metric_row(metric_path)))
+    seen_metrics: set[tuple[str, str]] = set()
+    for sweep_summary_path in _shared_sweep_summary_paths():
+        if not sweep_summary_path.exists():
+            continue
+
+        with sweep_summary_path.open(newline="") as handle:
+            for row in csv.DictReader(handle):
+                if row["algo"] not in {"ppo", "sac", "td3", "mappo"}:
+                    continue
+                run_id = row["run_id"]
+                metric_key = (run_id, row["split"])
+                if metric_key in seen_metrics:
+                    continue
+                metric_path = METRICS_ROOT / f"{run_id}.csv"
+                if not metric_path.exists():
+                    raise FileNotFoundError(
+                        f"missing metric row for {row['algo'].upper()} sweep run_id "
+                        f"{run_id}: expected {metric_path}"
+                    )
+                rows.append(SharedSweepRow(lr=row["lr"], metric=_read_metric_row(metric_path)))
+                seen_metrics.add(metric_key)
 
     return sorted(
         rows,
@@ -1255,8 +1268,9 @@ def _missing_canonical_metric_requirements() -> list[str]:
                     f"{expected_count} seeds, found {count}"
                 )
 
-    sweep_summary_path = REPO_ROOT / "results" / "sweep" / "summary.csv"
-    if sweep_summary_path.exists():
+    for sweep_summary_path in _shared_sweep_summary_paths():
+        if not sweep_summary_path.exists():
+            continue
         with sweep_summary_path.open(newline="") as handle:
             for row in csv.DictReader(handle):
                 if row["algo"] not in {"ppo", "sac", "td3", "mappo"}:
