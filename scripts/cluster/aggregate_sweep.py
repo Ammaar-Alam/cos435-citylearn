@@ -6,7 +6,8 @@ import json
 import re
 from pathlib import Path
 
-# matches cell dirs like "ppo_lr3e-4_seed0" or "sac_lr1e-4_seed9"
+# matches cell dirs like "ppo_lr3e-4_seed0", "sac_lr1e-4_seed9", or
+# "td3_lr3e-4_seed4"
 CELL_PATTERN = re.compile(r"^(?P<algo>[a-z]+)_lr(?P<lr>[^_]+)_seed(?P<seed>\d+)$")
 
 
@@ -26,7 +27,7 @@ def main() -> None:
     parser.add_argument("--out", default="results/sweep/summary.csv")
     parser.add_argument(
         "--algos",
-        default="ppo,sac",
+        default="ppo,sac,td3",
         help="comma-separated algos expected in the sweep",
     )
     parser.add_argument("--lrs", default="1e-4,3e-4", help="comma-separated lrs expected per algo")

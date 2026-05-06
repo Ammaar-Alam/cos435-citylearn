@@ -65,6 +65,18 @@ RUNNERS: dict[str, RunnerSpec] = {
         eval_config_path="configs/eval/default.yaml",
         supports_checkpoint_eval=True,
     ),
+    "td3_central_baseline": RunnerSpec(
+        runner_id="td3_central_baseline",
+        label="Centralized TD3",
+        algorithm="td3",
+        variant="central_baseline",
+        description="Centralized TD3 baseline (stable-baselines3) on the official local-eval split",
+        callable_path="cos435_citylearn.baselines.td3.run_td3",
+        workload_id="eval_td3_checkpoint",
+        config_path="configs/train/td3/td3_central_baseline.yaml",
+        eval_config_path="configs/eval/default.yaml",
+        supports_checkpoint_eval=True,
+    ),
     "sac_shared_dtde_reward_v2": RunnerSpec(
         runner_id="sac_shared_dtde_reward_v2",
         label="Shared SAC Reward v2",
@@ -91,6 +103,21 @@ RUNNERS: dict[str, RunnerSpec] = {
         callable_path="cos435_citylearn.baselines.ppo.run_ppo",
         workload_id="eval_ppo_checkpoint",
         config_path="configs/train/ppo/ppo_shared_dtde_reward_v2.yaml",
+        eval_config_path="configs/eval/default.yaml",
+        supports_checkpoint_eval=True,
+    ),
+    "td3_shared_dtde_reward_v2": RunnerSpec(
+        runner_id="td3_shared_dtde_reward_v2",
+        label="Shared TD3 Reward v2",
+        algorithm="td3",
+        variant="td3_shared_dtde_reward_v2",
+        description=(
+            "Parameter-shared decentralized TD3 with count-invariant district "
+            "context and reward_v2"
+        ),
+        callable_path="cos435_citylearn.baselines.td3.run_td3",
+        workload_id="eval_td3_checkpoint",
+        config_path="configs/train/td3/td3_shared_dtde_reward_v2.yaml",
         eval_config_path="configs/eval/default.yaml",
         supports_checkpoint_eval=True,
     ),

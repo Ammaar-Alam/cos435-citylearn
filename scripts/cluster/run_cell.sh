@@ -4,7 +4,7 @@
 # summary JSON so the aggregation step can just glob the outputs.
 #
 # invoked by sweep.slurm with positional args:
-#   $1 = algo (ppo|sac)
+#   $1 = algo (ppo|sac|td3)
 #   $2 = lr (float, eg 3e-4)
 #   $3 = seed (int)
 
@@ -21,11 +21,12 @@ source .venv/bin/activate
 case "$ALGO" in
   ppo) TRAIN_SCRIPT="scripts/train/run_ppo.py"; CONFIG="configs/train/ppo/ppo_shared_dtde_reward_v2.yaml" ;;
   sac) TRAIN_SCRIPT="scripts/train/run_sac.py"; CONFIG="configs/train/sac/sac_shared_dtde_reward_v2.yaml" ;;
+  td3) TRAIN_SCRIPT="scripts/train/run_td3.py"; CONFIG="configs/train/td3/td3_shared_dtde_reward_v2.yaml" ;;
   *)   echo "unknown algo: $ALGO" >&2; exit 2 ;;
 esac
 
 EVAL_CONFIG="configs/eval/default.yaml"
-# cell id embeds lr and seed so results/sweep/<cell>/ is unique across the 40-cell matrix
+# cell id embeds lr and seed so results/sweep/<cell>/ is unique across the 60-cell matrix
 CELL_ID="${ALGO}_lr${LR}_seed${SEED}"
 SUMMARY_DIR="$ROOT_DIR/results/sweep/${CELL_ID}"
 mkdir -p "$SUMMARY_DIR"

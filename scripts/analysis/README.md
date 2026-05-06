@@ -13,7 +13,9 @@ make cross-table
 
 - `export_submission_results.py` reads normalized run metrics and sweep summaries
   from ignored `results/` directories and writes the tracked CSV snapshot under
-  `submission/results/`.
+  `submission/results/`. Its shared sweep path is generic for PPO, SAC, and
+  TD3; the older `ppo_shared_sweep_*` outputs are preserved for report sections
+  that still depend on the PPO-specific tables.
 - `make_figures.py` writes the main report figures under `submission/figures/`.
 - `make_cross_split_figures.py` writes cross-split comparison figures under
   `submission/figures/`.

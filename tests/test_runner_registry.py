@@ -38,3 +38,10 @@ def test_ppo_runners_are_launchable_and_checkpoint_evaluable() -> None:
     assert RUNNERS["ppo_central_baseline"].supports_checkpoint_eval is True
     assert RUNNERS["ppo_shared_dtde_reward_v2"].launchable is True
     assert RUNNERS["ppo_shared_dtde_reward_v2"].supports_checkpoint_eval is True
+
+
+def test_td3_runners_are_launchable_and_checkpoint_evaluable() -> None:
+    assert RUNNERS["td3_central_baseline"].launchable is True
+    assert RUNNERS["td3_central_baseline"].supports_checkpoint_eval is True
+    assert RUNNERS["td3_shared_dtde_reward_v2"].launchable is True
+    assert RUNNERS["td3_shared_dtde_reward_v2"].supports_checkpoint_eval is True

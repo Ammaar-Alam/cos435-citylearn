@@ -1,7 +1,7 @@
 # cluster sweep scripts (Neuronic)
 
-40-cell robust sweep for the final project: 2 algos x 2 lrs x 10 seeds.
-Trains shared-parameter PPO and shared-parameter SAC on `public_dev`,
+60-cell robust sweep for the final project: 3 algos x 2 lrs x 10 seeds.
+Trains shared-parameter PPO, shared-parameter SAC, and shared-parameter TD3 on `public_dev`,
 then cross-topology evaluates each checkpoint on `phase_3_{1,2,3}`.
 
 ## one-time setup
@@ -61,11 +61,11 @@ can pass extra flags through, eg. `bash scripts/cluster/submit_sweep.sh
 Calling `sbatch scripts/cluster/sweep.slurm` directly still works once
 `results/sweep/` exists.
 
-The array dispatches **40 tasks** (2 algos x 2 lrs x 10 seeds), each
+The array dispatches **60 tasks** (3 algos x 2 lrs x 10 seeds), each
 requesting 4 CPUs and 8 GB RAM (no GPU; this workload is CPU-bound).
 Array id decomposes as:
 
-- `algo_idx = id / 20` -> 0=ppo, 1=sac
+- `algo_idx = id / 20` -> 0=ppo, 1=sac, 2=td3
 - `lr_idx   = (id%20)/10` -> 0=1e-4, 1=3e-4
 - `seed     = id % 10` -> 0..9
 
@@ -79,7 +79,7 @@ JSONs and `summary.csv` there after aggregation. Commit only normalized
 summary rows under `submission/results/`.
 
 Total wall time should be ~50 min if enough CPUs are free
-(40 x 4 = 160 CPUs; the cluster usually has >1000 idle).
+(60 x 4 = 240 CPUs; the cluster usually has >1000 idle).
 
 ## monitor
 
@@ -109,7 +109,7 @@ final writeup.
 ## artifact boundary
 
 The cluster scripts are the canonical Princeton/Neuronic path for the current
-PPO/SAC shared-parameter sweep. They do not cover the historical PPO phase-2
+PPO/SAC/TD3 shared-parameter sweep. They do not cover the historical PPO phase-2
 backfill path; see `scripts/analysis/README.md` for that specialized exporter.
 
 Do not commit:

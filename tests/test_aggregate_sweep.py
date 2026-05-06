@@ -52,3 +52,54 @@ def test_aggregate_sweep_ignores_unexpected_cells_for_missing_split_checks(tmp_p
     assert result.returncode == 0, result.stderr or result.stdout
     assert summary_path.exists()
     assert "MISSING SPLITS" not in result.stdout
+
+
+def test_aggregate_sweep_defaults_require_td3_cells_unless_allowed(tmp_path: Path) -> None:
+    sweep_root = tmp_path / "results" / "sweep"
+    (sweep_root / "ppo_lr1e-4_seed0").mkdir(parents=True)
+    summary_path = tmp_path / "summary.csv"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "cluster" / "aggregate_sweep.py"),
+            "--sweep-root",
+            str(sweep_root),
+            "--out",
+            str(summary_path),
+            "--lrs",
+            "1e-4",
+            "--seeds",
+            "0-0",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "td3 lr=1e-4 seed=0" in result.stdout
+
+    allowed = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "cluster" / "aggregate_sweep.py"),
+            "--sweep-root",
+            str(sweep_root),
+            "--out",
+            str(summary_path),
+            "--lrs",
+            "1e-4",
+            "--seeds",
+            "0-0",
+            "--allow-missing",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        check=False,
+    )
+
+    assert allowed.returncode == 0, allowed.stderr or allowed.stdout
+    assert "td3 lr=1e-4 seed=0" in allowed.stdout

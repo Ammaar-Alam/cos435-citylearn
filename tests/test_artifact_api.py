@@ -185,6 +185,32 @@ def test_artifact_import_rejects_bound_central_ppo_missing_required_sidecars(
     assert "checkpoint_metadata.json" in detail
 
 
+def test_artifact_import_rejects_bound_central_td3_missing_required_sidecars(
+    tmp_path: Path,
+) -> None:
+    settings = build_test_settings(tmp_path)
+    client = TestClient(create_app(settings))
+
+    response = client.post(
+        "/api/artifacts/import",
+        data={
+            "artifact_kind": "checkpoint",
+            "label": "central td3 missing sidecars",
+            "runner_id": "td3_central_baseline",
+        },
+        files=[
+            ("file", ("td3_model.zip", b"fake-sb3-zip", "application/zip")),
+            ("extra_files", ("vec_normalize.pkl", b"fake-vec", "application/octet-stream")),
+        ],
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "centralized TD3" in detail
+    assert "topology.json" in detail
+    assert "checkpoint_metadata.json" in detail
+
+
 def test_artifact_import_rejects_bound_central_ppo_sidecar_as_primary(
     tmp_path: Path,
 ) -> None:
