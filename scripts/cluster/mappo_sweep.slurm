@@ -17,6 +17,7 @@ set -euo pipefail
 
 ROOT_DIR="${ROOT_DIR:-/u/${USER}/cos435-citylearn}"
 SWEEP_ROOT="${SWEEP_ROOT:-$ROOT_DIR/results/mappo_sweep}"
+export ROOT_DIR SWEEP_ROOT
 mkdir -p "$SWEEP_ROOT"
 
 LRS=(1e-4 3e-4 1e-3)
