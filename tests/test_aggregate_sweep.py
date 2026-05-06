@@ -105,3 +105,40 @@ def test_aggregate_sweep_defaults_require_td3_cells_unless_allowed(tmp_path: Pat
 
     assert allowed.returncode == 0, allowed.stderr or allowed.stdout
     assert "td3 lr=1e-4 seed=0" in allowed.stdout
+
+
+def test_aggregate_sweep_parses_td3_cells(tmp_path: Path) -> None:
+    sweep_root = tmp_path / "results" / "sweep"
+    cell = sweep_root / "td3_lr1e-4_seed0"
+
+    _write_json(cell / "train.json", {"run_id": "td3-train", "average_score": 0.7})
+    _write_json(cell / "eval_phase_3_1.json", {"run_id": "td3-eval", "average_score": 0.8})
+
+    summary_path = tmp_path / "summary.csv"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "cluster" / "aggregate_sweep.py"),
+            "--sweep-root",
+            str(sweep_root),
+            "--out",
+            str(summary_path),
+            "--algos",
+            "td3",
+            "--lrs",
+            "1e-4",
+            "--seeds",
+            "0-0",
+            "--eval-splits",
+            "phase_3_1",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
+    rows = summary_path.read_text().splitlines()
+    assert "td3,1e-4,0,public_dev,td3-train,0.7" in rows
+    assert "td3,1e-4,0,phase_3_1,td3-eval,0.8" in rows

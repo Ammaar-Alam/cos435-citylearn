@@ -8,7 +8,7 @@ from pathlib import Path
 
 # matches cell dirs like "ppo_lr3e-4_seed0", "sac_lr1e-4_seed9", or
 # "td3_lr3e-4_seed4"
-CELL_PATTERN = re.compile(r"^(?P<algo>[a-z]+)_lr(?P<lr>[^_]+)_seed(?P<seed>\d+)$")
+CELL_PATTERN = re.compile(r"^(?P<algo>[a-z0-9]+)_lr(?P<lr>[^_]+)_seed(?P<seed>\d+)$")
 
 
 def _read(path: Path) -> dict | None:
