@@ -156,3 +156,27 @@ This uses `configs/train/mappo/mappo_shared_ctde_smoke.yaml` and writes the
 checkpoint, metrics, and manifest under the selected `/n/fs/pvl-lidar` sweep
 root. It requests 4 CPUs and 12 GB RAM, matching the existing CPU-bound sweep
 cell shape.
+
+## MAPPO CTDE sweep
+
+After the smoke job verifies the checkpoint/eval path, run the additive MAPPO
+matrix separately from the PPO/SAC/TD3 final sweep:
+
+```bash
+cd /u/$USER/cos435-citylearn
+JOB=mappo_sweep SWEEP_ID=citylearn-mappo-ctde-YYYYMMDD-r1 bash scripts/cluster/submit_sweep.sh
+```
+
+This dispatches 18 cells: `3 lrs x 2 ent_coef values x 3 seeds`, capped at 9
+concurrent tasks. It uses the same cell layout as the targeted final sweep, so
+aggregate it with:
+
+```bash
+python scripts/cluster/aggregate_final_sweep.py \
+  --algos mappo \
+  --sweep-root "$SWEEP_ROOT" \
+  --out "$SWEEP_ROOT/summary.csv"
+```
+
+Keep this separate while the existing `cos435-final` array is running so the
+original 81-cell PPO/SAC/TD3 contract remains undisturbed.

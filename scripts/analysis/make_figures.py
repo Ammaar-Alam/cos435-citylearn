@@ -39,6 +39,7 @@ METHOD_ORDER = [
     "sac_central_reward_v1_public_dev",
     "sac_central_reward_v2_public_dev",
     "sac_shared_dtde_reward_v2_public_dev",
+    "mappo_mappo_shared_ctde_reward_v2_public_dev",
 ]
 
 SHORT_LABELS = {
@@ -49,6 +50,7 @@ SHORT_LABELS = {
     "sac_central_reward_v1_public_dev": "SAC\nrv1",
     "sac_central_reward_v2_public_dev": "SAC\nrv2",
     "sac_shared_dtde_reward_v2_public_dev": "SAC\nDTDE",
+    "mappo_mappo_shared_ctde_reward_v2_public_dev": "MAPPO\nCTDE",
 }
 
 COLORS = {
@@ -59,6 +61,7 @@ COLORS = {
     "sac_central_reward_v1_public_dev": "#55A868",
     "sac_central_reward_v2_public_dev": "#C44E52",
     "sac_shared_dtde_reward_v2_public_dev": "#8172B2",
+    "mappo_mappo_shared_ctde_reward_v2_public_dev": "#8C6D31",
 }
 
 CHESCA_SCORE = 0.562  # official public leaderboard winner
@@ -246,6 +249,7 @@ PER_SPLIT_METHOD_ORDER = [
     ("SAC rv1", "#55A868"),
     ("SAC rv2", "#C44E52"),
     ("SAC DTDE", "#8172B2"),
+    ("MAPPO CTDE", "#8C6D31"),
 ]
 
 # Columns in cross_split_scores.csv that drive the per-split figure.
@@ -410,6 +414,12 @@ CROSS_SPLIT_METHODS = [
         "SAC\nDTDE",
         COLORS["sac_shared_dtde_reward_v2_public_dev"],
         "sac_shared_dtde_reward_v2_public_dev",
+    ),
+    (
+        "mappo_mappo_shared_ctde_reward_v2_released_phase_2_online_eval",
+        "MAPPO\nCTDE",
+        COLORS["mappo_mappo_shared_ctde_reward_v2_public_dev"],
+        "mappo_mappo_shared_ctde_reward_v2_public_dev",
     ),
 ]
 

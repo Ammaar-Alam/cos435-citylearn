@@ -3,7 +3,7 @@
 # hyperparameter in addition to learning rate and seed.
 #
 # args:
-#   $1 = algo (ppo|sac|td3)
+#   $1 = algo (ppo|sac|td3|mappo)
 #   $2 = lr
 #   $3 = seed
 #   $4 = hyperparameter name (ent_coef|reward_scaling|exploration_noise)
@@ -26,6 +26,11 @@ case "$ALGO:$HP_NAME" in
   ppo:ent_coef)
     TRAIN_SCRIPT="scripts/train/run_ppo.py"
     CONFIG="configs/train/ppo/ppo_shared_dtde_reward_v2.yaml"
+    EXTRA_ARGS=(--ent-coef "$HP_VALUE")
+    ;;
+  mappo:ent_coef)
+    TRAIN_SCRIPT="scripts/train/run_mappo.py"
+    CONFIG="configs/train/mappo/mappo_shared_ctde_reward_v2.yaml"
     EXTRA_ARGS=(--ent-coef "$HP_VALUE")
     ;;
   sac:reward_scaling)

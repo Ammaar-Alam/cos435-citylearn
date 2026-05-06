@@ -19,6 +19,12 @@ METHOD_KEYS: list[tuple[str, str, str, str]] = [
     ("SAC rv1", "sac", "central_reward_v1", "sac_central_reward_v1_public_dev"),
     ("SAC rv2", "sac", "central_reward_v2", "sac_central_reward_v2_public_dev"),
     ("SAC DTDE", "sac", "shared_dtde_reward_v2", "sac_shared_dtde_reward_v2_public_dev"),
+    (
+        "MAPPO CTDE",
+        "mappo",
+        "mappo_shared_ctde_reward_v2",
+        "mappo_mappo_shared_ctde_reward_v2_public_dev",
+    ),
 ]
 
 SPLIT_COLUMNS = [

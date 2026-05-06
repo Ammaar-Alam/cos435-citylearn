@@ -46,6 +46,7 @@ VARIANT_LABELS = {
     "ppo_shared_dtde_reward_v2": "Shared DTDE PPO reward_v2",
     "td3_central_baseline": "Centralized TD3 baseline",
     "td3_shared_dtde_reward_v2": "Shared DTDE TD3 reward_v2",
+    "mappo_shared_ctde_reward_v2": "Shared CTDE MAPPO reward_v2",
 }
 REQUIRED_LOCAL_SAC_VARIANTS = (
     "central_baseline",
@@ -244,7 +245,7 @@ def _is_submission_metric_path(path: Path) -> bool:
 def _load_local_rows(shared_sweep_rows: list[SharedSweepRow]) -> tuple[MetricRow, list[MetricRow]]:
     rbc_row = _latest_metric("rbc__basic_rbc__public_dev__seed0__*.csv")
     latest_rows: dict[tuple[str, str, int], MetricRow] = {}
-    for algorithm in ("ppo", "sac", "td3"):
+    for algorithm in ("ppo", "sac", "td3", "mappo"):
         for path in sorted(METRICS_ROOT.glob(f"{algorithm}__*.csv")):
             if not _is_submission_metric_path(path):
                 continue
@@ -258,6 +259,7 @@ def _load_local_rows(shared_sweep_rows: list[SharedSweepRow]) -> tuple[MetricRow
         ("ppo", "ppo_shared_dtde_reward_v2"),
         ("sac", "shared_dtde_reward_v2"),
         ("td3", "td3_shared_dtde_reward_v2"),
+        ("mappo", "mappo_shared_ctde_reward_v2"),
     }
     for sweep_row in shared_sweep_rows:
         metric = sweep_row.metric
@@ -293,7 +295,7 @@ def _released_group(split: str) -> str:
 
 def _load_released_rows() -> list[MetricRow]:
     latest_rows: dict[tuple[str, str, int], MetricRow] = {}
-    for algorithm in ("ppo", "rbc", "sac", "td3"):
+    for algorithm in ("ppo", "rbc", "sac", "td3", "mappo"):
         for path in sorted(METRICS_ROOT.glob(f"{algorithm}__*.csv")):
             if not _is_submission_metric_path(path):
                 continue
@@ -323,7 +325,7 @@ def _load_shared_sweep_rows() -> list[SharedSweepRow]:
     rows: list[SharedSweepRow] = []
     with sweep_summary_path.open(newline="") as handle:
         for row in csv.DictReader(handle):
-            if row["algo"] not in {"ppo", "sac", "td3"}:
+            if row["algo"] not in {"ppo", "sac", "td3", "mappo"}:
                 continue
             run_id = row["run_id"]
             metric_path = METRICS_ROOT / f"{run_id}.csv"
@@ -1125,8 +1127,8 @@ These files are the clean tracked summary of the raw outputs under `results/`.
 - `sac_seed_inventory.csv` — per-seed SAC run inventory for the local phase-2 batch
 - `released_eval_main_results.csv` — released official-eval family summaries
 - `released_eval_seed_inventory.csv` — per-seed released-eval checkpoint inventory
-- `shared_sweep_summary.csv` — per-learning-rate shared PPO/SAC/TD3 sweep summary rows
-- `shared_sweep_inventory.csv` — per-run shared PPO/SAC/TD3 sweep inventory with KPI columns
+- `shared_sweep_summary.csv` — per-learning-rate shared PPO/SAC/TD3/MAPPO sweep summary rows
+- `shared_sweep_inventory.csv` — per-run shared PPO/SAC/TD3/MAPPO sweep inventory with KPI columns
 - `ppo_shared_sweep_summary.csv` — per-learning-rate shared-PPO sweep summary rows
 - `ppo_shared_sweep_inventory.csv` — per-run shared-PPO sweep inventory with KPI columns
 - `official_benchmark_reference.csv` — published CityLearn 2023 reference numbers
@@ -1200,7 +1202,7 @@ def _missing_canonical_metric_requirements() -> list[str]:
 
     local_keys: set[tuple[str, str, int]] = set()
     released_seeds: dict[tuple[str, str, str, str], set[int]] = {}
-    for algorithm in ("ppo", "rbc", "sac"):
+    for algorithm in ("ppo", "rbc", "sac", "td3", "mappo"):
         for path in sorted(METRICS_ROOT.glob(f"{algorithm}__*.csv")):
             if not _is_submission_metric_path(path):
                 continue
@@ -1257,7 +1259,7 @@ def _missing_canonical_metric_requirements() -> list[str]:
     if sweep_summary_path.exists():
         with sweep_summary_path.open(newline="") as handle:
             for row in csv.DictReader(handle):
-                if row["algo"] not in {"ppo", "sac", "td3"}:
+                if row["algo"] not in {"ppo", "sac", "td3", "mappo"}:
                     continue
                 metric_path = METRICS_ROOT / f"{row['run_id']}.csv"
                 if not metric_path.exists():

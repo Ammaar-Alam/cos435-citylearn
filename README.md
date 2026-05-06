@@ -2,7 +2,7 @@
 
 Generalizable RL for neighborhood battery control in CityLearn.
 
-This repository contains the shared benchmark foundation for the COS435 / ECE433 final project. The CityLearn environment, official 2023 dataset download flow, schema export, smoke path, built-in RBC baseline, repo-local PPO runners, repo-local SAC runners, repo-local TD3 runners, tracked final-result summaries, and local dashboard are wired here.
+This repository contains the shared benchmark foundation for the COS435 / ECE433 final project. The CityLearn environment, official 2023 dataset download flow, schema export, smoke path, built-in RBC baseline, repo-local PPO runners, repo-local SAC runners, repo-local TD3 runners, repo-local MAPPO runner, tracked final-result summaries, and local dashboard are wired here.
 
 ## overview
 
@@ -11,6 +11,7 @@ The project is scoped around the 2023 CityLearn challenge and the comparison bet
 - centralized PPO
 - centralized SAC
 - centralized TD3
+- shared CTDE MAPPO
 - later structured RL variants
 
 Foundation in this repo now has:
@@ -27,6 +28,7 @@ Foundation in this repo now has:
 - parameter-shared decentralized SAC with shared district context
 - centralized TD3 baseline with SB3 artifact export
 - parameter-shared decentralized TD3 with count-invariant shared district context
+- parameter-shared MAPPO with decentralized actors and a centralized district critic
 - repo-local reward ladder for SAC (`reward_v0` through `reward_v3`)
 - default simulation-data export for completed evaluation runs
 - local dashboard backend and frontend for launch, playback, and comparison
@@ -95,6 +97,7 @@ The 2023 challenge trains on 3 buildings (phase-2 local_evaluation ≈ `public_d
 - `sac_shared_dtde_*` — shared-parameter per-building SAC. One actor-critic is called once per building. Eligible for phase-3 held-out evaluation and AICrowd submission.
 - `ppo_shared_dtde_*` — shared-parameter per-building PPO. Mirrors the SAC-shared design (one actor + one critic, called once per building, GAE(λ) on-policy updates) with a count-invariant `shared_context_version=v2`. Also eligible for phase-3 held-out evaluation.
 - `td3_shared_dtde_*` — shared-parameter per-building TD3. Uses deterministic shared actor, twin critics, target policy smoothing, delayed actor updates, and the same count-invariant context v2 for phase-3 held-out evaluation.
+- `mappo_shared_ctde_*` — shared-parameter MAPPO. The actor is still per-building and topology-invariant, while the critic gets count-invariant centralized district summaries during training. Eligible for phase-3 held-out evaluation.
 - `ppo_central_baseline` — centralized PPO (stable-baselines3). Fixed-topology reference number on `public_dev` only.
 - `sac_central_*` — centralized SAC. Fixed-topology reference numbers on `public_dev` only.
 - `td3_central_baseline` — centralized TD3 (stable-baselines3). Fixed-topology reference number on `public_dev` and released phase-2 only.
@@ -307,12 +310,13 @@ The dashboard currently supports:
 - launching the shared SAC `reward_v2` runner from the UI
 - launching the shared PPO `reward_v2` runner from the UI
 - launching the shared TD3 `reward_v2` runner from the UI
+- launching the shared CTDE MAPPO `reward_v2` runner from the UI
 - watching live preview payloads and worker logs while the benchmark job runs
 - listing discovered runs from `results/runs/`
 - inspecting one run with synchronized metrics, trace playback, and render media
 - comparing multiple runs side by side
 - importing playback payloads or other artifacts into a local registry
 - inspecting imported playback payloads directly in the UI
-- importing SAC, PPO, or TD3 checkpoints and evaluating them through a checkpoint-capable runner
+- importing SAC, PPO, TD3, or MAPPO checkpoints and evaluating them through a checkpoint-capable runner
 
-The dashboard exposes the launchable runners (RBC, centralized SAC/PPO/TD3, shared SAC/PPO/TD3 `reward_v2`) rather than every config variant in `configs/train/`.
+The dashboard exposes the launchable runners (RBC, centralized SAC/PPO/TD3, shared SAC/PPO/TD3 `reward_v2`, and shared CTDE MAPPO `reward_v2`) rather than every config variant in `configs/train/`.

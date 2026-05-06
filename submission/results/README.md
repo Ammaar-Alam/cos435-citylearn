@@ -26,7 +26,7 @@ is missing.
 ## Files in this directory
 
 - `local_main_results.csv` - tracked method-level summary rows for local `public_dev`
-- `method_comparison.csv` - compact report table for RBC, PPO, SAC, and TD3 local comparisons when all required runs exist
+- `method_comparison.csv` - compact report table for RBC, PPO, SAC, TD3, and MAPPO local comparisons when all required runs exist
 - `cross_split_scores.csv` - compact report table across `public_dev`, released phase-2, and released phase-3 splits
 - `sac_ablation_summary.csv` - SAC-only variant comparison with seed-aware means and CIs
 - `sac_seed_inventory.csv` - per-seed SAC run inventory for the local phase-2 batch
@@ -34,8 +34,8 @@ is missing.
 - `released_eval_seed_inventory.csv` - per-run released-eval inventory for RBC, PPO, and SAC where artifacts exist
 - `ppo_shared_sweep_summary.csv` - per-learning-rate shared-PPO sweep summary rows
 - `ppo_shared_sweep_inventory.csv` - per-run shared-PPO sweep inventory with KPI columns
-- `shared_sweep_summary.csv` - regenerated per-learning-rate shared PPO/SAC/TD3 sweep summary rows after the full 60-cell sweep
-- `shared_sweep_inventory.csv` - regenerated per-run shared PPO/SAC/TD3 sweep inventory after the full 60-cell sweep
+- `shared_sweep_summary.csv` - regenerated per-learning-rate shared PPO/SAC/TD3/MAPPO sweep summary rows after the relevant sweep has been collected
+- `shared_sweep_inventory.csv` - regenerated per-run shared PPO/SAC/TD3/MAPPO sweep inventory after the relevant sweep has been collected
 - `official_benchmark_reference.csv` - published CityLearn 2023 reference numbers
 - `figure_manifest.csv` - tracked report figure inventory
 
@@ -47,7 +47,7 @@ is missing.
 - `cross_split_scores.csv` backs the public-dev versus released-eval generalization comparison.
 - `sac_ablation_summary.csv` and `sac_seed_inventory.csv` back SAC reward and seed ablations.
 - `ppo_shared_sweep_summary.csv` and `ppo_shared_sweep_inventory.csv` back the existing shared-PPO learning-rate sweep discussion.
-- `shared_sweep_summary.csv` and `shared_sweep_inventory.csv` back the expanded PPO/SAC/TD3 result matrix once the 60-cell sweep has been collected.
+- `shared_sweep_summary.csv` and `shared_sweep_inventory.csv` back the expanded PPO/SAC/TD3/MAPPO result matrix once the relevant sweeps have been collected.
 - `official_benchmark_reference.csv` is context only; it is not mixed into local or released-eval means.
 
 ## Local public_dev snapshot

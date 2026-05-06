@@ -19,45 +19,61 @@ def _label_value(value: str) -> str:
     return value.replace("-", "m").replace(".", "p")
 
 
-def _expected_cells() -> list[dict[str, str | int]]:
+def _expected_cells(algos: tuple[str, ...]) -> list[dict[str, str | int]]:
     rows: list[dict[str, str | int]] = []
     seeds = (0, 1, 2)
-    for lr in ("1e-4", "2e-4", "5e-4", "1e-3"):
-        for reward_scaling in ("2.5", "5.0", "10.0"):
-            for seed in seeds:
-                rows.append(
-                    {
-                        "algo": "sac",
-                        "lr": lr,
-                        "seed": seed,
-                        "hyperparameter": "reward_scaling",
-                        "hyperparameter_value": reward_scaling,
-                    }
-                )
-    for lr in ("3e-4", "5e-4", "1e-3"):
-        for exploration_noise in ("0.05", "0.1", "0.2"):
-            for seed in seeds:
-                rows.append(
-                    {
-                        "algo": "td3",
-                        "lr": lr,
-                        "seed": seed,
-                        "hyperparameter": "exploration_noise",
-                        "hyperparameter_value": exploration_noise,
-                    }
-                )
-    for lr in ("1e-4", "1e-3", "3e-3"):
-        for ent_coef in ("0.0", "0.01"):
-            for seed in seeds:
-                rows.append(
-                    {
-                        "algo": "ppo",
-                        "lr": lr,
-                        "seed": seed,
-                        "hyperparameter": "ent_coef",
-                        "hyperparameter_value": ent_coef,
-                    }
-                )
+    if "sac" in algos:
+        for lr in ("1e-4", "2e-4", "5e-4", "1e-3"):
+            for reward_scaling in ("2.5", "5.0", "10.0"):
+                for seed in seeds:
+                    rows.append(
+                        {
+                            "algo": "sac",
+                            "lr": lr,
+                            "seed": seed,
+                            "hyperparameter": "reward_scaling",
+                            "hyperparameter_value": reward_scaling,
+                        }
+                    )
+    if "td3" in algos:
+        for lr in ("3e-4", "5e-4", "1e-3"):
+            for exploration_noise in ("0.05", "0.1", "0.2"):
+                for seed in seeds:
+                    rows.append(
+                        {
+                            "algo": "td3",
+                            "lr": lr,
+                            "seed": seed,
+                            "hyperparameter": "exploration_noise",
+                            "hyperparameter_value": exploration_noise,
+                        }
+                    )
+    if "ppo" in algos:
+        for lr in ("1e-4", "1e-3", "3e-3"):
+            for ent_coef in ("0.0", "0.01"):
+                for seed in seeds:
+                    rows.append(
+                        {
+                            "algo": "ppo",
+                            "lr": lr,
+                            "seed": seed,
+                            "hyperparameter": "ent_coef",
+                            "hyperparameter_value": ent_coef,
+                        }
+                    )
+    if "mappo" in algos:
+        for lr in ("1e-4", "3e-4", "1e-3"):
+            for ent_coef in ("0.0", "0.01"):
+                for seed in seeds:
+                    rows.append(
+                        {
+                            "algo": "mappo",
+                            "lr": lr,
+                            "seed": seed,
+                            "hyperparameter": "ent_coef",
+                            "hyperparameter_value": ent_coef,
+                        }
+                    )
     return rows
 
 
@@ -78,10 +94,21 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sweep-root", default="results/final_sweep")
     parser.add_argument("--out", default="results/final_sweep/summary.csv")
+    parser.add_argument(
+        "--algos",
+        default="sac,td3,ppo",
+        help="comma-separated expected algos; add mappo for the MAPPO-only sweep",
+    )
     parser.add_argument("--allow-missing", action="store_true")
     args = parser.parse_args()
 
     sweep_root = Path(args.sweep_root)
+    algos = tuple(algo.strip() for algo in args.algos.split(",") if algo.strip())
+    supported = {"sac", "td3", "ppo", "mappo"}
+    unknown = sorted(set(algos) - supported)
+    if unknown:
+        raise SystemExit(f"unsupported algos: {', '.join(unknown)}")
+
     rows: list[dict[str, object]] = []
     missing_cells: list[str] = []
     missing_splits: list[tuple[str, str]] = []
@@ -89,7 +116,7 @@ def main() -> None:
     if not sweep_root.exists():
         raise SystemExit(f"sweep root does not exist: {sweep_root}")
 
-    for cell in _expected_cells():
+    for cell in _expected_cells(algos):
         cell_id = _cell_id(cell)
         cell_dir = sweep_root / cell_id
         meta = _read_json(cell_dir / "meta.json")
