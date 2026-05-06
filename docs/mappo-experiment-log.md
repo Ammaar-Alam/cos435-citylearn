@@ -26,7 +26,9 @@ external controller dependency.
   context, checkpoint validation, and rollout buffer.
 - `src/cos435_citylearn/baselines/mappo.py` wires train, checkpoint, eval, and
   metric export using the same artifact layout as shared PPO.
-- `scripts/cluster/mappo_smoke.slurm` runs the one-cell cluster smoke.
+- `scripts/cluster/mappo_smoke.slurm` runs the one-cell cluster smoke and
+  prefers `$ROOT_DIR/src` so separate Neuronic worktrees do not import stale
+  editable-install source.
 - `scripts/cluster/mappo_sweep.slurm` adds an 18-cell MAPPO-only matrix:
   `3 learning rates x 2 entropy coefficients x 3 seeds`.
 - `scripts/cluster/aggregate_final_sweep.py --algos mappo` aggregates the MAPPO
@@ -58,6 +60,28 @@ bash -n scripts/cluster/run_final_cell.sh scripts/cluster/mappo_sweep.slurm scri
 
 Result: exit code `0`.
 
+After the direct-`sbatch` and separate-worktree fixes:
+
+```bash
+PYTHONPATH="$PWD/src" "/Users/erikdyer/Obsidian Vault/Classes/S2026/COS435/Final Project/cos435-citylearn/.venv/bin/python" \
+  -m pytest tests/test_cluster_scripts.py tests/test_aggregate_final_sweep.py -q
+```
+
+Result: `5 passed`.
+
+```bash
+PYTHONPATH="$PWD/src" "/Users/erikdyer/Obsidian Vault/Classes/S2026/COS435/Final Project/cos435-citylearn/.venv/bin/python" \
+  -m ruff check tests/test_cluster_scripts.py
+```
+
+Result: `All checks passed!`.
+
+```bash
+bash -n scripts/cluster/run_final_cell.sh scripts/cluster/mappo_smoke.slurm scripts/cluster/mappo_sweep.slurm scripts/cluster/submit_sweep.sh
+```
+
+Result: exit code `0`.
+
 Smoke metrics already generated locally:
 
 - `public_dev` MAPPO smoke, 96 training steps and 64 eval steps:
@@ -68,14 +92,43 @@ Smoke metrics already generated locally:
 These are syntax and topology-portability checks only. They are not competitive
 training evidence because the smoke config intentionally caps training and eval.
 
-## Neuronic Status
+## Baseline Neuronic Matrix
 
-The current PPO/SAC/TD3 final sweep should remain undisturbed. The MAPPO matrix
-is separate and should use its own sweep id:
+Existing PPO/SAC/TD3 final-sweep job `2984866` completed all 81 array cells
+with Slurm exit code `0:0`. Aggregation wrote 567 rows to:
+
+```text
+/n/fs/pvl-lidar/cache/ed1783/citylearn/sweeps/citylearn-final-hp-20260506-r1/summary.csv
+```
+
+Best mean `public_dev` configurations, using lower score as better:
+
+| Algorithm | Selected config | public_dev mean | phase 2 mean | phase 3 mean |
+| --- | --- | ---: | ---: | ---: |
+| PPO | `lr=3e-3`, `ent_coef=0.0` | 0.770650 | 0.782011 | 0.816921 |
+| SAC | `lr=1e-3`, `reward_scaling=5.0` | 0.553356 | 0.665839 | 0.743745 |
+| TD3 | `lr=1e-3`, `exploration_noise=0.05` | 0.600946 | 0.730462 | 0.763056 |
+
+SAC remains the strongest baseline from this matrix.
+
+## MAPPO Neuronic Status
+
+The current PPO/SAC/TD3 final sweep is complete. The MAPPO matrix is separate
+and uses its own sweep id:
 
 ```bash
-cd /u/$USER/cos435-citylearn
-JOB=mappo_sweep SWEEP_ID=citylearn-mappo-ctde-YYYYMMDD-r1 bash scripts/cluster/submit_sweep.sh
+cd /u/ed1783/cos435-citylearn-mappo-work
+JOB=mappo_sweep ROOT_DIR=/u/ed1783/cos435-citylearn-mappo-work \
+  SWEEP_ID=citylearn-mappo-ctde-20260506-r1 \
+  bash scripts/cluster/submit_sweep.sh
+```
+
+Submitted Slurm job: `2985130`.
+
+Artifact root:
+
+```text
+/n/fs/pvl-lidar/cache/ed1783/citylearn/sweeps/citylearn-mappo-ctde-20260506-r1
 ```
 
 Aggregate after completion:
@@ -86,10 +139,6 @@ python scripts/cluster/aggregate_final_sweep.py \
   --sweep-root "$SWEEP_ROOT" \
   --out "$SWEEP_ROOT/summary.csv"
 ```
-
-The last attempted SSH status check failed with
-`Permission denied (keyboard-interactive)`, so no MAPPO Neuronic job was
-submitted from this session.
 
 ## What Worked
 
@@ -102,8 +151,8 @@ submitted from this session.
 
 ## What Remains Open
 
-- Run the MAPPO 18-cell matrix on Neuronic after SSH access is restored and
-  after confirming it will not contend with the current `cos435-final` array.
+- Monitor MAPPO Slurm job `2985130` to completion and aggregate
+  `citylearn-mappo-ctde-20260506-r1/summary.csv`.
 - Compare MAPPO against PPO/SAC/TD3 on `public_dev`, released phase 2, and
   released phase 3 using normalized CSV rows.
 - Refresh `submission/results/` and figures only after the MAPPO matrix produces
