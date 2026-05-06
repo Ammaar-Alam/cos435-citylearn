@@ -72,6 +72,7 @@ EOF
 
 export COS435_REQUIRE_DATA=1
 export MPLCONFIGDIR="$ROOT_DIR/.cache/matplotlib"
+export PYTHONPATH="$ROOT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
 
 echo "=== train $CELL_ID on public_dev ==="
 python "$TRAIN_SCRIPT" \
