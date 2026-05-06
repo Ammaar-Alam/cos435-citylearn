@@ -430,6 +430,7 @@ def run_sac(
     split_override: str | None = None,
     seed_override: int | None = None,
     lr_override: float | None = None,
+    reward_scaling_override: float | None = None,
     allow_cross_reward_eval: bool = False,
 ) -> dict[str, Any]:
     config = load_yaml(config_path)
@@ -441,6 +442,8 @@ def run_sac(
         config["training"]["seed"] = int(seed_override)
     if lr_override is not None:
         config["training"]["learning_rate"] = float(lr_override)
+    if reward_scaling_override is not None:
+        config["training"]["reward_scaling"] = float(reward_scaling_override)
 
     split_config_path = f"configs/splits/{config['env']['split']}.yaml"
     split_config = load_yaml(split_config_path)

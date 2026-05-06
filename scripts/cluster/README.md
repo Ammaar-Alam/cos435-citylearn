@@ -116,3 +116,29 @@ Do not commit:
 
 After aggregation, copy only final CSV rows needed by the report into
 `submission/results/`.
+
+## targeted final sweep
+
+After the broad learning-rate screen, run the smaller algorithm-specific matrix
+with:
+
+```bash
+cd /u/$USER/cos435-citylearn
+JOB=final_sweep SWEEP_ID=citylearn-final-hp-20260506-r1 bash scripts/cluster/submit_sweep.sh
+```
+
+This dispatches 81 cells:
+
+- SAC: `lr x reward_scaling x seed`
+- TD3: `lr x exploration_noise x seed`
+- PPO: `lr x ent_coef x seed`
+
+The default Slurm array cap is 75 cells x 4 CPUs = 300 CPUs.
+
+Aggregate it with:
+
+```bash
+python scripts/cluster/aggregate_final_sweep.py \
+  --sweep-root "$SWEEP_ROOT" \
+  --out "$SWEEP_ROOT/summary.csv"
+```

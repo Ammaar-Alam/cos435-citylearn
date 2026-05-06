@@ -48,6 +48,12 @@ def main() -> None:
         default=None,
         help="override training.learning_rate from the config",
     )
+    parser.add_argument(
+        "--exploration-noise",
+        type=float,
+        default=None,
+        help="override training.exploration_noise from the config",
+    )
     parser.add_argument("--output-root", default=None, help="directory for run artifacts")
     parser.add_argument("--metrics-root", default=None, help="directory for metric CSV outputs")
     parser.add_argument("--manifests-root", default=None, help="directory for run manifests")
@@ -81,6 +87,7 @@ def main() -> None:
         split_override=args.split,
         seed_override=args.seed,
         lr_override=args.lr,
+        exploration_noise_override=args.exploration_noise,
         output_root=args.output_root,
         metrics_root=args.metrics_root,
         manifests_root=args.manifests_root,

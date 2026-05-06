@@ -796,6 +796,7 @@ def run_td3(
     split_override: str | None = None,
     seed_override: int | None = None,
     lr_override: float | None = None,
+    exploration_noise_override: float | None = None,
     allow_cross_reward_eval: bool = False,
 ) -> dict[str, Any]:
     config = load_yaml(config_path)
@@ -806,6 +807,8 @@ def run_td3(
         config["training"]["seed"] = int(seed_override)
     if lr_override is not None:
         config["training"]["learning_rate"] = float(lr_override)
+    if exploration_noise_override is not None:
+        config["training"]["exploration_noise"] = float(exploration_noise_override)
     split_config = load_yaml(f"configs/splits/{config['env']['split']}.yaml")
     assert_training_allowed_on_split(
         split_config,

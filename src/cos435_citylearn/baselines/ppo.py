@@ -365,6 +365,7 @@ def run_ppo(
     split_override: str | None = None,
     seed_override: int | None = None,
     lr_override: float | None = None,
+    ent_coef_override: float | None = None,
     allow_cross_reward_eval: bool = False,
     **kwargs,
 ) -> dict[str, Any]:
@@ -377,6 +378,8 @@ def run_ppo(
         config["training"]["seed"] = int(seed_override)
     if lr_override is not None:
         config["training"]["learning_rate"] = float(lr_override)
+    if ent_coef_override is not None:
+        config["training"]["ent_coef"] = float(ent_coef_override)
 
     split_config_path = f"configs/splits/{config['env']['split']}.yaml"
     split_config = load_yaml(split_config_path)
