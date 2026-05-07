@@ -36,6 +36,7 @@ is missing.
 - `ppo_shared_sweep_inventory.csv` - per-run shared-PPO sweep inventory with KPI columns
 - `shared_sweep_summary.csv` - regenerated per-learning-rate shared PPO/SAC/TD3/MAPPO sweep summary rows after the relevant sweep has been collected
 - `shared_sweep_inventory.csv` - regenerated per-run shared PPO/SAC/TD3/MAPPO sweep inventory after the relevant sweep has been collected
+- `final_hp_sweep_summary.csv` - combined 3-seed PPO/SAC/TD3/MAPPO final hyperparameter matrix from Neuronic sweep summaries
 - `official_benchmark_reference.csv` - published CityLearn 2023 reference numbers
 - `figure_manifest.csv` - tracked report figure inventory
 
@@ -48,6 +49,9 @@ is missing.
 - `sac_ablation_summary.csv` and `sac_seed_inventory.csv` back SAC reward and seed ablations.
 - `ppo_shared_sweep_summary.csv` and `ppo_shared_sweep_inventory.csv` back the existing shared-PPO learning-rate sweep discussion.
 - `shared_sweep_summary.csv` and `shared_sweep_inventory.csv` back the expanded PPO/SAC/TD3/MAPPO result matrix once the relevant sweeps have been collected.
+- `final_hp_sweep_summary.csv` records the completed final PPO/SAC/TD3 and
+  MAPPO sweep comparison used to decide that SAC remains the strongest
+  reportable controller.
 - `official_benchmark_reference.csv` is context only; it is not mixed into local or released-eval means.
 
 ## Local public_dev snapshot

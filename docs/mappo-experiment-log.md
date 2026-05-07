@@ -113,8 +113,8 @@ SAC remains the strongest baseline from this matrix.
 
 ## MAPPO Neuronic Status
 
-The current PPO/SAC/TD3 final sweep is complete. The MAPPO matrix is separate
-and uses its own sweep id:
+The current PPO/SAC/TD3 final sweep is complete. The MAPPO matrix was run as a
+separate additive sweep:
 
 ```bash
 cd /u/ed1783/cos435-citylearn-mappo-work
@@ -123,7 +123,12 @@ JOB=mappo_sweep ROOT_DIR=/u/ed1783/cos435-citylearn-mappo-work \
   bash scripts/cluster/submit_sweep.sh
 ```
 
-Submitted Slurm job: `2985130`.
+Submitted Slurm job: `2985130`. All 18 array cells completed with Slurm exit
+code `0:0`. Aggregation wrote 126 rows to:
+
+```text
+/n/fs/pvl-lidar/cache/ed1783/citylearn/sweeps/citylearn-mappo-ctde-20260506-r1/summary.csv
+```
 
 Artifact root:
 
@@ -131,7 +136,7 @@ Artifact root:
 /n/fs/pvl-lidar/cache/ed1783/citylearn/sweeps/citylearn-mappo-ctde-20260506-r1
 ```
 
-Aggregate after completion:
+Aggregation command:
 
 ```bash
 python scripts/cluster/aggregate_final_sweep.py \
@@ -139,6 +144,36 @@ python scripts/cluster/aggregate_final_sweep.py \
   --sweep-root "$SWEEP_ROOT" \
   --out "$SWEEP_ROOT/summary.csv"
 ```
+
+Best MAPPO mean `public_dev` configuration:
+
+| Algorithm | Selected config | public_dev mean | phase 2 mean | phase 3 mean |
+| --- | --- | ---: | ---: | ---: |
+| MAPPO | `lr=1e-3`, `ent_coef=0.0` | 0.922230 | 0.983547 | 0.997916 |
+
+MAPPO did not beat any PPO/SAC/TD3 baseline in this matrix. Its best released
+average was `0.960650` for `lr=1e-3`, `ent_coef=0.01`, still far worse than
+the best SAC released average.
+
+## Final Matrix Decision
+
+The combined 33-config final hyperparameter summary is tracked in
+`submission/results/final_hp_sweep_summary.csv`. Lower scores are better.
+
+| Selection rule | Algorithm | Config | public_dev mean | phase 2 mean | phase 3 mean | released avg |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| Best `public_dev` | SAC | `lr=1e-3`, `reward_scaling=5.0` | 0.553356 | 0.665839 | 0.743745 | 0.704792 |
+| Best phase 2 | SAC | `lr=5e-4`, `reward_scaling=10.0` | 0.560255 | 0.663757 | 0.753156 | 0.708457 |
+| Best phase 3 | SAC | `lr=5e-4`, `reward_scaling=5.0` | 0.566970 | 0.666234 | 0.737590 | 0.701912 |
+| Best released average | SAC | `lr=5e-4`, `reward_scaling=5.0` | 0.566970 | 0.666234 | 0.737590 | 0.701912 |
+
+Conclusion: the MAPPO pivot was rubric-safe and functional, but not useful for
+leaderboard performance. The strongest reportable controller remains shared SAC.
+Use `lr=1e-3`, `reward_scaling=5.0` as the primary configuration because it was
+selected on `public_dev`, the tuning split. Report `lr=5e-4`,
+`reward_scaling=5.0` as a post-hoc released-diagnostic configuration: it is the
+best phase-3 and released-average SAC setting, but it should not be presented as
+the pre-registered model-selection result.
 
 ## What Worked
 
@@ -148,12 +183,21 @@ python scripts/cluster/aggregate_final_sweep.py \
   summaries without changing the actor observation contract.
 - The aggregation path can now preserve the original PPO/SAC/TD3 final sweep and
   separately aggregate a MAPPO-only matrix.
+- The MAPPO branch produced a complete seed/hyperparameter matrix quickly on
+  Neuronic without interfering with the existing baseline sweep artifacts.
+
+## What Did Not Work
+
+- MAPPO underperformed badly after real training. Its best `public_dev` score
+  was `0.922230`, compared with SAC at `0.553356` and TD3 at `0.600946`.
+- The centralized critic did not translate into better cross-topology transfer
+  under the current short shared-actor training budget.
+- The separate MAPPO sweep initially exposed two workflow bugs: direct `sbatch`
+  did not export `SWEEP_ROOT`, and the remote shared virtualenv imported the
+  base checkout until cluster entrypoints explicitly preferred `$ROOT_DIR/src`.
 
 ## What Remains Open
 
-- Monitor MAPPO Slurm job `2985130` to completion and aggregate
-  `citylearn-mappo-ctde-20260506-r1/summary.csv`.
-- Compare MAPPO against PPO/SAC/TD3 on `public_dev`, released phase 2, and
-  released phase 3 using normalized CSV rows.
-- Refresh `submission/results/` and figures only after the MAPPO matrix produces
-  complete metrics.
+- If figures need to show the final MAPPO matrix, copy the remote normalized
+  MAPPO metric CSVs into local ignored `results/metrics/` and regenerate the
+  report figures from the exporter path.
