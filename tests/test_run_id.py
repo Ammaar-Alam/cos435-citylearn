@@ -115,6 +115,28 @@ def test_build_run_id_prefers_slurm_array_env(monkeypatch) -> None:
     assert run_id.endswith("__123456.7")
 
 
+def test_build_run_id_distinguishes_same_lr_seed_slurm_array_cells(monkeypatch) -> None:
+    kwargs = {
+        "algo": "mappo",
+        "variant": "mappo_shared_ctde_reward_v2",
+        "split": "public_dev",
+        "seed": 0,
+        "now": datetime(2026, 5, 6, 23, 46, 54, tzinfo=timezone.utc),
+        "lr": 1e-4,
+    }
+
+    monkeypatch.setenv("SLURM_ARRAY_JOB_ID", "2985130")
+    monkeypatch.setenv("SLURM_ARRAY_TASK_ID", "0")
+    first_entropy = build_run_id(**kwargs)
+
+    monkeypatch.setenv("SLURM_ARRAY_TASK_ID", "3")
+    second_entropy = build_run_id(**kwargs)
+
+    assert first_entropy.endswith("__2985130.0")
+    assert second_entropy.endswith("__2985130.3")
+    assert first_entropy != second_entropy
+
+
 def test_build_run_id_falls_back_to_slurm_job_id(monkeypatch) -> None:
     monkeypatch.delenv("SLURM_ARRAY_JOB_ID", raising=False)
     monkeypatch.delenv("SLURM_ARRAY_TASK_ID", raising=False)

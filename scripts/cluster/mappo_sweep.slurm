@@ -24,6 +24,8 @@ LRS=(1e-4 3e-4 1e-3)
 ENT_COEFS=(0.0 0.01)
 SEEDS=(0 1 2)
 
+# build_run_id appends SLURM_ARRAY_JOB_ID.SLURM_ARRAY_TASK_ID, so the two
+# ent_coef cells for the same (lr, seed) still get distinct run/metric paths.
 TASK_ID=$SLURM_ARRAY_TASK_ID
 LR="${LRS[$(( TASK_ID / 6 ))]}"
 ENT_COEF="${ENT_COEFS[$(( (TASK_ID % 6) / 3 ))]}"
