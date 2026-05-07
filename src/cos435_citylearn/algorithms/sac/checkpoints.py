@@ -80,6 +80,11 @@ SHARED_CONTROLLER_STATE_KEYS = {
     "shared_context_dimension",
 }
 
+RESIDUAL_SHARED_CONTROLLER_STATE_KEYS = SHARED_CONTROLLER_STATE_KEYS | {
+    "expert_policy",
+    "residual_scaling_coefficient",
+}
+
 
 def resolve_imported_checkpoint_path(
     *,
@@ -132,7 +137,7 @@ def validate_checkpoint_payload_structure(payload: Any) -> None:
     if payload["algorithm"] != "sac":
         raise ValueError("checkpoint payload is not a SAC checkpoint")
 
-    if payload["control_mode"] not in {"centralized", "shared_dtde"}:
+    if payload["control_mode"] not in {"centralized", "shared_dtde", "shared_residual"}:
         raise ValueError(f"unsupported SAC checkpoint control_mode: {payload['control_mode']}")
 
     if not isinstance(payload["observation_names"], list) or not isinstance(
@@ -155,6 +160,8 @@ def validate_checkpoint_payload_structure(payload: Any) -> None:
         missing_specific = sorted(CENTRALIZED_CONTROLLER_STATE_KEYS - set(controller_state))
     elif controller_type == "shared_parameter_sac":
         missing_specific = sorted(SHARED_CONTROLLER_STATE_KEYS - set(controller_state))
+    elif controller_type == "shared_residual_sac":
+        missing_specific = sorted(RESIDUAL_SHARED_CONTROLLER_STATE_KEYS - set(controller_state))
     else:
         raise ValueError(f"unknown SAC checkpoint controller type: {controller_type}")
 
@@ -163,7 +170,7 @@ def validate_checkpoint_payload_structure(payload: Any) -> None:
             "SAC checkpoint controller_state missing required keys: " + ", ".join(missing_specific)
         )
 
-    if controller_type == "shared_parameter_sac":
+    if controller_type in {"shared_parameter_sac", "shared_residual_sac"}:
         try:
             shared_context_dimension = int(controller_state["shared_context_dimension"])
         except (TypeError, ValueError) as exc:
@@ -236,16 +243,16 @@ def validate_checkpoint_env_compatibility(
     env_action_names = [list(names) for names in action_names]
     control_mode = checkpoint_payload.get("control_mode", "<unknown>")
 
-    if control_mode == "shared_dtde":
+    if control_mode in {"shared_dtde", "shared_residual"}:
         # Shared policies are topology-invariant: the number of buildings can differ
         # as long as the per-building observation/action schemas match.
         if not checkpoint_observation_names or not env_observation_names:
             raise ValueError(
-                "shared_dtde checkpoint requires non-empty observation schema on both sides"
+                f"{control_mode} checkpoint requires non-empty observation schema on both sides"
             )
         if not checkpoint_action_names or not env_action_names:
             raise ValueError(
-                "shared_dtde checkpoint requires non-empty action schema on both sides"
+                f"{control_mode} checkpoint requires non-empty action schema on both sides"
             )
         reference_observation_names = checkpoint_observation_names[0]
         reference_action_names = checkpoint_action_names[0]
@@ -259,21 +266,22 @@ def validate_checkpoint_env_compatibility(
         if any(names != env_reference_observation for names in env_observation_names):
             raise ValueError(
                 "target env has inconsistent per-building observation schemas; "
-                "shared_dtde requires identical buildings"
+                f"{control_mode} requires identical buildings"
             )
         if any(names != env_reference_action for names in env_action_names):
             raise ValueError(
                 "target env has inconsistent per-building action schemas; "
-                "shared_dtde requires identical buildings"
+                f"{control_mode} requires identical buildings"
             )
         if reference_observation_names != env_reference_observation:
             raise ValueError(
-                "shared_dtde checkpoint per-building observation schema does not match target env; "
+                f"{control_mode} checkpoint per-building observation schema does not match "
+                "target env; "
                 "the two datasets expose different building features."
             )
         if reference_action_names != env_reference_action:
             raise ValueError(
-                "shared_dtde checkpoint per-building action schema does not match target env."
+                f"{control_mode} checkpoint per-building action schema does not match target env."
             )
         return
 

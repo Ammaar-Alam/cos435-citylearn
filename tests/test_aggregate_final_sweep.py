@@ -87,3 +87,55 @@ def test_aggregate_final_sweep_writes_present_cells_when_allowed(tmp_path: Path)
         "sac_lr1e-4_hp-reward_scaling_val-2p5_seed0,sac,1e-4,0,"
         "reward_scaling,2.5,phase_2_online_eval_1,eval-run,0.6"
     ) in rows
+
+
+def test_aggregate_hp_sweep_scans_residual_cells(tmp_path: Path) -> None:
+    sweep_root = tmp_path / "residual_sac_sweep"
+    cell_id = "sac_residual_lr3e-4_hp-residual_scaling_val-0p75_seed1"
+    cell = sweep_root / cell_id
+    summary_path = tmp_path / "summary.csv"
+
+    _write_json(
+        cell / "meta.json",
+        {
+            "cell_id": cell_id,
+            "algo": "sac_residual",
+            "lr": "3e-4",
+            "seed": 1,
+            "hyperparameter": "residual_scaling",
+            "hyperparameter_value": "0.75",
+        },
+    )
+    _write_json(cell / "train.json", {"run_id": "train-run", "average_score": 0.45})
+    _write_json(
+        cell / "eval_phase_3_1.json",
+        {"run_id": "eval-run", "average_score": 0.55},
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "cluster" / "aggregate_hp_sweep.py"),
+            "--sweep-root",
+            str(sweep_root),
+            "--out",
+            str(summary_path),
+            "--eval-splits",
+            "phase_3_1",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
+    rows = summary_path.read_text().splitlines()
+    assert (
+        "sac_residual_lr3e-4_hp-residual_scaling_val-0p75_seed1,sac_residual,3e-4,1,"
+        "residual_scaling,0.75,public_dev,train-run,0.45"
+    ) in rows
+    assert (
+        "sac_residual_lr3e-4_hp-residual_scaling_val-0p75_seed1,sac_residual,3e-4,1,"
+        "residual_scaling,0.75,phase_3_1,eval-run,0.55"
+    ) in rows

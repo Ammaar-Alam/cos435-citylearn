@@ -7,8 +7,10 @@ from cos435_citylearn.algorithms.sac.checkpoints import (
 )
 from cos435_citylearn.algorithms.sac.controllers import (
     CentralizedSACController,
+    ResidualSharedSACController,
     SharedSACController,
 )
+from cos435_citylearn.algorithms.sac.expert import SUPPORTED_EXPERT_POLICIES, ExpertActionPolicy
 from cos435_citylearn.algorithms.sac.features import (
     SHARED_CONTEXT_DIMENSION,
     augment_shared_observations,
@@ -22,7 +24,10 @@ from cos435_citylearn.algorithms.sac.rewards import (
 
 __all__ = [
     "CentralizedSACController",
+    "ExpertActionPolicy",
+    "ResidualSharedSACController",
     "SharedSACController",
+    "SUPPORTED_EXPERT_POLICIES",
     "SHARED_CONTEXT_DIMENSION",
     "resolve_imported_checkpoint_path",
     "safe_load_checkpoint_payload",

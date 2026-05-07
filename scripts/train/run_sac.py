@@ -49,6 +49,17 @@ def main() -> None:
         default=None,
         help="override training.reward_scaling from the config",
     )
+    parser.add_argument(
+        "--expert-policy",
+        default=None,
+        help="override expert.policy for shared residual SAC configs",
+    )
+    parser.add_argument(
+        "--residual-scaling",
+        type=float,
+        default=None,
+        help="override expert.residual_scaling_coefficient for shared residual SAC configs",
+    )
     parser.add_argument("--output-root", default=None, help="directory for run artifacts")
     parser.add_argument("--metrics-root", default=None, help="directory for metric CSV outputs")
     parser.add_argument("--manifests-root", default=None, help="directory for run manifests")
@@ -82,6 +93,8 @@ def main() -> None:
         seed_override=args.seed,
         lr_override=args.lr,
         reward_scaling_override=args.reward_scaling,
+        expert_policy_override=args.expert_policy,
+        residual_scaling_override=args.residual_scaling,
         output_root=args.output_root,
         metrics_root=args.metrics_root,
         manifests_root=args.manifests_root,

@@ -3,7 +3,7 @@
 # hyperparameter in addition to learning rate and seed.
 #
 # args:
-#   $1 = algo (ppo|sac|td3)
+#   $1 = algo (ppo|sac|sac_residual|td3)
 #   $2 = lr
 #   $3 = seed
 #   $4 = hyperparameter name (ent_coef|reward_scaling|exploration_noise)
@@ -32,6 +32,11 @@ case "$ALGO:$HP_NAME" in
     TRAIN_SCRIPT="scripts/train/run_sac.py"
     CONFIG="configs/train/sac/sac_shared_dtde_reward_v2.yaml"
     EXTRA_ARGS=(--reward-scaling "$HP_VALUE")
+    ;;
+  sac_residual:residual_scaling)
+    TRAIN_SCRIPT="scripts/train/run_sac.py"
+    CONFIG="configs/train/sac/sac_shared_residual_adaptive_reward_v2.yaml"
+    EXTRA_ARGS=(--residual-scaling "$HP_VALUE")
     ;;
   td3:exploration_noise)
     TRAIN_SCRIPT="scripts/train/run_td3.py"

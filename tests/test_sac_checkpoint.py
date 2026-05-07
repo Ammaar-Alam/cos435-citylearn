@@ -112,6 +112,17 @@ def _minimal_shared_checkpoint_payload() -> dict[str, object]:
     }
 
 
+def _minimal_residual_checkpoint_payload() -> dict[str, object]:
+    payload = _minimal_shared_checkpoint_payload()
+    payload["control_mode"] = "shared_residual"
+    payload["variant"] = "shared_residual_adaptive_reward_v2"
+    controller_state = payload["controller_state"]
+    controller_state["controller_type"] = "shared_residual_sac"
+    controller_state["expert_policy"] = "adaptive_storage_v1"
+    controller_state["residual_scaling_coefficient"] = 0.75
+    return payload
+
+
 def _warm_checkpoint_payload(config_path: str, tmp_path: Path):
     config = load_yaml(config_path)
     reward_function = resolve_reward_function(config["reward"]["version"])
@@ -231,6 +242,21 @@ def _matching_runner_config_shared() -> dict[str, object]:
 def test_validate_checkpoint_runner_compatibility_passes_on_matching_runtime_labels() -> None:
     payload = _minimal_shared_checkpoint_payload()
     config = _matching_runner_config_shared()
+    mismatches = validate_checkpoint_runner_compatibility(payload, config)
+    assert mismatches == {}
+
+
+def test_validate_residual_checkpoint_runner_compatibility_passes() -> None:
+    payload = _minimal_residual_checkpoint_payload()
+    config = {
+        "algorithm": {
+            "name": "sac",
+            "control_mode": "shared_residual",
+            "variant": "shared_residual_adaptive_reward_v2",
+        },
+        "reward": {"version": "v2"},
+        "features": {"version": "v2"},
+    }
     mismatches = validate_checkpoint_runner_compatibility(payload, config)
     assert mismatches == {}
 
@@ -384,6 +410,17 @@ def test_validate_shared_checkpoint_env_compatibility_allows_topology_expansion(
     )
 
 
+def test_validate_residual_checkpoint_env_compatibility_allows_topology_expansion() -> None:
+    """Residual shared checkpoints keep the same topology-invariant contract."""
+    payload = _minimal_residual_checkpoint_payload()
+
+    validate_checkpoint_env_compatibility(
+        payload,
+        observation_names=[["hour", "load"]] * 6,
+        action_names=[["battery"]] * 6,
+    )
+
+
 def test_validate_checkpoint_env_compatibility_rejects_shared_per_building_mismatch() -> None:
     """Shared checkpoints must still fail when per-building schemas differ."""
     payload = _minimal_shared_checkpoint_payload()
@@ -414,6 +451,14 @@ def test_validate_checkpoint_payload_structure_rejects_missing_shared_context_di
     del payload["controller_state"]["shared_context_dimension"]
 
     with pytest.raises(ValueError, match="shared_context_dimension"):
+        validate_checkpoint_payload_structure(payload)
+
+
+def test_validate_checkpoint_payload_structure_rejects_missing_residual_fields() -> None:
+    payload = _minimal_residual_checkpoint_payload()
+    del payload["controller_state"]["residual_scaling_coefficient"]
+
+    with pytest.raises(ValueError, match="residual_scaling_coefficient"):
         validate_checkpoint_payload_structure(payload)
 
 

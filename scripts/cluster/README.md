@@ -142,3 +142,25 @@ python scripts/cluster/aggregate_final_sweep.py \
   --sweep-root "$SWEEP_ROOT" \
   --out "$SWEEP_ROOT/summary.csv"
 ```
+
+## residual SAC sweep
+
+The residual SAC branch adds a shared SAC policy that acts as a bounded
+correction around the adaptive expert controller. Run its smaller matrix with:
+
+```bash
+cd /u/$USER/cos435-citylearn
+JOB=residual_sac_sweep SWEEP_ID=citylearn-residual-sac-20260507-r1 bash scripts/cluster/submit_sweep.sh
+```
+
+This dispatches 27 cells:
+
+- residual SAC: `lr x residual_scaling x seed`
+
+Aggregate it with:
+
+```bash
+python scripts/cluster/aggregate_hp_sweep.py \
+  --sweep-root "$SWEEP_ROOT" \
+  --out "$SWEEP_ROOT/summary.csv"
+```

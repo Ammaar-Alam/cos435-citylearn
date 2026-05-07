@@ -9,6 +9,7 @@ import torch
 
 from cos435_citylearn.algorithms.sac import (
     CentralizedSACController,
+    ResidualSharedSACController,
     SharedSACController,
     resolve_imported_checkpoint_path,
     resolve_reward_function,
@@ -89,6 +90,17 @@ def _instantiate_controller(env: Any, config: dict[str, Any]):
             shared_context_dimension=int(config["features"].get("shared_context_dimension", 4)),
             **controller_kwargs,
         )
+    if control_mode == "shared_residual":
+        expert_config = config.get("expert", {})
+        return ResidualSharedSACController(
+            env,
+            shared_context_dimension=int(config["features"].get("shared_context_dimension", 4)),
+            expert_policy=str(expert_config.get("policy", "adaptive_storage_v1")),
+            residual_scaling_coefficient=float(
+                expert_config.get("residual_scaling_coefficient", 0.75)
+            ),
+            **controller_kwargs,
+        )
     raise ValueError(f"unsupported SAC control mode: {control_mode}")
 
 
@@ -119,6 +131,16 @@ def _instantiate_controller_from_checkpoint(
         controller = SharedSACController(
             env,
             shared_context_dimension=int(controller_state.get("shared_context_dimension", 4)),
+            **common_kwargs,
+        )
+    elif controller_state["controller_type"] == "shared_residual_sac":
+        controller = ResidualSharedSACController(
+            env,
+            shared_context_dimension=int(controller_state.get("shared_context_dimension", 4)),
+            expert_policy=str(controller_state.get("expert_policy", "adaptive_storage_v1")),
+            residual_scaling_coefficient=float(
+                controller_state.get("residual_scaling_coefficient", 0.75)
+            ),
             **common_kwargs,
         )
     else:
@@ -267,6 +289,8 @@ def _run_training_loop(
                     "alpha": stats.get("alpha"),
                     "alpha_loss": stats.get("alpha_loss"),
                     "buffer_size": stats.get("buffer_size"),
+                    "expert_abs_mean": stats.get("expert_abs_mean"),
+                    "residual_abs_mean": stats.get("residual_abs_mean"),
                 }
             )
 
@@ -431,6 +455,8 @@ def run_sac(
     seed_override: int | None = None,
     lr_override: float | None = None,
     reward_scaling_override: float | None = None,
+    expert_policy_override: str | None = None,
+    residual_scaling_override: float | None = None,
     allow_cross_reward_eval: bool = False,
 ) -> dict[str, Any]:
     config = load_yaml(config_path)
@@ -444,6 +470,12 @@ def run_sac(
         config["training"]["learning_rate"] = float(lr_override)
     if reward_scaling_override is not None:
         config["training"]["reward_scaling"] = float(reward_scaling_override)
+    if expert_policy_override is not None:
+        config.setdefault("expert", {})["policy"] = str(expert_policy_override)
+    if residual_scaling_override is not None:
+        config.setdefault("expert", {})["residual_scaling_coefficient"] = float(
+            residual_scaling_override
+        )
 
     split_config_path = f"configs/splits/{config['env']['split']}.yaml"
     split_config = load_yaml(split_config_path)

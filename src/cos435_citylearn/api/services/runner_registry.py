@@ -91,6 +91,21 @@ RUNNERS: dict[str, RunnerSpec] = {
         eval_config_path="configs/eval/default.yaml",
         supports_checkpoint_eval=True,
     ),
+    "sac_shared_residual_adaptive_reward_v2": RunnerSpec(
+        runner_id="sac_shared_residual_adaptive_reward_v2",
+        label="Residual SAC Adaptive Expert",
+        algorithm="sac",
+        variant="shared_residual_adaptive_reward_v2",
+        description=(
+            "Parameter-shared SAC residual policy around the adaptive expert controller "
+            "with reward_v2"
+        ),
+        callable_path="cos435_citylearn.baselines.sac.run_sac",
+        workload_id="eval_sac_checkpoint",
+        config_path="configs/train/sac/sac_shared_residual_adaptive_reward_v2.yaml",
+        eval_config_path="configs/eval/default.yaml",
+        supports_checkpoint_eval=True,
+    ),
     "ppo_shared_dtde_reward_v2": RunnerSpec(
         runner_id="ppo_shared_dtde_reward_v2",
         label="Shared PPO Reward v2",

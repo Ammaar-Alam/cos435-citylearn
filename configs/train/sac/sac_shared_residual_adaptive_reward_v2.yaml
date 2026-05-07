@@ -1,0 +1,51 @@
+env:
+  base_config: configs/env/citylearn_2023.yaml
+  split: public_dev
+
+algorithm:
+  name: sac
+  control_mode: shared_residual
+  variant: shared_residual_adaptive_reward_v2
+  policy: gaussian_mlp_residual
+
+expert:
+  policy: adaptive_storage_v1
+  residual_scaling_coefficient: 0.75
+
+reward:
+  version: reward_v2
+
+features:
+  version: shared_district_context
+  shared_context_dimension: 4
+
+training:
+  total_timesteps: 250000
+  seed: 0
+  batch_size: 256
+  learning_rate: 0.0003
+  replay_buffer_size: 100000
+  hidden_dimension: [256, 256]
+  discount: 0.99
+  tau: 0.005
+  alpha: 0.2
+  reward_scaling: 5.0
+  update_per_time_step: 2
+  auto_entropy_tuning: true
+  exploration_steps: 8192
+  standardize_start_time_step: 4096
+  log_interval_steps: 256
+  action_scaling_coefficient: 0.5
+
+evaluation:
+  deterministic: true
+  eval_episodes: 1
+  save_rollout_trace: true
+  trace_limit: 96
+  preview_stride: 12
+
+logging:
+  run_group: sac_residual
+  output_root: results/runs
+  metrics_root: results/metrics
+  manifests_root: results/manifests

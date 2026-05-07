@@ -10,6 +10,7 @@ from citylearn.preprocessing import Encoder, RemoveFeature
 from citylearn.rl import PolicyNetwork, ReplayBuffer, SoftQNetwork
 from torch import nn, optim
 
+from cos435_citylearn.algorithms.sac.expert import ExpertActionPolicy
 from cos435_citylearn.algorithms.sac.features import (
     SHARED_CONTEXT_DIMENSION,
     build_shared_context,
@@ -855,3 +856,150 @@ class SharedSACController(RLC):
             state_dict = payload.get("alpha_optimizer_state_dict")
             if state_dict is not None:
                 self.alpha_optimizer.load_state_dict(state_dict)
+
+
+class ResidualSharedSACController(SharedSACController):
+    def __init__(
+        self,
+        env,
+        *,
+        expert_policy: str = "adaptive_storage_v1",
+        residual_scaling_coefficient: float = 0.75,
+        **kwargs: Any,
+    ):
+        self.expert_policy_name = str(expert_policy)
+        self.residual_scaling_coefficient = float(residual_scaling_coefficient)
+        if self.residual_scaling_coefficient <= 0.0:
+            raise ValueError("residual_scaling_coefficient must be positive")
+        self.expert_policy: ExpertActionPolicy | None = None
+        super().__init__(env, **kwargs)
+        self.expert_policy = ExpertActionPolicy(
+            self.expert_policy_name,
+            observation_names=self.observation_names,
+            action_names=self.action_names,
+            action_lows=[space.low.astype(float).tolist() for space in self.action_space],
+            action_highs=[space.high.astype(float).tolist() for space in self.action_space],
+        )
+
+    @property
+    def controller_type(self) -> str:
+        return "shared_residual_sac"
+
+    def _residual_center(self, index: int) -> np.ndarray:
+        space = self.action_space[index]
+        return self.action_scaling_coefficient * (space.high + space.low) / 2.0
+
+    def _residual_low(self, index: int) -> np.ndarray:
+        return self.action_scaling_coefficient * self.action_space[index].low
+
+    def _residual_high(self, index: int) -> np.ndarray:
+        return self.action_scaling_coefficient * self.action_space[index].high
+
+    def _expert_actions(self, observations: list[list[float]]) -> list[list[float]]:
+        if self.expert_policy is None:
+            raise RuntimeError("residual SAC expert policy was not initialized")
+        return self.expert_policy.predict(observations)
+
+    def _compose_residual_actions(
+        self,
+        expert_actions: list[list[float]],
+        residual_policy_actions: list[list[float]],
+    ) -> list[list[float]]:
+        composed: list[list[float]] = []
+
+        for index, (expert_action, residual_action) in enumerate(
+            zip(expert_actions, residual_policy_actions)
+        ):
+            expert = np.asarray(expert_action, dtype="float32")
+            residual = np.asarray(residual_action, dtype="float32")
+            delta = residual - self._residual_center(index)
+            action = expert + self.residual_scaling_coefficient * delta
+            action = np.clip(action, self.action_space[index].low, self.action_space[index].high)
+            composed.append(action.astype(float).tolist())
+
+        return composed
+
+    def _to_residual_policy_actions(
+        self,
+        observations: list[list[float]],
+        applied_actions: list[list[float]],
+    ) -> list[list[float]]:
+        expert_actions = self._expert_actions(observations)
+        residual_actions: list[list[float]] = []
+
+        for index, (expert_action, applied_action) in enumerate(
+            zip(expert_actions, applied_actions)
+        ):
+            expert = np.asarray(expert_action, dtype="float32")
+            applied = np.asarray(applied_action, dtype="float32")
+            raw_residual = self._residual_center(index) + (
+                (applied - expert) / self.residual_scaling_coefficient
+            )
+            raw_residual = np.clip(
+                raw_residual,
+                self._residual_low(index),
+                self._residual_high(index),
+            )
+            residual_actions.append(raw_residual.astype(float).tolist())
+
+        return residual_actions
+
+    def predict(
+        self,
+        observations: list[list[float]],
+        deterministic: bool = False,
+    ) -> list[list[float]]:
+        expert_actions = self._expert_actions(observations)
+        if self.time_step > self.end_exploration_time_step or deterministic:
+            residual_policy_actions = self._predict_with_policy(
+                observations,
+                deterministic=deterministic,
+            )
+        else:
+            residual_policy_actions = [
+                list(self.action_scaling_coefficient * space.sample())
+                for space in self.action_space
+            ]
+
+        actions = self._compose_residual_actions(expert_actions, residual_policy_actions)
+        self.actions = actions
+        self.next_time_step()
+        return actions
+
+    def update(
+        self,
+        observations: list[list[float]],
+        actions: list[list[float]],
+        reward: list[float],
+        next_observations: list[list[float]],
+        done: bool,
+    ) -> None:
+        expert_actions = self._expert_actions(observations)
+        residual_policy_actions = self._to_residual_policy_actions(observations, actions)
+        super().update(
+            observations,
+            residual_policy_actions,
+            reward,
+            next_observations,
+            done,
+        )
+        expert_abs_mean = float(np.mean(np.abs(np.asarray(expert_actions, dtype="float32"))))
+        residual_abs_mean = float(
+            np.mean(np.abs(np.asarray(residual_policy_actions, dtype="float32")))
+        )
+        self.last_update_stats = {
+            **self.last_update_stats,
+            "expert_abs_mean": expert_abs_mean,
+            "residual_abs_mean": residual_abs_mean,
+        }
+
+    def checkpoint_state(self) -> dict[str, Any]:
+        state = super().checkpoint_state()
+        state.update(
+            {
+                "controller_type": self.controller_type,
+                "expert_policy": self.expert_policy_name,
+                "residual_scaling_coefficient": float(self.residual_scaling_coefficient),
+            }
+        )
+        return state
