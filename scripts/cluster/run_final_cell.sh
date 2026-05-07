@@ -21,6 +21,7 @@ ROOT_DIR="${ROOT_DIR:-/u/${USER}/cos435-citylearn}"
 SWEEP_ROOT="${SWEEP_ROOT:-$ROOT_DIR/results/final_sweep}"
 cd "$ROOT_DIR"
 source .venv/bin/activate
+export PYTHONPATH="$ROOT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
 
 case "$ALGO:$HP_NAME" in
   ppo:ent_coef)
