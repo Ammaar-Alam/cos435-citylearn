@@ -2,7 +2,7 @@
 
 This note records the current RL-centric pivot beyond the PPO/SAC/TD3 baselines.
 It is intentionally separate from generated result CSVs because the MAPPO branch
-has only smoke-level evidence so far.
+now includes both smoke evidence and a completed Neuronic sweep.
 
 ## Rationale
 
