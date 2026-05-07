@@ -12,6 +12,17 @@ def test_mappo_sweep_exports_artifact_root_for_direct_sbatch() -> None:
     assert export_idx < call_idx
 
 
+def test_mappo_direct_sbatch_logs_use_tracked_results_directory() -> None:
+    for rel_path in [
+        "scripts/cluster/mappo_sweep.slurm",
+        "scripts/cluster/mappo_smoke.slurm",
+    ]:
+        script = (REPO_ROOT / rel_path).read_text()
+        assert "/results/sweep/" not in script
+        assert "#SBATCH --output=/u/%u/cos435-citylearn/results/" in script
+        assert "#SBATCH --error=/u/%u/cos435-citylearn/results/" in script
+
+
 def test_mappo_cluster_entrypoints_prefer_root_source_tree() -> None:
     export_line = 'export PYTHONPATH="$ROOT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"'
     for rel_path in [

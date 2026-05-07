@@ -4,8 +4,8 @@
 #SBATCH --time=00:45:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=12G
-#SBATCH --output=/u/%u/cos435-citylearn/results/sweep/mappo-smoke-%j.out
-#SBATCH --error=/u/%u/cos435-citylearn/results/sweep/mappo-smoke-%j.out
+#SBATCH --output=/u/%u/cos435-citylearn/results/mappo-smoke-%j.out
+#SBATCH --error=/u/%u/cos435-citylearn/results/mappo-smoke-%j.out
 
 set -euo pipefail
 

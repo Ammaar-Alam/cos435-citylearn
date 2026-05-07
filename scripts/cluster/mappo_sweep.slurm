@@ -5,8 +5,8 @@
 #SBATCH --time=03:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=12G
-#SBATCH --output=/u/%u/cos435-citylearn/results/sweep/mappo-%A_%a.out
-#SBATCH --error=/u/%u/cos435-citylearn/results/sweep/mappo-%A_%a.out
+#SBATCH --output=/u/%u/cos435-citylearn/results/mappo-%A_%a.out
+#SBATCH --error=/u/%u/cos435-citylearn/results/mappo-%A_%a.out
 
 # 18-cell MAPPO CTDE sweep:
 #   3 learning rates x 2 entropy coefficients x 3 seeds.
