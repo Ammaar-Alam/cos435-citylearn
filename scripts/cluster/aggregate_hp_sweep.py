@@ -171,6 +171,7 @@ def main() -> None:
         "split",
         "run_id",
         "average_score",
+        "expert_policy",
     ]
     with out_path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)

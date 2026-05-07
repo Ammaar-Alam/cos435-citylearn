@@ -2,7 +2,7 @@ PYTHON := .venv/bin/python
 MPLCONFIGDIR := $(CURDIR)/.cache/matplotlib
 NPM_CACHE := $(CURDIR)/.npm-cache
 
-.PHONY: install install-benchmark test check env-info repo-tree download-citylearn download-citylearn-all env-schema smoke train-rbc train-sac train-sac-shared train-sac-residual train-td3 train-td3-shared train-ppo train-ppo-shared submission-results figures cross-figures cross-table check-ui-exports dashboard-install dashboard-build dashboard-check dashboard-backend dashboard-frontend ui ui-open
+.PHONY: install install-benchmark test check env-info repo-tree download-citylearn download-citylearn-all env-schema smoke train-rbc train-sac train-sac-shared train-sac-residual train-sac-residual-basic-rbc train-td3 train-td3-shared train-ppo train-ppo-shared submission-results figures cross-figures cross-table check-ui-exports dashboard-install dashboard-build dashboard-check dashboard-backend dashboard-frontend ui ui-open
 
 install:
 	bash scripts/setup/install_env.sh
@@ -51,6 +51,9 @@ train-sac-shared:
 
 train-sac-residual:
 	COS435_REQUIRE_DATA=1 MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/train/run_sac.py --config configs/train/sac/sac_shared_residual_adaptive_reward_v2.yaml --eval-config configs/eval/default.yaml
+
+train-sac-residual-basic-rbc:
+	COS435_REQUIRE_DATA=1 MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/train/run_sac.py --config configs/train/sac/sac_shared_residual_adaptive_reward_v2.yaml --eval-config configs/eval/default.yaml --expert-policy basic_rbc
 
 train-td3-shared:
 	COS435_REQUIRE_DATA=1 MPLCONFIGDIR="$(MPLCONFIGDIR)" $(PYTHON) scripts/train/run_td3.py --config configs/train/td3/td3_shared_dtde_reward_v2.yaml --eval-config configs/eval/default.yaml

@@ -31,7 +31,8 @@ The branch `feat/rl-hybrid-residual-controller` adds:
 - residual SAC checkpoint save/load and topology-compatible evaluation;
 - residual SAC configs under `configs/train/sac/`;
 - `scripts/eval/run_expert_policy.py` for expert-only scoring;
-- `scripts/cluster/residual_sac_sweep.slurm` for a 27-cell sweep;
+- `scripts/cluster/residual_sac_sweep.slurm` for a 27-cell sweep, with
+  `RESIDUAL_EXPERT_POLICY` support for a BasicRBC follow-up;
 - `scripts/cluster/aggregate_hp_sweep.py` for complete-cell aggregation.
 
 ## Current Expert-Only Baselines
@@ -107,7 +108,8 @@ first decision:
 - `> 0.80`: stop chasing CHESCA with this method; document as a negative stretch
   result.
 - `0.70 - 0.80`: do not claim CHESCA competitiveness; consider only one small
-  follow-up, likely switching the expert base to `basic_rbc`.
+  follow-up, likely switching the expert base to `basic_rbc` with
+  `RESIDUAL_EXPERT_POLICY=basic_rbc`.
 - `< 0.70`: worth targeted tuning because it is competitive with the strongest
   existing RL results.
 - `< 0.60`: worth a serious CHESCA-focused follow-up.

@@ -153,6 +153,13 @@ cd /u/$USER/cos435-citylearn
 JOB=residual_sac_sweep SWEEP_ID=citylearn-residual-sac-20260507-r1 bash scripts/cluster/submit_sweep.sh
 ```
 
+By default the residual controller uses `adaptive_storage_v1` as the expert.
+To run the same matrix around the simpler BasicRBC expert, set:
+
+```bash
+RESIDUAL_EXPERT_POLICY=basic_rbc JOB=residual_sac_sweep SWEEP_ID=citylearn-residual-sac-basic-rbc-r1 bash scripts/cluster/submit_sweep.sh
+```
+
 This dispatches 27 cells:
 
 - residual SAC: `lr x residual_scaling x seed`

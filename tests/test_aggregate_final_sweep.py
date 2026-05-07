@@ -134,12 +134,56 @@ def test_aggregate_hp_sweep_scans_residual_cells(tmp_path: Path) -> None:
     rows = summary_path.read_text().splitlines()
     assert (
         "sac_residual_lr3e-4_hp-residual_scaling_val-0p75_seed1,sac_residual,3e-4,1,"
-        "residual_scaling,0.75,public_dev,train-run,0.45"
+        "residual_scaling,0.75,public_dev,train-run,0.45,"
     ) in rows
     assert (
         "sac_residual_lr3e-4_hp-residual_scaling_val-0p75_seed1,sac_residual,3e-4,1,"
-        "residual_scaling,0.75,phase_3_1,eval-run,0.55"
+        "residual_scaling,0.75,phase_3_1,eval-run,0.55,"
     ) in rows
+
+
+def test_aggregate_hp_sweep_preserves_residual_expert_policy(tmp_path: Path) -> None:
+    sweep_root = tmp_path / "residual_sac_sweep"
+    cell_id = "sac_residual_lr3e-4_hp-residual_scaling_val-0p75_seed1"
+    cell = sweep_root / cell_id
+    summary_path = tmp_path / "summary.csv"
+
+    _write_json(
+        cell / "meta.json",
+        {
+            "cell_id": cell_id,
+            "algo": "sac_residual",
+            "lr": "3e-4",
+            "seed": 1,
+            "hyperparameter": "residual_scaling",
+            "hyperparameter_value": "0.75",
+            "expert_policy": "basic_rbc",
+        },
+    )
+    _write_json(cell / "train.json", {"run_id": "train-run", "average_score": 0.45})
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "cluster" / "aggregate_hp_sweep.py"),
+            "--sweep-root",
+            str(sweep_root),
+            "--out",
+            str(summary_path),
+            "--eval-splits",
+            "",
+            "--allow-missing",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
+    rows = summary_path.read_text().splitlines()
+    assert rows[0].endswith(",expert_policy")
+    assert rows[1].endswith(",basic_rbc")
 
 
 def test_aggregate_hp_sweep_fails_when_expected_residual_cell_missing(tmp_path: Path) -> None:

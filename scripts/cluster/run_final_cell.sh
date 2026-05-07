@@ -23,6 +23,8 @@ cd "$ROOT_DIR"
 source .venv/bin/activate
 export PYTHONPATH="$ROOT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
 
+EXPERT_POLICY_META=""
+
 case "$ALGO:$HP_NAME" in
   ppo:ent_coef)
     TRAIN_SCRIPT="scripts/train/run_ppo.py"
@@ -37,7 +39,9 @@ case "$ALGO:$HP_NAME" in
   sac_residual:residual_scaling)
     TRAIN_SCRIPT="scripts/train/run_sac.py"
     CONFIG="configs/train/sac/sac_shared_residual_adaptive_reward_v2.yaml"
-    EXTRA_ARGS=(--residual-scaling "$HP_VALUE")
+    RESIDUAL_EXPERT_POLICY="${RESIDUAL_EXPERT_POLICY:-adaptive_storage_v1}"
+    EXPERT_POLICY_META="$RESIDUAL_EXPERT_POLICY"
+    EXTRA_ARGS=(--expert-policy "$RESIDUAL_EXPERT_POLICY" --residual-scaling "$HP_VALUE")
     ;;
   td3:exploration_noise)
     TRAIN_SCRIPT="scripts/train/run_td3.py"
@@ -67,8 +71,13 @@ MANIFESTS_ROOT="$SWEEP_ROOT/manifests"
 UI_EXPORTS_ROOT="$SWEEP_ROOT/ui_exports"
 mkdir -p "$SUMMARY_DIR" "$RUNS_ROOT" "$METRICS_ROOT" "$MANIFESTS_ROOT" "$UI_EXPORTS_ROOT"
 
+META_EXTRA=""
+if [ -n "$EXPERT_POLICY_META" ]; then
+  META_EXTRA=",\"expert_policy\":\"$EXPERT_POLICY_META\""
+fi
+
 cat > "$SUMMARY_DIR/meta.json" <<EOF
-{"cell_id":"$CELL_ID","algo":"$ALGO","lr":"$LR","seed":$SEED,"hyperparameter":"$HP_NAME","hyperparameter_value":"$HP_VALUE"}
+{"cell_id":"$CELL_ID","algo":"$ALGO","lr":"$LR","seed":$SEED,"hyperparameter":"$HP_NAME","hyperparameter_value":"$HP_VALUE"$META_EXTRA}
 EOF
 
 export COS435_REQUIRE_DATA=1
