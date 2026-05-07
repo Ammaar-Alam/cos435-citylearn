@@ -273,12 +273,8 @@ def _load_local_rows(shared_sweep_rows: list[SharedSweepRow]) -> tuple[MetricRow
         current = best_sweep_rows.get(key)
         if current is None or metric.average_score < current.average_score:
             best_sweep_rows[key] = metric
-    if best_sweep_rows:
-        latest_rows = {
-            key: row for key, row in latest_rows.items() if key[:2] not in shared_variants
-        }
-        for row in best_sweep_rows.values():
-            latest_rows[(row.algorithm, row.variant, row.seed)] = row
+    for key, row in best_sweep_rows.items():
+        latest_rows[key] = row
 
     local_rows = sorted(
         latest_rows.values(),

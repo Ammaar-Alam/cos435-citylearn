@@ -156,6 +156,7 @@ def test_load_local_rows_uses_mappo_sweep_best_instead_of_latest_metric(
     rbc_run = "rbc__basic_rbc__public_dev__seed0__baseline"
     stale_mappo_run = "mappo__mappo_shared_ctde_reward_v2__public_dev__seed0__zzz"
     best_mappo_run = "mappo__mappo_shared_ctde_reward_v2__public_dev__seed0__aaa"
+    ppo_run = "ppo__ppo_shared_dtde_reward_v2__public_dev__seed0__latest"
     _write_metric(
         metrics_root / f"{rbc_run}.csv",
         run_id=rbc_run,
@@ -177,6 +178,13 @@ def test_load_local_rows_uses_mappo_sweep_best_instead_of_latest_metric(
         variant="mappo_shared_ctde_reward_v2",
         average_score=0.4,
     )
+    _write_metric(
+        metrics_root / f"{ppo_run}.csv",
+        run_id=ppo_run,
+        algorithm="ppo",
+        variant="ppo_shared_dtde_reward_v2",
+        average_score=0.7,
+    )
     shared_rows = [
         export.SharedSweepRow(
             lr="1e-4",
@@ -192,3 +200,4 @@ def test_load_local_rows_uses_mappo_sweep_best_instead_of_latest_metric(
         if row.algorithm == "mappo"
     }
     assert selected[("mappo", "mappo_shared_ctde_reward_v2", 0)] == best_mappo_run
+    assert any(row.run_id == ppo_run for row in local_rows)
