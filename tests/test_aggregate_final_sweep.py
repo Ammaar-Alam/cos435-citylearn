@@ -122,6 +122,7 @@ def test_aggregate_hp_sweep_scans_residual_cells(tmp_path: Path) -> None:
             str(summary_path),
             "--eval-splits",
             "phase_3_1",
+            "--allow-missing",
         ],
         capture_output=True,
         text=True,
@@ -139,3 +140,30 @@ def test_aggregate_hp_sweep_scans_residual_cells(tmp_path: Path) -> None:
         "sac_residual_lr3e-4_hp-residual_scaling_val-0p75_seed1,sac_residual,3e-4,1,"
         "residual_scaling,0.75,phase_3_1,eval-run,0.55"
     ) in rows
+
+
+def test_aggregate_hp_sweep_fails_when_expected_residual_cell_missing(tmp_path: Path) -> None:
+    sweep_root = tmp_path / "residual_sac_sweep"
+    sweep_root.mkdir()
+    summary_path = tmp_path / "summary.csv"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "cluster" / "aggregate_hp_sweep.py"),
+            "--sweep-root",
+            str(sweep_root),
+            "--out",
+            str(summary_path),
+            "--eval-splits",
+            "phase_3_1",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "MISSING CELLS" in result.stdout
+    assert "sac_residual_lr1e-4_hp-residual_scaling_val-0p5_seed0" in result.stdout

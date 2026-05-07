@@ -13,6 +13,40 @@ EVAL_SPLITS = (
     "phase_3_2",
     "phase_3_3",
 )
+DEFAULT_LRS = ("1e-4", "3e-4", "1e-3")
+DEFAULT_SEEDS = (0, 1, 2)
+DEFAULT_HYPERPARAMETER = "residual_scaling"
+DEFAULT_HYPERPARAMETER_VALUES = ("0.5", "0.75", "1.0")
+
+
+def _label_value(value: str) -> str:
+    return value.replace("-", "m").replace(".", "p")
+
+
+def _parse_ints(value: str) -> list[int]:
+    if "-" in value:
+        lo, hi = (int(part) for part in value.split("-", 1))
+        return list(range(lo, hi + 1))
+    return [int(part) for part in value.split(",") if part]
+
+
+def _expected_cells(
+    *,
+    algo: str,
+    lrs: list[str],
+    seeds: list[int],
+    hyperparameter: str,
+    hyperparameter_values: list[str],
+) -> list[str]:
+    return [
+        (
+            f"{algo}_lr{lr}_hp-{hyperparameter}"
+            f"_val-{_label_value(str(hyperparameter_value))}_seed{seed}"
+        )
+        for lr in lrs
+        for hyperparameter_value in hyperparameter_values
+        for seed in seeds
+    ]
 
 
 def _read_json(path: Path) -> dict | None:
@@ -70,6 +104,31 @@ def main() -> None:
         default=",".join(EVAL_SPLITS),
         help="comma-separated held-out splits expected under each cell directory",
     )
+    parser.add_argument(
+        "--algo",
+        default="sac_residual",
+        help="algorithm label expected in residual sweep cell ids",
+    )
+    parser.add_argument(
+        "--lrs",
+        default=",".join(DEFAULT_LRS),
+        help="comma-separated learning rates expected in the sweep",
+    )
+    parser.add_argument(
+        "--seeds",
+        default=f"{DEFAULT_SEEDS[0]}-{DEFAULT_SEEDS[-1]}",
+        help="seed range, e.g. 0-2, or comma-separated seed list",
+    )
+    parser.add_argument(
+        "--hyperparameter",
+        default=DEFAULT_HYPERPARAMETER,
+        help="hyperparameter name encoded in cell ids",
+    )
+    parser.add_argument(
+        "--hyperparameter-values",
+        default=",".join(DEFAULT_HYPERPARAMETER_VALUES),
+        help="comma-separated hyperparameter values expected in the sweep",
+    )
     parser.add_argument("--allow-missing", action="store_true")
     args = parser.parse_args()
 
@@ -79,12 +138,26 @@ def main() -> None:
 
     eval_splits = [split for split in args.eval_splits.split(",") if split]
     rows: list[dict[str, object]] = []
+    missing_cells: list[str] = []
     missing: list[tuple[str, str]] = []
+    expected_cells = _expected_cells(
+        algo=args.algo,
+        lrs=[lr for lr in args.lrs.split(",") if lr],
+        seeds=_parse_ints(args.seeds),
+        hyperparameter=args.hyperparameter,
+        hyperparameter_values=[
+            value for value in args.hyperparameter_values.split(",") if value
+        ],
+    )
 
-    for cell_dir in sorted(path for path in sweep_root.iterdir() if path.is_dir()):
+    for cell_id in expected_cells:
+        cell_dir = sweep_root / cell_id
+        if not cell_dir.exists():
+            missing_cells.append(cell_id)
+            continue
         cell_rows, cell_missing = _rows_for_cell(cell_dir, eval_splits)
         rows.extend(cell_rows)
-        missing.extend((cell_dir.name, split) for split in cell_missing)
+        missing.extend((cell_id, split) for split in cell_missing)
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -105,11 +178,15 @@ def main() -> None:
         writer.writerows(rows)
 
     print(f"wrote {len(rows)} rows -> {out_path}")
+    if missing_cells:
+        print(f"MISSING CELLS ({len(missing_cells)}):")
+        for cell_id in missing_cells:
+            print(f"  {cell_id}")
     if missing:
         print(f"MISSING SPLITS ({len(missing)}):")
         for cell_id, split in missing:
             print(f"  {cell_id} split={split}")
-    if missing and not args.allow_missing:
+    if (missing_cells or missing) and not args.allow_missing:
         raise SystemExit("hyperparameter sweep is incomplete")
 
 
