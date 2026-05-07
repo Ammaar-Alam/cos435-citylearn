@@ -13,6 +13,12 @@ SHARED_SWEEP_SUMMARY_RELATIVE_PATHS = (
     Path("results/sweep/summary.csv"),
     Path("results/mappo_sweep/summary.csv"),
 )
+SHARED_SWEEP_VARIANTS = {
+    ("ppo", "ppo_shared_dtde_reward_v2"),
+    ("sac", "shared_dtde_reward_v2"),
+    ("td3", "td3_shared_dtde_reward_v2"),
+    ("mappo", "mappo_shared_ctde_reward_v2"),
+}
 
 TRACKED_OUTPUT_FILES = [
     "local_main_results.csv",
@@ -248,6 +254,33 @@ def _is_submission_metric_path(path: Path) -> bool:
     return "_smoke__" not in path.name
 
 
+def _shared_sweep_config_key(row: SharedSweepRow) -> tuple[str, str, int, str, str, str]:
+    metric = row.metric
+    return (
+        metric.algorithm,
+        metric.variant,
+        metric.seed,
+        row.lr,
+        row.hyperparameter,
+        row.hyperparameter_value,
+    )
+
+
+def _best_public_dev_shared_sweep_rows(
+    shared_sweep_rows: list[SharedSweepRow],
+) -> dict[tuple[str, str, int], SharedSweepRow]:
+    best_sweep_rows: dict[tuple[str, str, int], SharedSweepRow] = {}
+    for sweep_row in shared_sweep_rows:
+        metric = sweep_row.metric
+        key = (metric.algorithm, metric.variant, metric.seed)
+        if metric.split != "public_dev" or key[:2] not in SHARED_SWEEP_VARIANTS:
+            continue
+        current = best_sweep_rows.get(key)
+        if current is None or metric.average_score < current.metric.average_score:
+            best_sweep_rows[key] = sweep_row
+    return best_sweep_rows
+
+
 def _load_local_rows(shared_sweep_rows: list[SharedSweepRow]) -> tuple[MetricRow, list[MetricRow]]:
     rbc_row = _latest_metric("rbc__basic_rbc__public_dev__seed0__*.csv")
     latest_rows: dict[tuple[str, str, int], MetricRow] = {}
@@ -260,23 +293,13 @@ def _load_local_rows(shared_sweep_rows: list[SharedSweepRow]) -> tuple[MetricRow
             row = _read_metric_row(path)
             latest_rows[(row.algorithm, row.variant, row.seed)] = row
 
-    best_sweep_rows: dict[tuple[str, str, int], MetricRow] = {}
-    shared_variants = {
-        ("ppo", "ppo_shared_dtde_reward_v2"),
-        ("sac", "shared_dtde_reward_v2"),
-        ("td3", "td3_shared_dtde_reward_v2"),
-        ("mappo", "mappo_shared_ctde_reward_v2"),
+    best_sweep_rows = _best_public_dev_shared_sweep_rows(shared_sweep_rows)
+    sweep_variants = {key[:2] for key in best_sweep_rows}
+    latest_rows = {
+        key: row for key, row in latest_rows.items() if key[:2] not in sweep_variants
     }
-    for sweep_row in shared_sweep_rows:
-        metric = sweep_row.metric
-        key = (metric.algorithm, metric.variant, metric.seed)
-        if metric.split != "public_dev" or key[:2] not in shared_variants:
-            continue
-        current = best_sweep_rows.get(key)
-        if current is None or metric.average_score < current.average_score:
-            best_sweep_rows[key] = metric
     for key, row in best_sweep_rows.items():
-        latest_rows[key] = row
+        latest_rows[key] = row.metric
 
     local_rows = sorted(
         latest_rows.values(),
@@ -295,8 +318,8 @@ def _released_group(split: str) -> str:
     raise ValueError(f"unsupported released split: {split}")
 
 
-def _load_released_rows() -> list[MetricRow]:
-    latest_rows: dict[tuple[str, str, int], MetricRow] = {}
+def _load_released_rows(shared_sweep_rows: list[SharedSweepRow]) -> list[MetricRow]:
+    latest_rows: dict[tuple[str, str, str, int], MetricRow] = {}
     for algorithm in ("ppo", "rbc", "sac", "td3", "mappo"):
         for path in sorted(METRICS_ROOT.glob(f"{algorithm}__*.csv")):
             if not _is_submission_metric_path(path):
@@ -305,6 +328,23 @@ def _load_released_rows() -> list[MetricRow]:
             if not row.split.startswith("phase_"):
                 continue
             latest_rows[(row.algorithm, row.variant, row.split, row.seed)] = row
+
+    best_sweep_rows = _best_public_dev_shared_sweep_rows(shared_sweep_rows)
+    sweep_variants = {key[:2] for key in best_sweep_rows}
+    if sweep_variants:
+        selected_configs = {
+            _shared_sweep_config_key(row) for row in best_sweep_rows.values()
+        }
+        latest_rows = {
+            key: row for key, row in latest_rows.items() if key[:2] not in sweep_variants
+        }
+        for sweep_row in shared_sweep_rows:
+            metric = sweep_row.metric
+            if not metric.split.startswith("phase_"):
+                continue
+            if _shared_sweep_config_key(sweep_row) not in selected_configs:
+                continue
+            latest_rows[(metric.algorithm, metric.variant, metric.split, metric.seed)] = metric
 
     return sorted(
         latest_rows.values(),
@@ -1363,7 +1403,7 @@ def main() -> None:
     shared_sweep_rows = _load_shared_sweep_rows()
     ppo_sweep_rows = [row for row in shared_sweep_rows if row.metric.algorithm == "ppo"]
     rbc_row, method_rows = _load_local_rows(shared_sweep_rows)
-    released_rows = _load_released_rows()
+    released_rows = _load_released_rows(shared_sweep_rows)
     method_summaries = _build_method_summaries(method_rows)
     sac_summaries = _build_sac_summaries(method_rows)
     released_group_summaries = _build_released_group_summaries(released_rows)

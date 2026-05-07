@@ -206,6 +206,162 @@ def test_load_local_rows_uses_mappo_sweep_best_instead_of_latest_metric(
     assert any(row.run_id == ppo_run for row in local_rows)
 
 
+def test_load_local_rows_drops_stale_shared_variant_metrics_when_sweep_is_partial(
+    tmp_path: Path, monkeypatch
+) -> None:
+    metrics_root = tmp_path / "results" / "metrics"
+    monkeypatch.setattr(export, "METRICS_ROOT", metrics_root)
+
+    rbc_run = "rbc__basic_rbc__public_dev__seed0__baseline"
+    selected_mappo_run = "mappo__mappo_shared_ctde_reward_v2__public_dev__seed0__best"
+    stale_mappo_seed1 = "mappo__mappo_shared_ctde_reward_v2__public_dev__seed1__latest"
+    ppo_run = "ppo__ppo_shared_dtde_reward_v2__public_dev__seed0__latest"
+    _write_metric(
+        metrics_root / f"{rbc_run}.csv",
+        run_id=rbc_run,
+        algorithm="rbc",
+        variant="basic_rbc",
+        average_score=1.0,
+    )
+    _write_metric(
+        metrics_root / f"{selected_mappo_run}.csv",
+        run_id=selected_mappo_run,
+        algorithm="mappo",
+        variant="mappo_shared_ctde_reward_v2",
+        average_score=0.4,
+    )
+    _write_metric(
+        metrics_root / f"{stale_mappo_seed1}.csv",
+        run_id=stale_mappo_seed1,
+        algorithm="mappo",
+        variant="mappo_shared_ctde_reward_v2",
+        seed=1,
+        average_score=0.3,
+    )
+    _write_metric(
+        metrics_root / f"{ppo_run}.csv",
+        run_id=ppo_run,
+        algorithm="ppo",
+        variant="ppo_shared_dtde_reward_v2",
+        average_score=0.7,
+    )
+    shared_rows = [
+        export.SharedSweepRow(
+            lr="1e-3",
+            metric=export._read_metric_row(metrics_root / f"{selected_mappo_run}.csv"),
+            hyperparameter="ent_coef",
+            hyperparameter_value="0.0",
+        )
+    ]
+
+    _, local_rows = export._load_local_rows(shared_rows)
+
+    run_ids = {row.run_id for row in local_rows}
+    assert selected_mappo_run in run_ids
+    assert stale_mappo_seed1 not in run_ids
+    assert ppo_run in run_ids
+
+
+def test_load_released_rows_uses_selected_mappo_sweep_config(
+    tmp_path: Path, monkeypatch
+) -> None:
+    metrics_root = tmp_path / "results" / "metrics"
+    monkeypatch.setattr(export, "METRICS_ROOT", metrics_root)
+
+    selected_public = "mappo__mappo_shared_ctde_reward_v2__public_dev__seed0__zero"
+    rejected_public = "mappo__mappo_shared_ctde_reward_v2__public_dev__seed0__high"
+    selected_released = (
+        "mappo__mappo_shared_ctde_reward_v2__phase_2_online_eval_1__seed0__zero"
+    )
+    rejected_released = (
+        "mappo__mappo_shared_ctde_reward_v2__phase_2_online_eval_1__seed0__high"
+    )
+    stale_released = (
+        "mappo__mappo_shared_ctde_reward_v2__phase_2_online_eval_1__seed0__stale"
+    )
+    sac_released = "sac__central_reward_v2__phase_2_online_eval_1__seed0__latest"
+    _write_metric(
+        metrics_root / f"{selected_public}.csv",
+        run_id=selected_public,
+        algorithm="mappo",
+        variant="mappo_shared_ctde_reward_v2",
+        average_score=0.4,
+    )
+    _write_metric(
+        metrics_root / f"{rejected_public}.csv",
+        run_id=rejected_public,
+        algorithm="mappo",
+        variant="mappo_shared_ctde_reward_v2",
+        average_score=0.8,
+    )
+    _write_metric(
+        metrics_root / f"{selected_released}.csv",
+        run_id=selected_released,
+        algorithm="mappo",
+        variant="mappo_shared_ctde_reward_v2",
+        split="phase_2_online_eval_1",
+        average_score=0.6,
+    )
+    _write_metric(
+        metrics_root / f"{rejected_released}.csv",
+        run_id=rejected_released,
+        algorithm="mappo",
+        variant="mappo_shared_ctde_reward_v2",
+        split="phase_2_online_eval_1",
+        average_score=0.9,
+    )
+    _write_metric(
+        metrics_root / f"{stale_released}.csv",
+        run_id=stale_released,
+        algorithm="mappo",
+        variant="mappo_shared_ctde_reward_v2",
+        split="phase_2_online_eval_1",
+        average_score=0.2,
+    )
+    _write_metric(
+        metrics_root / f"{sac_released}.csv",
+        run_id=sac_released,
+        algorithm="sac",
+        variant="central_reward_v2",
+        split="phase_2_online_eval_1",
+        average_score=0.5,
+    )
+    shared_rows = [
+        export.SharedSweepRow(
+            lr="1e-3",
+            metric=export._read_metric_row(metrics_root / f"{selected_public}.csv"),
+            hyperparameter="ent_coef",
+            hyperparameter_value="0.0",
+        ),
+        export.SharedSweepRow(
+            lr="1e-3",
+            metric=export._read_metric_row(metrics_root / f"{rejected_public}.csv"),
+            hyperparameter="ent_coef",
+            hyperparameter_value="0.01",
+        ),
+        export.SharedSweepRow(
+            lr="1e-3",
+            metric=export._read_metric_row(metrics_root / f"{selected_released}.csv"),
+            hyperparameter="ent_coef",
+            hyperparameter_value="0.0",
+        ),
+        export.SharedSweepRow(
+            lr="1e-3",
+            metric=export._read_metric_row(metrics_root / f"{rejected_released}.csv"),
+            hyperparameter="ent_coef",
+            hyperparameter_value="0.01",
+        ),
+    ]
+
+    rows = export._load_released_rows(shared_rows)
+
+    run_ids = {row.run_id for row in rows}
+    assert selected_released in run_ids
+    assert rejected_released not in run_ids
+    assert stale_released not in run_ids
+    assert sac_released in run_ids
+
+
 def test_build_shared_sweep_summary_keeps_mappo_entropy_settings_separate(
     tmp_path: Path,
 ) -> None:
