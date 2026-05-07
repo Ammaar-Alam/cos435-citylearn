@@ -58,10 +58,10 @@ def _read_json(path: Path) -> dict | None:
 def _rows_for_cell(
     cell_dir: Path,
     eval_splits: list[str],
-) -> tuple[list[dict[str, object]], list[str]]:
+) -> tuple[list[dict[str, object]], list[str], bool]:
     meta = _read_json(cell_dir / "meta.json")
     if meta is None:
-        return [], []
+        return [], [], True
 
     rows: list[dict[str, object]] = []
     missing: list[str] = []
@@ -92,7 +92,7 @@ def _rows_for_cell(
             }
         )
 
-    return rows, missing
+    return rows, missing, False
 
 
 def main() -> None:
@@ -139,6 +139,7 @@ def main() -> None:
     eval_splits = [split for split in args.eval_splits.split(",") if split]
     rows: list[dict[str, object]] = []
     missing_cells: list[str] = []
+    missing_metadata: list[str] = []
     missing: list[tuple[str, str]] = []
     expected_cells = _expected_cells(
         algo=args.algo,
@@ -155,7 +156,10 @@ def main() -> None:
         if not cell_dir.exists():
             missing_cells.append(cell_id)
             continue
-        cell_rows, cell_missing = _rows_for_cell(cell_dir, eval_splits)
+        cell_rows, cell_missing, cell_missing_metadata = _rows_for_cell(cell_dir, eval_splits)
+        if cell_missing_metadata:
+            missing_metadata.append(cell_id)
+            continue
         rows.extend(cell_rows)
         missing.extend((cell_id, split) for split in cell_missing)
 
@@ -183,11 +187,15 @@ def main() -> None:
         print(f"MISSING CELLS ({len(missing_cells)}):")
         for cell_id in missing_cells:
             print(f"  {cell_id}")
+    if missing_metadata:
+        print(f"MISSING METADATA ({len(missing_metadata)}):")
+        for cell_id in missing_metadata:
+            print(f"  {cell_id}")
     if missing:
         print(f"MISSING SPLITS ({len(missing)}):")
         for cell_id, split in missing:
             print(f"  {cell_id} split={split}")
-    if (missing_cells or missing) and not args.allow_missing:
+    if (missing_cells or missing_metadata or missing) and not args.allow_missing:
         raise SystemExit("hyperparameter sweep is incomplete")
 
 

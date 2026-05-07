@@ -211,3 +211,39 @@ def test_aggregate_hp_sweep_fails_when_expected_residual_cell_missing(tmp_path: 
     assert result.returncode != 0
     assert "MISSING CELLS" in result.stdout
     assert "sac_residual_lr1e-4_hp-residual_scaling_val-0p5_seed0" in result.stdout
+
+
+def test_aggregate_hp_sweep_fails_when_expected_cell_metadata_is_missing(
+    tmp_path: Path,
+) -> None:
+    sweep_root = tmp_path / "residual_sac_sweep"
+    cell_id = "sac_residual_lr1e-4_hp-residual_scaling_val-0p5_seed0"
+    (sweep_root / cell_id).mkdir(parents=True)
+    summary_path = tmp_path / "summary.csv"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "cluster" / "aggregate_hp_sweep.py"),
+            "--sweep-root",
+            str(sweep_root),
+            "--out",
+            str(summary_path),
+            "--eval-splits",
+            "phase_3_1",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "MISSING METADATA" in result.stdout
+    assert cell_id in result.stdout
+
+
+def test_residual_sweep_exports_sweep_root_for_child_runner() -> None:
+    script = REPO_ROOT / "scripts" / "cluster" / "residual_sac_sweep.slurm"
+
+    assert "export ROOT_DIR SWEEP_ROOT RESIDUAL_EXPERT_POLICY" in script.read_text()
