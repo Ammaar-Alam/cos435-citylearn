@@ -14,7 +14,8 @@ make cross-table
 - `export_submission_results.py` reads normalized run metrics and sweep summaries
   from ignored `results/` directories and writes the tracked CSV snapshot under
   `submission/results/`. Its shared sweep path is generic for PPO, SAC, TD3, and
-  MAPPO, reading `results/sweep/summary.csv` and
+  MAPPO, reading `results/sweep/summary.csv`,
+  `results/final_sweep/summary.csv`, and
   `results/mappo_sweep/summary.csv`. Shared sweep exports preserve any varied
   hyperparameter columns such as MAPPO `ent_coef`; the older
   `ppo_shared_sweep_*` outputs are preserved for report sections that still

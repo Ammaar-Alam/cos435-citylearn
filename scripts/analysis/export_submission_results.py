@@ -11,6 +11,7 @@ METRICS_ROOT = REPO_ROOT / "results" / "metrics"
 OUTPUT_ROOT = REPO_ROOT / "submission" / "results"
 SHARED_SWEEP_SUMMARY_RELATIVE_PATHS = (
     Path("results/sweep/summary.csv"),
+    Path("results/final_sweep/summary.csv"),
     Path("results/mappo_sweep/summary.csv"),
 )
 SHARED_SWEEP_VARIANTS = {

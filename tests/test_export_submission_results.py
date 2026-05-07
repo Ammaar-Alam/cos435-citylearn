@@ -83,7 +83,7 @@ def test_variant_label_prefers_algorithm_specific_label() -> None:
     )
 
 
-def test_load_shared_sweep_rows_includes_mappo_sweep_summary(
+def test_load_shared_sweep_rows_includes_final_and_mappo_sweep_summaries(
     tmp_path: Path, monkeypatch
 ) -> None:
     metrics_root = tmp_path / "results" / "metrics"
@@ -91,6 +91,7 @@ def test_load_shared_sweep_rows_includes_mappo_sweep_summary(
     monkeypatch.setattr(export, "METRICS_ROOT", metrics_root)
 
     ppo_run = "ppo__ppo_shared_dtde_reward_v2__public_dev__seed0__old"
+    sac_run = "sac__shared_dtde_reward_v2__public_dev__seed0__final"
     mappo_run = "mappo__mappo_shared_ctde_reward_v2__public_dev__seed0__best"
     _write_metric(
         metrics_root / f"{ppo_run}.csv",
@@ -98,6 +99,13 @@ def test_load_shared_sweep_rows_includes_mappo_sweep_summary(
         algorithm="ppo",
         variant="ppo_shared_dtde_reward_v2",
         average_score=0.7,
+    )
+    _write_metric(
+        metrics_root / f"{sac_run}.csv",
+        run_id=sac_run,
+        algorithm="sac",
+        variant="shared_dtde_reward_v2",
+        average_score=0.5,
     )
     _write_metric(
         metrics_root / f"{mappo_run}.csv",
@@ -123,6 +131,22 @@ def test_load_shared_sweep_rows_includes_mappo_sweep_summary(
         ],
     )
     _write_summary(
+        tmp_path / "results" / "final_sweep" / "summary.csv",
+        [
+            {
+                "cell_id": "sac_lr1e-3_hp-reward_scaling_val-5p0_seed0",
+                "algo": "sac",
+                "lr": "1e-3",
+                "seed": 0,
+                "hyperparameter": "reward_scaling",
+                "hyperparameter_value": "5.0",
+                "split": "public_dev",
+                "run_id": sac_run,
+                "average_score": 0.5,
+            }
+        ],
+    )
+    _write_summary(
         tmp_path / "results" / "mappo_sweep" / "summary.csv",
         [
             {
@@ -141,10 +165,14 @@ def test_load_shared_sweep_rows_includes_mappo_sweep_summary(
 
     rows = export._load_shared_sweep_rows()
 
-    assert [(row.metric.algorithm, row.metric.run_id) for row in rows] == [
+    assert {(row.metric.algorithm, row.metric.run_id) for row in rows} == {
         ("mappo", mappo_run),
         ("ppo", ppo_run),
-    ]
+        ("sac", sac_run),
+    }
+    sac_row = next(row for row in rows if row.metric.algorithm == "sac")
+    assert sac_row.hyperparameter == "reward_scaling"
+    assert sac_row.hyperparameter_value == "5.0"
     mappo_row = next(row for row in rows if row.metric.algorithm == "mappo")
     assert mappo_row.hyperparameter == "ent_coef"
     assert mappo_row.hyperparameter_value == "0.0"
