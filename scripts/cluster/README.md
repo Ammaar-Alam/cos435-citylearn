@@ -164,3 +164,6 @@ python scripts/cluster/aggregate_hp_sweep.py \
   --sweep-root "$SWEEP_ROOT" \
   --out "$SWEEP_ROOT/summary.csv"
 ```
+
+See [`docs/residual-sac-experiment.md`](../../docs/residual-sac-experiment.md)
+for the active Neuronic job provenance, aggregation gate, and go/no-go thresholds.
