@@ -34,8 +34,8 @@ is missing.
 - `released_eval_seed_inventory.csv` - per-run released-eval inventory for RBC, PPO, and SAC where artifacts exist
 - `ppo_shared_sweep_summary.csv` - per-learning-rate shared-PPO sweep summary rows
 - `ppo_shared_sweep_inventory.csv` - per-run shared-PPO sweep inventory with KPI columns
-- `shared_sweep_summary.csv` - regenerated per-learning-rate shared PPO/SAC/TD3/MAPPO sweep summary rows after the relevant sweep has been collected
-- `shared_sweep_inventory.csv` - regenerated per-run shared PPO/SAC/TD3/MAPPO sweep inventory after the relevant sweep has been collected
+- `shared_sweep_summary.csv` - regenerated shared PPO/SAC/TD3/MAPPO sweep summary rows by learning rate and varied hyperparameter after the relevant sweep has been collected
+- `shared_sweep_inventory.csv` - regenerated per-run shared PPO/SAC/TD3/MAPPO sweep inventory, including varied hyperparameters, after the relevant sweep has been collected
 - `final_hp_sweep_summary.csv` - combined 3-seed PPO/SAC/TD3/MAPPO final hyperparameter matrix from Neuronic sweep summaries
 - `official_benchmark_reference.csv` - published CityLearn 2023 reference numbers
 - `figure_manifest.csv` - tracked report figure inventory

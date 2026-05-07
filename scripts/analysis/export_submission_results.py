@@ -210,6 +210,8 @@ class ReleasedSummary:
 class SharedSweepRow:
     lr: str
     metric: MetricRow
+    hyperparameter: str = ""
+    hyperparameter_value: str = ""
 
 
 def _read_metric_row(path: Path) -> MetricRow:
@@ -342,7 +344,14 @@ def _load_shared_sweep_rows() -> list[SharedSweepRow]:
                         f"missing metric row for {row['algo'].upper()} sweep run_id "
                         f"{run_id}: expected {metric_path}"
                     )
-                rows.append(SharedSweepRow(lr=row["lr"], metric=_read_metric_row(metric_path)))
+                rows.append(
+                    SharedSweepRow(
+                        lr=row["lr"],
+                        metric=_read_metric_row(metric_path),
+                        hyperparameter=row.get("hyperparameter", ""),
+                        hyperparameter_value=row.get("hyperparameter_value", ""),
+                    )
+                )
                 seen_metrics.add(metric_key)
 
     return sorted(
@@ -833,29 +842,49 @@ def _build_ppo_sweep_summary_rows(ppo_rows: list[SharedSweepRow]) -> list[dict[s
 
 
 def _build_shared_sweep_summary_rows(shared_rows: list[SharedSweepRow]) -> list[dict[str, object]]:
-    grouped: dict[tuple[str, str, str], list[SharedSweepRow]] = {}
+    grouped: dict[tuple[str, str, str, str, str], list[SharedSweepRow]] = {}
     for row in shared_rows:
-        grouped.setdefault((row.metric.algorithm, row.lr, row.metric.split), []).append(row)
+        grouped.setdefault(
+            (
+                row.metric.algorithm,
+                row.lr,
+                row.hyperparameter,
+                row.hyperparameter_value,
+                row.metric.split,
+            ),
+            [],
+        ).append(row)
 
     rows: list[dict[str, object]] = []
-    for (algorithm, lr, split), grouped_rows in sorted(grouped.items()):
+    for (algorithm, lr, hyperparameter, hyperparameter_value, split), grouped_rows in sorted(
+        grouped.items()
+    ):
         summary = _summarize_rows([row.metric for row in grouped_rows])
         best_row = min(grouped_rows, key=lambda row: row.metric.average_score).metric
         worst_row = max(grouped_rows, key=lambda row: row.metric.average_score).metric
+        setting_parts = [f"lr={lr}"]
+        method_id_setting = lr
+        if hyperparameter:
+            setting_parts.append(f"{hyperparameter}={hyperparameter_value}")
+            method_id_setting = f"{lr}_{hyperparameter}_{hyperparameter_value}"
+        setting = ", ".join(setting_parts)
         if split == "public_dev":
-            note = f"10-seed shared {algorithm.upper()} sweep on local phase_2"
+            note = f"shared {algorithm.upper()} sweep on local phase_2 ({setting})"
         else:
             note = (
-                f"10-seed shared {algorithm.upper()} checkpoint evaluation " "on released phase_3"
+                f"shared {algorithm.upper()} checkpoint evaluation on released phase_3 "
+                f"({setting})"
             )
 
         rows.append(
             {
-                "method_id": f"{algorithm}_{summary.variant}_{lr}_{split}",
+                "method_id": f"{algorithm}_{summary.variant}_{method_id_setting}_{split}",
                 "method_label": _variant_label(summary.variant, summary.algorithm),
                 "algorithm": summary.algorithm,
                 "variant": summary.variant,
                 "lr": lr,
+                "hyperparameter": hyperparameter,
+                "hyperparameter_value": hyperparameter_value,
                 "split": split,
                 "seed_count": len(summary.rows),
                 "evidence_level": _evidence_level(len(summary.rows)),
@@ -916,7 +945,36 @@ def _build_ppo_sweep_inventory_rows(ppo_rows: list[SharedSweepRow]) -> list[dict
 def _build_shared_sweep_inventory_rows(
     shared_rows: list[SharedSweepRow],
 ) -> list[dict[str, object]]:
-    return _build_ppo_sweep_inventory_rows(shared_rows)
+    rows: list[dict[str, object]] = []
+    for row in shared_rows:
+        metric = row.metric
+        rows.append(
+            {
+                "run_id": metric.run_id,
+                "file_name": metric.file_name,
+                "algorithm": metric.algorithm,
+                "variant": metric.variant,
+                "lr": row.lr,
+                "hyperparameter": row.hyperparameter,
+                "hyperparameter_value": row.hyperparameter_value,
+                "split": metric.split,
+                "seed": metric.seed,
+                "dataset_name": metric.dataset_name,
+                "average_score": round(metric.average_score, 6),
+                "district_cost_total": round(metric.district_cost_total, 6),
+                "district_carbon_emissions_total": round(
+                    metric.district_carbon_emissions_total, 6
+                ),
+                "district_daily_peak_average": round(metric.district_daily_peak_average, 6),
+                "district_discomfort_proportion": round(
+                    metric.district_discomfort_proportion, 6
+                ),
+                "district_one_minus_thermal_resilience_proportion": round(
+                    metric.district_one_minus_thermal_resilience_proportion, 6
+                ),
+            }
+        )
+    return rows
 
 
 def _build_reference_rows() -> list[dict[str, object]]:
@@ -1452,6 +1510,8 @@ def main() -> None:
             "algorithm",
             "variant",
             "lr",
+            "hyperparameter",
+            "hyperparameter_value",
             "split",
             "seed_count",
             "evidence_level",
@@ -1479,6 +1539,8 @@ def main() -> None:
             "algorithm",
             "variant",
             "lr",
+            "hyperparameter",
+            "hyperparameter_value",
             "split",
             "seed",
             "dataset_name",

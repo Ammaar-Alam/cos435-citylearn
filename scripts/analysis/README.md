@@ -15,8 +15,10 @@ make cross-table
   from ignored `results/` directories and writes the tracked CSV snapshot under
   `submission/results/`. Its shared sweep path is generic for PPO, SAC, TD3, and
   MAPPO, reading `results/sweep/summary.csv` and
-  `results/mappo_sweep/summary.csv`; the older `ppo_shared_sweep_*` outputs are
-  preserved for report sections that still depend on the PPO-specific tables.
+  `results/mappo_sweep/summary.csv`. Shared sweep exports preserve any varied
+  hyperparameter columns such as MAPPO `ent_coef`; the older
+  `ppo_shared_sweep_*` outputs are preserved for report sections that still
+  depend on the PPO-specific tables.
 - `make_figures.py` writes the main report figures under `submission/figures/`.
 - `make_cross_split_figures.py` writes cross-split comparison figures under
   `submission/figures/`.

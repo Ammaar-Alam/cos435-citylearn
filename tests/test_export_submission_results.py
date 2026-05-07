@@ -145,6 +145,9 @@ def test_load_shared_sweep_rows_includes_mappo_sweep_summary(
         ("mappo", mappo_run),
         ("ppo", ppo_run),
     ]
+    mappo_row = next(row for row in rows if row.metric.algorithm == "mappo")
+    assert mappo_row.hyperparameter == "ent_coef"
+    assert mappo_row.hyperparameter_value == "0.0"
 
 
 def test_load_local_rows_uses_mappo_sweep_best_instead_of_latest_metric(
@@ -201,3 +204,48 @@ def test_load_local_rows_uses_mappo_sweep_best_instead_of_latest_metric(
     }
     assert selected[("mappo", "mappo_shared_ctde_reward_v2", 0)] == best_mappo_run
     assert any(row.run_id == ppo_run for row in local_rows)
+
+
+def test_build_shared_sweep_summary_keeps_mappo_entropy_settings_separate(
+    tmp_path: Path,
+) -> None:
+    metrics_root = tmp_path / "results" / "metrics"
+    zero_entropy_run = "mappo__mappo_shared_ctde_reward_v2__public_dev__seed0__zero"
+    high_entropy_run = "mappo__mappo_shared_ctde_reward_v2__public_dev__seed0__high"
+    _write_metric(
+        metrics_root / f"{zero_entropy_run}.csv",
+        run_id=zero_entropy_run,
+        algorithm="mappo",
+        variant="mappo_shared_ctde_reward_v2",
+        average_score=0.9,
+    )
+    _write_metric(
+        metrics_root / f"{high_entropy_run}.csv",
+        run_id=high_entropy_run,
+        algorithm="mappo",
+        variant="mappo_shared_ctde_reward_v2",
+        average_score=1.1,
+    )
+    shared_rows = [
+        export.SharedSweepRow(
+            lr="1e-3",
+            metric=export._read_metric_row(metrics_root / f"{zero_entropy_run}.csv"),
+            hyperparameter="ent_coef",
+            hyperparameter_value="0.0",
+        ),
+        export.SharedSweepRow(
+            lr="1e-3",
+            metric=export._read_metric_row(metrics_root / f"{high_entropy_run}.csv"),
+            hyperparameter="ent_coef",
+            hyperparameter_value="0.01",
+        ),
+    ]
+
+    rows = export._build_shared_sweep_summary_rows(shared_rows)
+
+    assert [row["hyperparameter_value"] for row in rows] == ["0.0", "0.01"]
+    assert [row["average_score_mean"] for row in rows] == [0.9, 1.1]
+    assert [row["method_id"] for row in rows] == [
+        "mappo_mappo_shared_ctde_reward_v2_1e-3_ent_coef_0.0_public_dev",
+        "mappo_mappo_shared_ctde_reward_v2_1e-3_ent_coef_0.01_public_dev",
+    ]
