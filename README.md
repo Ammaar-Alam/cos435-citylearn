@@ -151,6 +151,7 @@ The clean, grader-facing artifacts are tracked under [`submission/`](submission/
 
 - [`submission/results/`](submission/results/) has the CSV tables backing the final report claims.
 - [`submission/figures/`](submission/figures/) has the PNG figures copied into the final report and deck.
+- [`submission/final-paper/final-report.pdf`](submission/final-paper/final-report.pdf) is the compiled final report.
 - [`submission/presentation.pptx`](submission/presentation.pptx) is the generated presentation deck.
 
 The canonical local result refresh is:
