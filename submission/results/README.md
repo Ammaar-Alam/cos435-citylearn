@@ -40,7 +40,7 @@ is missing.
 - `final_sweep_best_by_algorithm.csv` - best setting per algorithm/evaluation group from the latest shared-controller sweeps
 - `context_experiment_summary.csv` - compact negative/benchmark context for MAPPO, residual SAC, CHESCA, and the SAC random-episode sprint
 - `result_source_audit.csv` - verified Neuronic and Drive source locations used by the final paper refresh
-- `paper_claim_map.csv` - final-paper numeric claims mapped to tracked CSV evidence
+- `paper_claim_map.csv` - final-report numeric claims mapped to tracked CSV evidence
 - `official_benchmark_reference.csv` - published CityLearn 2023 reference numbers
 - `figure_manifest.csv` - tracked report figure inventory
 
@@ -53,14 +53,14 @@ is missing.
 - `sac_ablation_summary.csv` and `sac_seed_inventory.csv` back SAC reward and seed ablations.
 - `ppo_shared_sweep_summary.csv` and `ppo_shared_sweep_inventory.csv` back the existing shared-PPO learning-rate sweep discussion.
 - `shared_sweep_summary.csv` and `shared_sweep_inventory.csv` back the expanded PPO/SAC/TD3 result matrix once the 60-cell sweep has been collected.
-- `final_sweep_summary.csv` and `final_sweep_best_by_algorithm.csv` back the refreshed final-paper PPO/SAC/TD3 shared-controller matrix.
+- `final_sweep_summary.csv` and `final_sweep_best_by_algorithm.csv` back the refreshed final-report PPO/SAC/TD3 shared-controller matrix.
 - `context_experiment_summary.csv` backs context-only statements about noncompetitive MAPPO/residual SAC runs and external CHESCA optimization results.
 - `result_source_audit.csv` and `paper_claim_map.csv` are the audit trail for the final paper's latest numeric claims.
 - `official_benchmark_reference.csv` is context only; it is not mixed into local or released-eval means.
 
-## Latest final-paper matrix
+## Latest final-report matrix
 
-The May 2026 final-paper refresh uses two verified Neuronic summaries:
+The May 2026 final-report refresh uses two verified Neuronic summaries:
 
 - `citylearn-72cell-lr-screen-20260506-r1`: 504 rows, PPO/SAC/TD3 x 8 learning rates x 3 seeds x 7 splits.
 - `citylearn-final-hp-20260506-r1`: 567 rows, PPO/SAC/TD3 x targeted algorithm-specific hyperparameters x 3 seeds x 7 splits.

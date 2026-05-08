@@ -29,6 +29,8 @@ node_modules/
 *.fls
 *.out
 *.synctex.gz
+*.w18
+_minted-*/
 
 data/external/*
 !data/external/.gitkeep

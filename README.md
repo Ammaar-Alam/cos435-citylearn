@@ -151,8 +151,9 @@ The final submission artifacts are tracked under [`submission/`](submission/):
 
 - [`submission/results/`](submission/results/) has the CSV tables backing the final report claims.
 - [`submission/figures/`](submission/figures/) has the PNG figures copied into the final report and deck.
-- [`submission/final-paper/final-report.pdf`](submission/final-paper/final-report.pdf) is the compiled final report.
-- [`submission/presentation.pptx`](submission/presentation.pptx) is the generated presentation deck.
+- [`submission/proposal/`](submission/proposal/) has the project proposal source.
+- [`submission/final-report/final-report.pdf`](submission/final-report/final-report.pdf) is the compiled final report.
+- [`submission/presentation/presentation.pptx`](submission/presentation/presentation.pptx) is the generated presentation deck.
 - [`results/final/`](results/final/) mirrors the final paper's result tables and figures.
 
 The canonical local result refresh is:

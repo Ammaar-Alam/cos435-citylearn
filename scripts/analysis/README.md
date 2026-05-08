@@ -20,7 +20,7 @@ make cross-table
 - `make_cross_split_figures.py` writes cross-split comparison figures under
   `submission/figures/`.
 - `make_cross_split_table.py` refreshes the compact cross-split table.
-- `build_deck.py` builds `submission/presentation.pptx` from tracked result
+- `build_deck.py` builds `submission/presentation/presentation.pptx` from tracked result
   tables and figures.
 
 ## specialized script

@@ -1,6 +1,6 @@
 """Generate the Track-3 presentation deck as a .pptx file.
 
-This mirrors submission/presentation_outline.md — seven 16:9 slides, ~30s each,
+This mirrors submission/presentation/outline.md — seven 16:9 slides, ~30s each,
 covering all five Rubric Section 3 questions (problem / importance / hardness /
 prior work + differentiator / approach + results + limitations). Slide 7 embeds
 submission/figures/per_split_scores.png as the Rubric Section 2 deliverable.
@@ -9,7 +9,7 @@ Usage:
     .venv/bin/python scripts/analysis/build_deck.py
 
 Output:
-    submission/presentation.pptx
+    submission/presentation/presentation.pptx
 """
 
 from __future__ import annotations
@@ -23,9 +23,9 @@ from pptx.enum.text import PP_ALIGN
 from pptx.util import Emu, Inches, Pt
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-OUTLINE_PATH = REPO_ROOT / "submission" / "presentation_outline.md"
+OUTLINE_PATH = REPO_ROOT / "submission" / "presentation" / "outline.md"
 FIGURE_PATH = REPO_ROOT / "submission" / "figures" / "per_split_scores.png"
-OUTPUT_PATH = REPO_ROOT / "submission" / "presentation.pptx"
+OUTPUT_PATH = REPO_ROOT / "submission" / "presentation" / "presentation.pptx"
 
 # Princeton-ish palette with accessible contrast on white.
 COLOR_TITLE = RGBColor(0x0F, 0x1B, 0x2D)  # deep navy

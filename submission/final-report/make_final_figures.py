@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / "results"
-FIGURES = ROOT / "final-paper" / "figures"
+FIGURES = ROOT / "final-report" / "figures"
 
 COLORS = {
     "RBC": "#5B6770",
