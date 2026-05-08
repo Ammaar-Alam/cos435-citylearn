@@ -38,19 +38,14 @@ data/external/*
 data/manifests/citylearn_2023_manifest.json
 
 results/runs/*
-!results/runs/.gitkeep
 
 results/metrics/*
-!results/metrics/.gitkeep
 
 results/tables/*
-!results/tables/.gitkeep
 
 results/figures/*
-!results/figures/.gitkeep
 
 results/manifests/*
-!results/manifests/.gitkeep
 
 results/ui_exports/*
 results/*_tmp/

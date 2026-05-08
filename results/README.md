@@ -1,6 +1,6 @@
 # results layout
 
-Actual run outputs stay out of git, but the directory structure is tracked so everyone writes results to the same place.
+Actual run outputs stay out of git. Scripts create these directories as needed, and the tracked final result summaries live under `submission/`.
 
 - `runs/` run-local artifacts and checkpoints
 - `metrics/` flat metric exports
@@ -16,8 +16,8 @@ report assets under `submission/`.
 
 ## git policy
 
-The tracked files in this directory should normally be only `.gitkeep` files and
-documentation. The ignored local-output boundaries are:
+The tracked files in this directory should normally be documentation only. The
+ignored local-output boundaries are:
 
 - `results/runs/` checkpoints, rollout traces, and run-local metadata
 - `results/metrics/` flat per-run metric rows consumed by the submission exporter
