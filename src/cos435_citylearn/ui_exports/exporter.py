@@ -202,36 +202,54 @@ def _playback_payload(
                 "name": building.name,
                 "series": {
                     "net_electricity_consumption": _trim(
-                        _to_float_list(building.net_electricity_consumption), series_limit, series_start
+                        _to_float_list(building.net_electricity_consumption),
+                        series_limit,
+                        series_start,
                     ),
                     "non_shiftable_load": _trim(
                         _to_float_list(building.non_shiftable_load), series_limit, series_start
                     ),
                     "solar_generation": _trim(
-                        _to_float_list(building.solar_generation, scale=-1.0), series_limit, series_start
-                    ),
-                    "cooling_demand": _trim(_to_float_list(building.cooling_demand), series_limit, series_start),
-                    "dhw_demand": _trim(_to_float_list(building.dhw_demand), series_limit, series_start),
-                    "indoor_temperature": _trim(
-                        _to_float_list(building.indoor_dry_bulb_temperature), series_limit, series_start
-                    ),
-                    "temperature_set_point": _trim(
-                        _to_float_list(
-                        building.indoor_dry_bulb_temperature_set_point
-                        ),
+                        _to_float_list(building.solar_generation, scale=-1.0),
                         series_limit,
                         series_start,
                     ),
-                    "occupant_count": _trim(_to_float_list(building.occupant_count), series_limit, series_start),
-                    "power_outage": _trim(_to_int_list(building.power_outage_signal), series_limit, series_start),
+                    "cooling_demand": _trim(
+                        _to_float_list(building.cooling_demand), series_limit, series_start
+                    ),
+                    "dhw_demand": _trim(
+                        _to_float_list(building.dhw_demand), series_limit, series_start
+                    ),
+                    "indoor_temperature": _trim(
+                        _to_float_list(building.indoor_dry_bulb_temperature),
+                        series_limit,
+                        series_start,
+                    ),
+                    "temperature_set_point": _trim(
+                        _to_float_list(building.indoor_dry_bulb_temperature_set_point),
+                        series_limit,
+                        series_start,
+                    ),
+                    "occupant_count": _trim(
+                        _to_float_list(building.occupant_count), series_limit, series_start
+                    ),
+                    "power_outage": _trim(
+                        _to_int_list(building.power_outage_signal), series_limit, series_start
+                    ),
                     "battery_soc": _trim(
-                        _to_float_list(building.electrical_storage.soc, scale=100.0), series_limit, series_start
+                        _to_float_list(building.electrical_storage.soc, scale=100.0),
+                        series_limit,
+                        series_start,
                     ),
                     "battery_delta": _trim(
-                        _to_float_list(building.electrical_storage.energy_balance), series_limit, series_start
+                        _to_float_list(building.electrical_storage.energy_balance),
+                        series_limit,
+                        series_start,
                     ),
                     "electricity_pricing": _trim(
-                        _to_float_list(building.pricing.electricity_pricing), series_limit, series_start
+                        _to_float_list(building.pricing.electricity_pricing),
+                        series_limit,
+                        series_start,
                     ),
                     "electricity_pricing_predicted_6h": _trim(
                         _to_float_list(building.pricing.electricity_pricing_predicted_6h),
@@ -249,7 +267,9 @@ def _playback_payload(
                         series_start,
                     ),
                     "carbon_intensity": _trim(
-                        _to_float_list(building.carbon_intensity.carbon_intensity), series_limit, series_start
+                        _to_float_list(building.carbon_intensity.carbon_intensity),
+                        series_limit,
+                        series_start,
                     ),
                 },
             }
@@ -274,7 +294,9 @@ def _playback_payload(
                 _to_float_list(env.net_electricity_consumption), series_limit, series_start
             ),
             "net_electricity_consumption_cost": _trim(
-                _to_float_list(getattr(env, "net_electricity_consumption_cost", [])), series_limit, series_start
+                _to_float_list(getattr(env, "net_electricity_consumption_cost", [])),
+                series_limit,
+                series_start,
             ),
             "net_electricity_consumption_emission": _trim(
                 _to_float_list(getattr(env, "net_electricity_consumption_emission", [])),
@@ -305,7 +327,9 @@ class DashboardCapture:
     def __post_init__(self) -> None:
         self.ui_exports_root = _resolve_ui_exports_root(self.ui_exports_root)
         self.artifacts_root = (
-            self.ui_exports_root.parent if self.artifacts_root is None else Path(self.artifacts_root)
+            self.ui_exports_root.parent
+            if self.artifacts_root is None
+            else Path(self.artifacts_root)
         )
         self.simulation_dir = self.ui_exports_root / "SimulationData" / self.run_id
         self.media_dir = self.ui_exports_root / "media" / self.run_id
@@ -379,7 +403,9 @@ class DashboardCapture:
         return {
             "frame_count": self.frame_count,
             "frame_stride": self.frame_stride,
-            "poster_path": _relative_artifact_path(self.poster_path, relative_root=self.artifacts_root),
+            "poster_path": _relative_artifact_path(
+                self.poster_path, relative_root=self.artifacts_root
+            ),
             "gif_path": _relative_artifact_path(self.gif_path, relative_root=self.artifacts_root),
             "frames": [
                 _relative_artifact_path(path, relative_root=self.artifacts_root)
@@ -392,7 +418,9 @@ class DashboardCapture:
         return {
             "frame_count": self.frame_count,
             "frame_stride": self.frame_stride,
-            "poster_path": _relative_artifact_path(self.poster_path, relative_root=self.artifacts_root),
+            "poster_path": _relative_artifact_path(
+                self.poster_path, relative_root=self.artifacts_root
+            ),
             "gif_path": _relative_artifact_path(self.gif_path, relative_root=self.artifacts_root),
             "frames": [
                 _relative_artifact_path(path, relative_root=self.artifacts_root)
@@ -415,7 +443,9 @@ def build_live_preview_payload(
     artifacts_root: str | Path | None = None,
 ) -> dict[str, Any]:
     series_end = current_step + 1
-    bounded_history = series_end if history_limit is None else max(1, min(history_limit, series_end))
+    bounded_history = (
+        series_end if history_limit is None else max(1, min(history_limit, series_end))
+    )
     window_start = max(0, series_end - bounded_history)
     trace_start_step = int(rollout_trace[0]["step"]) if rollout_trace else 0
     total_steps = int(getattr(env, "time_steps", series_end))
@@ -462,9 +492,7 @@ def export_simulation_bundle(
     resolved_artifacts_root = (
         resolved_ui_exports_root.parent if artifacts_root is None else Path(artifacts_root)
     )
-    total_steps = int(
-        getattr(env, "time_steps", len(env.buildings[0].net_electricity_consumption))
-    )
+    total_steps = int(getattr(env, "time_steps", len(env.buildings[0].net_electricity_consumption)))
     timestamps = _hourly_timestamps(total_steps)
     simulation_dir = resolved_ui_exports_root / "SimulationData" / run_id
     simulation_dir.mkdir(parents=True, exist_ok=True)
@@ -536,13 +564,17 @@ def export_simulation_bundle(
     )
     exported_files.append(kpi_path)
 
-    media_manifest = capture.finalize_media() if capture is not None else {
-        "frame_count": 0,
-        "frame_stride": None,
-        "poster_path": None,
-        "gif_path": None,
-        "frames": [],
-    }
+    media_manifest = (
+        capture.finalize_media()
+        if capture is not None
+        else {
+            "frame_count": 0,
+            "frame_stride": None,
+            "poster_path": None,
+            "gif_path": None,
+            "frames": [],
+        }
+    )
     playback_payload = _playback_payload(
         env=env,
         run_context=run_context,
@@ -563,8 +595,12 @@ def export_simulation_bundle(
             "generated_at": utc_now_iso(),
             "run_id": run_id,
             "dataset_name": run_context["dataset_name"],
-            "simulation_dir": _relative_artifact_path(simulation_dir, relative_root=resolved_artifacts_root),
-            "playback_path": _relative_artifact_path(playback_path, relative_root=resolved_artifacts_root),
+            "simulation_dir": _relative_artifact_path(
+                simulation_dir, relative_root=resolved_artifacts_root
+            ),
+            "playback_path": _relative_artifact_path(
+                playback_path, relative_root=resolved_artifacts_root
+            ),
             "media": media_manifest,
             "files": [
                 _relative_artifact_path(path, relative_root=resolved_artifacts_root)
@@ -574,11 +610,17 @@ def export_simulation_bundle(
     )
 
     return {
-        "simulation_dir": _relative_artifact_path(simulation_dir, relative_root=resolved_artifacts_root)
+        "simulation_dir": _relative_artifact_path(
+            simulation_dir, relative_root=resolved_artifacts_root
+        )
         or str(simulation_dir),
-        "playback_path": _relative_artifact_path(playback_path, relative_root=resolved_artifacts_root)
+        "playback_path": _relative_artifact_path(
+            playback_path, relative_root=resolved_artifacts_root
+        )
         or str(playback_path),
-        "export_manifest_path": _relative_artifact_path(export_manifest_path, relative_root=resolved_artifacts_root)
+        "export_manifest_path": _relative_artifact_path(
+            export_manifest_path, relative_root=resolved_artifacts_root
+        )
         or str(export_manifest_path),
         "media": media_manifest,
     }

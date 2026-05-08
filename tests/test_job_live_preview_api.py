@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import time
 from pathlib import Path
 
@@ -24,7 +25,7 @@ def build_test_settings(tmp_path: Path) -> ApiSettings:
         artifacts_root=tmp_path,
         frontend_root=frontend_root,
         frontend_dist=frontend_root / "dist",
-        python_executable=REPO_ROOT / ".venv" / "bin" / "python",
+        python_executable=Path(sys.executable),
         mpl_config_dir=tmp_path / ".cache" / "matplotlib",
         max_concurrent_jobs=1,
     )

@@ -16,7 +16,7 @@ def test_env_instantiation_and_schema_export(tmp_path):
     bundle = make_citylearn_env()
 
     assert bundle.dataset_name == DEFAULT_DATASET_NAME
-    assert bundle.schema_path == schema_path
+    assert bundle.schema_path.resolve() == schema_path.resolve()
     assert bundle.central_agent is True
     assert len(bundle.env.buildings) > 0
     assert len(bundle.env.action_space) == 1

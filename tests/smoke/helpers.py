@@ -20,13 +20,7 @@ def require_benchmark_runtime() -> None:
 
 
 def require_dataset() -> Path:
-    schema_path = (
-        DATA_DIR
-        / "external"
-        / "citylearn_2023"
-        / DEFAULT_DATASET_NAME
-        / "schema.json"
-    )
+    schema_path = DATA_DIR / "external" / "citylearn_2023" / DEFAULT_DATASET_NAME / "schema.json"
 
     if not schema_path.exists():
         if os.getenv("COS435_REQUIRE_DATA") == "1":

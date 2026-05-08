@@ -1,4 +1,5 @@
 """Generate results figures and tables."""
+
 from __future__ import annotations
 
 import csv
@@ -96,8 +97,13 @@ def plot_training_curve(run_dir: Path) -> None:
     with plt.rc_context(STYLE):
         fig, ax = plt.subplots(figsize=(8, 4.5))
 
-        ax.plot(steps / 1_000, rewards / 1_000, color=COLORS["ppo_central_baseline_public_dev"],
-                linewidth=1.8, label="Centralized PPO baseline")
+        ax.plot(
+            steps / 1_000,
+            rewards / 1_000,
+            color=COLORS["ppo_central_baseline_public_dev"],
+            linewidth=1.8,
+            label="Centralized PPO baseline",
+        )
 
         ax.set_xlabel("Training steps (thousands)")
         ax.set_ylabel("Mean episode reward (thousands)")
@@ -127,16 +133,35 @@ def plot_method_comparison(rows: dict[str, dict]) -> None:
     with plt.rc_context(STYLE):
         fig, ax = plt.subplots(figsize=(9, 5))
 
-        bars = ax.bar(x, means, yerr=stds, capsize=4, color=colors,
-                      error_kw={"elinewidth": 1.2, "ecolor": "#444"}, width=0.6, zorder=3)
+        bars = ax.bar(
+            x,
+            means,
+            yerr=stds,
+            capsize=4,
+            color=colors,
+            error_kw={"elinewidth": 1.2, "ecolor": "#444"},
+            width=0.6,
+            zorder=3,
+        )
 
-        ax.axhline(CHESCA_SCORE, color="#e53935", linewidth=1.5, linestyle="--",
-                   label=f"CHESCA public ref ({CHESCA_SCORE:.3f}, diff. eval server)",
-                   zorder=4)
+        ax.axhline(
+            CHESCA_SCORE,
+            color="#e53935",
+            linewidth=1.5,
+            linestyle="--",
+            label=f"CHESCA public ref ({CHESCA_SCORE:.3f}, diff. eval server)",
+            zorder=4,
+        )
 
         for bar, mean in zip(bars, means):
-            ax.text(bar.get_x() + bar.get_width() / 2, mean + 0.01,
-                    f"{mean:.3f}", ha="center", va="bottom", fontsize=9)
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                mean + 0.01,
+                f"{mean:.3f}",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
 
         ax.set_xticks(x)
         ax.set_xticklabels(labels, fontsize=10)
@@ -214,13 +239,13 @@ def plot_kpi_breakdown(rows: dict[str, dict]) -> None:
 
 
 PER_SPLIT_METHOD_ORDER = [
-    ("RBC",          "#aaaaaa"),
-    ("PPO Central",  "#4C72B0"),
-    ("PPO DTDE",     "#2196F3"),
-    ("SAC Central",  "#DD8452"),
-    ("SAC rv1",      "#55A868"),
-    ("SAC rv2",      "#C44E52"),
-    ("SAC DTDE",     "#8172B2"),
+    ("RBC", "#aaaaaa"),
+    ("PPO Central", "#4C72B0"),
+    ("PPO DTDE", "#2196F3"),
+    ("SAC Central", "#DD8452"),
+    ("SAC rv1", "#55A868"),
+    ("SAC rv2", "#C44E52"),
+    ("SAC DTDE", "#8172B2"),
 ]
 
 # Columns in cross_split_scores.csv that drive the per-split figure.
@@ -268,13 +293,23 @@ def plot_per_split_scores() -> None:
         ax.axvspan(phase2_end, x[-1] + 0.5, color="#000000", alpha=0.04, zorder=0)
         ax.axvline(phase2_end, color="#999999", linestyle=":", linewidth=1.2, zorder=1)
         ax.text(
-            phase2_end - 0.05, 1.075, "phase_2 ←",
-            ha="right", va="bottom", fontsize=9, color="#666666",
+            phase2_end - 0.05,
+            1.075,
+            "phase_2 ←",
+            ha="right",
+            va="bottom",
+            fontsize=9,
+            color="#666666",
             transform=ax.get_xaxis_transform(),
         )
         ax.text(
-            phase2_end + 0.05, 1.075, "→ phase_3",
-            ha="left", va="bottom", fontsize=9, color="#666666",
+            phase2_end + 0.05,
+            1.075,
+            "→ phase_3",
+            ha="left",
+            va="bottom",
+            fontsize=9,
+            color="#666666",
             transform=ax.get_xaxis_transform(),
         )
 
@@ -287,21 +322,36 @@ def plot_per_split_scores() -> None:
             if not ys_drawn:
                 continue
             ax.plot(
-                xs_drawn, ys_drawn, marker="o", color=color,
-                linewidth=2.0, markersize=6, label=method, zorder=4,
+                xs_drawn,
+                ys_drawn,
+                marker="o",
+                color=color,
+                linewidth=2.0,
+                markersize=6,
+                label=method,
+                zorder=4,
             )
 
         ax.axhline(
-            CHESCA_SCORE, color="#e53935", linewidth=1.6, linestyle="--",
+            CHESCA_SCORE,
+            color="#e53935",
+            linewidth=1.6,
+            linestyle="--",
             label=f"CHESCA 2023 public ref ({CHESCA_SCORE:.3f}, diff. eval server)",
             zorder=3,
         )
 
         ax.text(
-            (phase2_end + x[-1] + 0.5) / 2, 0.82,
+            (phase2_end + x[-1] + 0.5) / 2,
+            0.82,
             "centralized models\nnot portable",
-            ha="center", va="center", fontsize=10, color="#888888",
-            style="italic", transform=ax.get_xaxis_transform(), zorder=2,
+            ha="center",
+            va="center",
+            fontsize=10,
+            color="#888888",
+            style="italic",
+            transform=ax.get_xaxis_transform(),
+            zorder=2,
         )
 
         ax.set_xticks(x)
@@ -397,17 +447,31 @@ def plot_cross_split_comparison() -> None:
     with plt.rc_context(STYLE):
         fig, ax = plt.subplots(figsize=(10, 5))
         bars = ax.bar(
-            x, means, yerr=ci95s, capsize=4, color=colors,
-            error_kw={"elinewidth": 1.2, "ecolor": "#444"}, width=0.65, zorder=3,
+            x,
+            means,
+            yerr=ci95s,
+            capsize=4,
+            color=colors,
+            error_kw={"elinewidth": 1.2, "ecolor": "#444"},
+            width=0.65,
+            zorder=3,
         )
         ax.axhline(
-            CHESCA_SCORE, color="#e53935", linewidth=1.5, linestyle="--",
-            label="CHESCA public reference (not same eval)", zorder=4,
+            CHESCA_SCORE,
+            color="#e53935",
+            linewidth=1.5,
+            linestyle="--",
+            label="CHESCA public reference (not same eval)",
+            zorder=4,
         )
         for bar, mean in zip(bars, means):
             ax.text(
-                bar.get_x() + bar.get_width() / 2, mean + 0.015,
-                f"{mean:.3f}", ha="center", va="bottom", fontsize=9,
+                bar.get_x() + bar.get_width() / 2,
+                mean + 0.015,
+                f"{mean:.3f}",
+                ha="center",
+                va="bottom",
+                fontsize=9,
             )
 
         ax.set_xticks(x)
@@ -417,10 +481,13 @@ def plot_cross_split_comparison() -> None:
         ax.set_ylim(0, max(means) * 1.18)
         ax.legend(loc="upper right", framealpha=0.95, fontsize=9)
         fig.text(
-            0.01, -0.01,
+            0.01,
+            -0.01,
             "Published CHESCA is benchmark context; compare local/released runs "
             "within their own split group.",
-            ha="left", fontsize=8, color="#666666",
+            ha="left",
+            fontsize=8,
+            color="#666666",
         )
         fig.tight_layout()
 
@@ -501,10 +568,7 @@ def plot_generalization_gap(rows: dict[str, dict]) -> None:
         print("  skip generalization_gap: released_eval_main_results.csv not found")
         return
 
-    methods = [
-        m for m in CROSS_SPLIT_METHODS
-        if m[0] in released and m[3] in rows
-    ]
+    methods = [m for m in CROSS_SPLIT_METHODS if m[0] in released and m[3] in rows]
     labels = [m[1] for m in methods]
     colors = [m[2] for m in methods]
     public_means = [float(rows[m[3]]["average_score_mean"]) for m in methods]
@@ -518,18 +582,32 @@ def plot_generalization_gap(rows: dict[str, dict]) -> None:
         fig, ax = plt.subplots(figsize=(11, 5))
         # Lighter shade for public_dev bar (alpha=0.45).
         ax.bar(
-            x - width / 2, public_means, width=width, color=colors,
-            alpha=0.45, edgecolor="none", zorder=3,
+            x - width / 2,
+            public_means,
+            width=width,
+            color=colors,
+            alpha=0.45,
+            edgecolor="none",
+            zorder=3,
             label="public_dev (tuning split)",
         )
         ax.bar(
-            x + width / 2, released_means, width=width, color=colors,
-            yerr=released_stds, capsize=3, edgecolor="none",
-            error_kw={"elinewidth": 1.0, "ecolor": "#333"}, zorder=3,
+            x + width / 2,
+            released_means,
+            width=width,
+            color=colors,
+            yerr=released_stds,
+            capsize=3,
+            edgecolor="none",
+            error_kw={"elinewidth": 1.0, "ecolor": "#333"},
+            zorder=3,
             label="phase_2_online_eval (mean ± std, 3 splits)",
         )
         ax.axhline(
-            CHESCA_SCORE, color="#e53935", linewidth=1.5, linestyle="--",
+            CHESCA_SCORE,
+            color="#e53935",
+            linewidth=1.5,
+            linestyle="--",
             label=f"CHESCA 2023 public ref ({CHESCA_SCORE:.3f}, diff. eval server)",
             zorder=4,
         )
@@ -553,8 +631,13 @@ def plot_generalization_gap(rows: dict[str, dict]) -> None:
 def write_comparison_table(rows: dict[str, dict]) -> None:
     available = [m for m in METHOD_ORDER if m in rows]
     fieldnames = [
-        "method_label", "algorithm", "seed_count", "evidence_level",
-        "average_score_mean", "average_score_std", "average_score_ci95",
+        "method_label",
+        "algorithm",
+        "seed_count",
+        "evidence_level",
+        "average_score_mean",
+        "average_score_std",
+        "average_score_ci95",
         "pct_improvement_vs_local_rbc_mean",
     ]
     out_rows = []

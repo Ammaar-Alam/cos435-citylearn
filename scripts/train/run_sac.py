@@ -44,6 +44,26 @@ def main() -> None:
         help="override training.learning_rate from the config",
     )
     parser.add_argument(
+        "--reward-scaling",
+        type=float,
+        default=None,
+        help="override training.reward_scaling from the config",
+    )
+    parser.add_argument("--output-root", default=None, help="directory for run artifacts")
+    parser.add_argument("--metrics-root", default=None, help="directory for metric CSV outputs")
+    parser.add_argument("--manifests-root", default=None, help="directory for run manifests")
+    parser.add_argument("--ui-exports-root", default=None, help="directory for UI export artifacts")
+    parser.add_argument(
+        "--artifacts-root",
+        default=None,
+        help="root that contains runs/, metrics/, manifests/ for artifact lookup",
+    )
+    parser.add_argument(
+        "--imported-artifacts-root",
+        default=None,
+        help="root for imported artifacts when evaluating externally copied checkpoints",
+    )
+    parser.add_argument(
         "--allow-cross-reward-eval",
         action="store_true",
         help=(
@@ -61,6 +81,13 @@ def main() -> None:
         split_override=args.split,
         seed_override=args.seed,
         lr_override=args.lr,
+        reward_scaling_override=args.reward_scaling,
+        output_root=args.output_root,
+        metrics_root=args.metrics_root,
+        manifests_root=args.manifests_root,
+        ui_exports_root=args.ui_exports_root,
+        artifacts_root=args.artifacts_root,
+        imported_artifacts_root=args.imported_artifacts_root,
         allow_cross_reward_eval=args.allow_cross_reward_eval,
     )
     print(json.dumps(payload, indent=2, sort_keys=True))

@@ -9,8 +9,11 @@ from cos435_citylearn.algorithms.sac.controllers import (
     CentralizedSACController,
     SharedSACController,
 )
-from cos435_citylearn.algorithms.sac.features import augment_shared_observations, build_shared_context
-from cos435_citylearn.algorithms.sac.features import SHARED_CONTEXT_DIMENSION
+from cos435_citylearn.algorithms.sac.features import (
+    SHARED_CONTEXT_DIMENSION,
+    augment_shared_observations,
+    build_shared_context,
+)
 from cos435_citylearn.algorithms.sac.rewards import (
     OFFICIAL_CHALLENGE_WEIGHTS,
     OfficialChallengeReward,

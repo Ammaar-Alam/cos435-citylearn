@@ -81,14 +81,19 @@ class OfficialChallengeReward(RewardFunction):
 
         return numerator / denominator
 
-    def _storage_penalties(self, observations: Sequence[Mapping[str, float]]) -> tuple[float, float]:
+    def _storage_penalties(
+        self, observations: Sequence[Mapping[str, float]]
+    ) -> tuple[float, float]:
         storage_socs = [float(o.get("electrical_storage_soc", 0.0)) for o in observations]
         if self._previous_storage_soc is None:
             deltas = [0.0 for _ in storage_socs]
             smoothness_penalty = 0.0
             sign_flip_penalty = 0.0
         else:
-            deltas = [current - previous for current, previous in zip(storage_socs, self._previous_storage_soc)]
+            deltas = [
+                current - previous
+                for current, previous in zip(storage_socs, self._previous_storage_soc)
+            ]
             smoothness_penalty = float(np.mean(np.abs(deltas), dtype="float32")) if deltas else 0.0
             if self._previous_storage_delta is None:
                 sign_flip_penalty = 0.0
@@ -107,7 +112,10 @@ class OfficialChallengeReward(RewardFunction):
         if self._step_index > 0 and self._step_index % 24 == 0:
             self._daily_positive_loads = []
 
-        positive_loads = [_positive(observation.get("net_electricity_consumption", 0.0)) for observation in observations]
+        positive_loads = [
+            _positive(observation.get("net_electricity_consumption", 0.0))
+            for observation in observations
+        ]
         district_positive_load = float(np.sum(positive_loads, dtype="float32"))
         carbon_term = _log1p(
             sum(

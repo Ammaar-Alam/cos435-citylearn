@@ -1,5 +1,7 @@
 \documentclass{article}
 \input{boilerplate}
+\author{}
+\setlength{\headheight}{28pt}
 
 \begin{document}
 
@@ -11,6 +13,7 @@
 \vspace{1em} \hfill \lectureDate
 
 \maketitle
+\setlength{\headheight}{28pt}
 
 \paragraph{Authors.} Grace Sun (\texttt{gs0625@princeton.edu}), Ammaar Alam (\texttt{ah0952@princeton.edu}), Erik Dyer (\texttt{ed1783@princeton.edu}) 
 
@@ -33,25 +36,26 @@ To get a high score, a controller has to respond to solar and demand signals, an
 The main challenge is generalization. A learned policy can overfit on the training split and degrade on held out conditions. It can also overfit architecturally. 
 A policy whose input and output layers are fixed to three buildings cannot run on a six building neighborhood. Rule based control (RBC) sidesteps both failure modes by encoding human priors rather than fitting data, which helps explain why the strongest prior entries, such as the 2023 competition winner CHESCA \citep{pinto2024citylearn}, have favored hierarchical optimization over learned policies. Prior RL approaches to CityLearn have struggled with three recurring gaps. Reward signals do not directly match the composite evaluation criterion, single run results overstate reliability, and fixed topology architectures cannot adapt to neighborhoods of different sizes. Our work directly addresses all three.
 
-We ask whether a systematic RL pipeline can outperform RBC on held out evaluation data while remaining portable to building configurations never seen during training. Rather than searching for a single best hyperparameter setting, we run a controlled ablation across two algorithms (PPO and SAC), two control topologies (centralized and shared parameter decentralized), and three reward variants, using multiseed runs ($n = 3$--$10$) and reporting confidence intervals throughout. Section~\ref{sec:related} reviews related work on CityLearn and continuous control algorithms; Section~\ref{sec:methods} describes our experimental design; Section~\ref{sec:results} presents results; and Section~\ref{sec:discussion} discusses findings and limitations. Our main contributions are
+We ask whether a systematic RL pipeline can outperform RBC on held out evaluation data while remaining portable to building configurations never seen during training. Rather than searching for a single best hyperparameter setting, we run a controlled ablation across two algorithms (PPO and SAC), two control topologies (centralized and shared parameter decentralized), and three reward variants, using multiseed runs ($n = 3$--$10$) and reporting confidence intervals throughout. We then extend the shared-controller study with larger PPO/SAC/TD3 sweeps on Princeton Neuronic to test whether the same conclusions survive broader seed, learning-rate, and algorithm coverage. Section~\ref{sec:related} reviews related work on CityLearn and continuous control algorithms; Section~\ref{sec:methods} describes our experimental design; Section~\ref{sec:results} presents results; and Section~\ref{sec:discussion} discusses findings and limitations. Our main contributions are
 
 \begin{itemize}
     \item SAC with a reward aligned to the official scoring terms reduces the RBC composite score by 48\% on the local evaluation dataset and by 40\% on the released held out phase 2 splits.
     \item Shared parameter decentralized training/execution (shared-DTDE) is the only topology portable to the 6 building phase 3 held out splits; among portable policies, SAC-DTDE outperforms PPO-DTDE on phase 3 (0.774 vs.\ 0.843).
     \item A reward design ablation shows that matching the official scoring terms improves local performance, while adding battery smoothness penalties improves held out phase 2 generalization.
+    \item The final shared-controller sweep adds TD3 as a stretch algorithm. SAC remains the strongest learned controller overall in the targeted matrix (0.702 released-all), while TD3 is competitive and gives the best broad-sweep phase-3 score (0.736).
 \end{itemize}
 
 \section{Related Work}\label{sec:related}
 
 The CityLearn environment \citep{vazquez2020citylearn, citylearnrepo} has been the platform for multiple competition tracks on building level energy management. The strongest entries in the 2023 challenge combined explicit forecasting, hierarchical control, and optimization rather than end to end learned policies. CHESCA \citep{pinto2024citylearn} achieved the top score by first optimizing individual building behavior and then refining decisions through a community level controller, giving it both scalability and explicit structure. The 2023 second place solution \citep{zheng2025optimizing} combined learned forecasts (linear regression, k-NN, and LightGBM) with building level and microgrid level model predictive control. Earlier work similarly found that optimization with online adaptation is highly competitive while remaining interpretable \citep{khattar2023winning}. Collectively, these results motivate a narrower question of which design choices make a simple RL baseline credible, reproducible, and portable, and how much of the gap to optimization they can close.
 
-The two algorithms we evaluate are PPO \citep{schulman2017proximal} and SAC \citep{haarnoja2018soft}. PPO is a widely used on policy method with a clipped surrogate objective that stabilizes training across a range of continuous control tasks. SAC is an off policy actor critic that adds entropy regularization, improving sample efficiency and reducing sensitivity to reward scaling. Properties that are especially valuable in the sample limited continuous control setting of battery dispatch. We use Stable-Baselines3 \citep{raffin2021stable} for centralized variants and a custom shared parameter stack for decentralized execution. Building energy management poses specific challenges for both algorithms. Episodes span a full year of hourly operations over 8,760 steps, rewards from the multi KPI scoring formula have different timescales like in the case where thermal comfort is instantaneous while peak demand accumulates over days, and actions in a shared battery schedule create delayed effects that are hard to attribute to individual timesteps. These properties favor off policy methods with long replay memory, and motivate our reward design ablation as a controlled experiment in aligning the training signal with the evaluation criterion.
+The original ablation evaluates PPO \citep{schulman2017proximal} and SAC \citep{haarnoja2018soft}, and the final sweep adds TD3 \citep{fujimoto2018addressing}. PPO is a widely used on policy method with a clipped surrogate objective that stabilizes training across a range of continuous control tasks. SAC is an off policy actor critic that adds entropy regularization, improving sample efficiency and reducing sensitivity to reward scaling. TD3 is an off policy deterministic actor critic that uses twin critics, delayed policy updates, and target policy smoothing to reduce overestimation. Properties that are especially valuable in the sample limited continuous control setting of battery dispatch. We use Stable-Baselines3 \citep{raffin2021stable} for centralized variants and a custom shared parameter stack for decentralized execution. Building energy management poses specific challenges for both algorithms. Episodes span a full year of hourly operations over 8,760 steps, rewards from the multi KPI scoring formula have different timescales like in the case where thermal comfort is instantaneous while peak demand accumulates over days, and actions in a shared battery schedule create delayed effects that are hard to attribute to individual timesteps. These properties favor off policy methods with long replay memory, and motivate our reward design ablation as a controlled experiment in aligning the training signal with the evaluation criterion.
 
 Centralized versus decentralized control for building energy management has been studied directly in prior work. \citet{kathirgamanathan2021centralised} compared centralized and decentralized RL for battery control in a smart grid setting and found tradeoffs between coordination quality and scalability. Centralized policies have access to all agents' observations and can optimize a joint action, but they do not generalize to different numbers of agents at test time. Parameter sharing in decentralized policies offers a practical middle ground. Buildings are treated as instances of the same control problem, a single network is trained on experience pooled across all buildings, and the resulting checkpoint can run on any neighborhood size. Our work extends this comparison by evaluating the topology tradeoff across both same size and cross size held out splits under a systematic reward design ablation, making the generalization cost of each choice quantitatively visible.
 
 \section{Methods}\label{sec:methods}
 
-We compare two RL algorithms across two control topologies and three reward formulations, evaluated on local and released held out splits from the CityLearn 2023 competition.
+We compare two RL algorithms across two control topologies and three reward formulations, evaluated on local and released held out splits from the CityLearn 2023 competition. The final result audit additionally evaluates shared-DTDE TD3 and reruns PPO/SAC/TD3 shared controllers in larger sweeps so that the final claims are not based only on the earlier pilot matrix.
 
 \paragraph{Environment.} We use the CityLearn Gymnasium environment \citep{vazquez2020citylearn, citylearnrepo} in its 2023 competition configuration of a 3 building neighborhood with rooftop solar PV and battery storage at each building. Observations include time of day encodings, normalized net electricity demand, solar generation, battery state of charge, and short horizon forecasts. The composite score (lower is better) is a normalized weighted average of five KPI ratios, each comparing agent performance to a do nothing baseline.
 
@@ -61,9 +65,13 @@ We compare two RL algorithms across two control topologies and three reward form
 \begin{itemize}
     \item PPO \citep{schulman2017proximal}  On policy proximal policy optimization with a clipped surrogate objective. We implement centralized PPO with Stable-Baselines3 \citep{raffin2021stable} and a custom shared-DTDE variant with per building embeddings. The shared-DTDE PPO policy uses a 2 layer MLP (256 hidden units per layer) applied per building; the rollout buffer pools experience across all buildings. We sweep learning rates over $\{10^{-4}, 3\times10^{-4}\}$ across 10 seeds and select the best per seed on the local validation split.
     \item SAC \citep{haarnoja2018soft}  Off policy soft actor critic with entropy regularization. SAC reuses transitions through replay, which is useful in sample limited continuous control settings. Both the centralized and shared-DTDE SAC variants use 2 layer MLP actor and critic networks (256 hidden units), a replay buffer of size $10^6$, and automatic entropy tuning. We implement centralized SAC (5 seeds) and a shared-DTDE SAC pilot (3 seeds), the latter using a shared replay buffer that pools transitions from all buildings.
+    \item TD3 \citep{fujimoto2018addressing}  Off policy deterministic actor critic with twin critics, target networks, target policy smoothing, delayed actor updates, replay normalization, and deterministic evaluation. We use TD3 as a stretch shared-DTDE algorithm in the final sweeps, using the same count-invariant shared district context features as the shared SAC controller.
 \end{itemize}
 
 All policies train for 500K, or 1M environment steps. Centralized policies treat the 3 building tuple as a single environment step; shared-DTDE variants accumulate one transition per building per environment step, effectively multiplying the transition count by the number of buildings. Checkpoints are saved every 50K steps and the final checkpoint (not the best validation checkpoint) is used for evaluation, which avoids implicit validation leakage.
+
+\paragraph{Final sweep audit.}
+After the initial ablation, we ran two larger shared-controller sweeps on Princeton Neuronic. The broad learning-rate screen contains 504 summary rows: PPO/SAC/TD3 $\times$ 8 learning rates $\times$ 3 seeds, evaluated on \texttt{public\_dev}, three released phase-2 splits, and three released phase-3 splits. The targeted final sweep contains 567 rows with algorithm-specific hyperparameters: entropy coefficient for PPO, reward scaling for SAC, and exploration noise for TD3. The paper-facing CSV summaries in \texttt{submission/results/} record the best setting per algorithm and evaluation group, while raw checkpoints, traces, and run directories remain outside git.
 
 \paragraph{Reward design.}
 The default CityLearn reward is a negative net consumption proxy, but the competition ranks submissions using a multiterm composite score. We test three reward variants
@@ -84,13 +92,52 @@ The reward variant ablation is fully crossed for centralized SAC. PPO uses \text
 
 We organize results around the three evaluations of local tuning performance, same topology held out generalization during phase 2, and cross size generalization during phase 3. All figures and tables report seed averaged means with 95\% confidence intervals and error bars.
 
+\paragraph{Final shared-controller sweep update.} The original ablation below compares PPO and SAC under the reward and topology design choices we developed during the project. After adding TD3 and running the larger shared-controller sweeps, the headline learned-controller ordering remains SAC first, TD3 close behind, and PPO weaker. In the targeted final sweep, SAC achieves the best released-all learned score at $0.702 \pm 0.023$, followed by TD3 at $0.727 \pm 0.017$ and PPO at $0.799 \pm 0.018$. The same table also keeps the RBC reference visible, showing that every learned shared controller improves over RBC while still trailing the external CHESCA optimization reproduction on released phase 2.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figures/final_result_matrix.png}
+    \caption{
+        Final shared-controller result matrix from the targeted PPO/SAC/TD3 sweep. Bars show the best setting per learned algorithm and evaluation group; error bars are 95\% confidence intervals. The CHESCA marker is a reproduced upstream optimization controller and is included as benchmark context, not as part of our learned RL method average.
+    }
+    \label{fig:final_matrix}
+\end{figure}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Algorithm} & \textbf{Public dev} & \textbf{Phase 2} & \textbf{Phase 3} & \textbf{Released all} \\
+\midrule
+RBC & 1.023 & 1.087 & 1.114 & 1.100 \\
+PPO & 0.771 & 0.782 & 0.817 & 0.799 \\
+SAC & 0.553 & 0.664 & 0.738 & 0.702 \\
+TD3 & 0.601 & 0.713 & 0.742 & 0.727 \\
+\bottomrule
+\end{tabular}
+\caption{Best shared-controller scores from the final targeted hyperparameter sweep. For learned methods, each cell selects the best setting for that algorithm and evaluation group; exact learning rates and hyperparameters are recorded in \texttt{submission/results/final\_sweep\_best\_by\_algorithm.csv}.}
+\label{tab:final_matrix}
+\end{table}
+
+\paragraph{TD3 stretch result.} TD3 was added as a compute-heavy stretch algorithm to test whether deterministic off-policy control could improve cross-topology transfer. The broad learning-rate screen gives its strongest result: TD3 with lr $3{\times}10^{-4}$ achieves $0.736 \pm 0.020$ on released phase 3, just ahead of SAC at $0.738 \pm 0.008$. In the targeted final sweep, SAC slightly retakes the phase-3 lead ($0.738$ versus $0.742$), but TD3 remains competitive and beats PPO by roughly 0.075 points on released phase 3.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.92\linewidth]{figures/lr_screen_phase3.png}
+    \caption{
+        Broad learning-rate screen on the released phase-3 transfer splits. Each point aggregates three seeds over three six-building splits. SAC is stable across mid-to-high learning rates, while TD3 has a sharper optimum at $3{\times}10^{-4}$ that gives the best phase-3 score in the broad sweep.
+    }
+    \label{fig:lr_phase3}
+\end{figure}
+
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{figures/per_split_scores.png}
     \caption{
         \texttt{average\_score} (lower is better) on six released held out evaluation datasets. Left panel  three \texttt{phase\_2\_online\_eval} splits (3 building). Right panel (shaded)  three \texttt{phase\_3} splits (6 building). Centralized policies cannot execute on phase 3 splits due to input/output size mismatch. SAC-DTDE achieves the best phase 3 mean (0.774), confirming that shared parameter decentralization is the only topology that enables cross size generalization. The dashed line at 0.562 is the CHESCA 2023 public leaderboard reference. Note that it is from a private evaluator and shown for benchmark context, not for direct comparison.
     }
-    \label{fig per_split}
+    \label{fig:per_split}
 \end{figure}
 
 \paragraph{Local evaluation.} Table~\ref{tab local} summarizes results on the local \texttt{public\_dev} split. The local RBC baseline scores 1.023, and every RL method improves on it. The best local variant is SAC centralized \texttt{reward\_v1} at $0.527 \pm 0.011$ (5 seeds), a 48.4 reduction relative to RBC. SAC \texttt{reward\_v2} ($0.536 \pm 0.016$) and the SAC baseline ($0.554 \pm 0.009$) trail by 1--3 points, indicating that reward alignment helps but is not the sole driver. SAC shared-DTDE scores $0.569 \pm 0.018$ (3 seed pilot), modestly behind centralized SAC. The decentralized controller sees only per building observations and cannot jointly coordinate charge/discharge across the neighborhood. PPO variants are substantially weaker (0.777--0.883), consistent with SAC's expected advantage in continuous control tasks from off policy replay and entropy regularization.
@@ -169,6 +216,8 @@ The results above establish that architectural portability is the binding constr
 
 \paragraph{SAC substantially outperforms PPO for this domain.} Across topologies and splits, SAC variants score roughly 15--25 percentage points below PPO variants. The most likely explanation is sample efficiency. SAC reuses historical transitions through off policy replay, and entropy regularization reduces sensitivity to reward scaling. PPO is simpler to implement. It avoids replay buffers and target networks, but that simplicity does not translate to better performance in continuous battery control where replay is directly beneficial.
 
+\paragraph{TD3 is useful but not a replacement for SAC.} The final sweeps make TD3 a credible additional baseline rather than just an implementation exercise. It gives the best broad-sweep phase-3 transfer score, which suggests deterministic off-policy control can exploit the shared topology when the learning rate is tuned well. However, SAC remains stronger in the targeted released-all matrix and is less brittle across nearby learning rates, so the safest final claim is that SAC is the best overall learned controller while TD3 is competitive on transfer.
+
 \paragraph{Reward design matters within SAC.} The gap between the SAC baseline and \texttt{reward\_v1} (0.554 vs.\ 0.527 locally) shows that training on the official scoring objective outperforms training on a proxy. The smoothness penalties in \texttt{reward\_v2} trade a small local regression for better phase 2 generalization. Large SoC swings and repeated sign flips become costly even if they improve a short local trajectory, and this behavioral regularization transfers better when weather and demand traces change. For deployment on new buildings, \texttt{reward\_v2} is therefore the more robust choice. An important practical implication is that the reward design decision is inseparable from the evaluation protocol. If we had only measured performance on the local \texttt{public\_dev} split, we would have selected \texttt{rv1} as the best reward and missed the fact that \texttt{rv2} generalizes better. This underscores the value of held out evaluation even for design choices that appear secondary to algorithm selection.
 
 \paragraph{Comparison to optimization based methods.} CHESCA achieved 0.562 on the official 2023 public leaderboard \citep{pinto2024citylearn}, below our best held out SAC result of 0.653 on the released phase 2 splits. This is benchmark context, not a head to head comparison. Our phase 2 results use the subsequently released evaluation datasets, not the original competition server, so a direct numerical comparison is not valid. Substantively, CHESCA and the HKUST solution \citep{zheng2025optimizing} use hierarchy to separate building level and community level objectives, giving them a natural way to reserve storage for future events and enforce resilience constraints. Our shared-DTDE policies gain portability by treating buildings as independent instances, but they give up the community level optimization layer. A natural next step is a hybrid controller that uses a learned per building policy for fast local proposals and an MPC or optimization layer to enforce aggregate grid and resilience constraints. Combining the portability of shared-DTDE with the explicit planning structure of the top leaderboard entries.
@@ -177,6 +226,7 @@ The results above establish that architectural portability is the binding constr
 \begin{itemize}
     \item Single tuning split. All reward variants and hyperparameters were selected on the local \texttt{public\_dev} split. A stronger protocol would reserve a separate validation split to reduce the risk of overfitting design choices to one dataset.
     \item Compute constraints. SAC shared-DTDE was run with only 3 seeds (pilot), and the reward variant ablation was not conducted for PPO due to GPU budget limits. The PPO sweep covered 10 seeds but only two learning rates; wider sweeps might yield better configurations.
+    \item Final sweep selection. The latest PPO/SAC/TD3 matrix uses three seeds per hyperparameter cell and selects the best setting within each algorithm/evaluation group. This is useful for robustness evidence, but it is not a blind leaderboard protocol.
     \item Centralized policies not portable. The centralized SAC variants, which achieve the best local scores, cannot be evaluated on phase 3 (6 building) splits. Generalization claims for centralized SAC are necessarily limited to same topology held out sets.
     \item No forecast model. We use only the short horizon forecasts provided by the environment. A learned demand prediction module could improve policy quality and is a common component of strong model predictive baselines.
     \item CHESCA comparison is indirect. The 0.562 CHESCA reference is from the competition paper \citep{pinto2024citylearn} and was scored on a hidden split via an evaluation server that is no longer publicly accessible, making a direct numerical comparison impossible.
@@ -239,5 +289,8 @@ Local RBC                   & 1.023 & 1.839 & 1.890 & 0.944 & 0.454 \\
 \caption{SAC reward-variant ablation on local \texttt{public\_dev}. KPI columns are seed-averaged means (lower is better). ``Cost'' and ``Carbon'' are normalized district totals; ``Discomfort'' is the proportion of occupant-hours with comfort violations; ``1$-$Resilience'' is the proportion of hours without full thermal resilience.}
 \label{tab:sac_ablation}
 \end{table}
+
+\paragraph{Latest result source audit.}
+The paper-facing refresh verified four Neuronic summaries and two Google Drive context artifacts. The core PPO/SAC/TD3 claims come from \texttt{citylearn-72cell-lr-screen-20260506-r1} (504 rows) and \texttt{citylearn-final-hp-20260506-r1} (567 rows). MAPPO (126 rows) and residual SAC (189 rows) are retained as negative context only: their best released-all means are 0.961 and 1.008, respectively, so they are not competitive with PPO/SAC/TD3. The CHESCA reproduction comes from the Drive artifact \texttt{chesca\_upstream\_reproduction\_20260507.json}; it scores 0.480 on \texttt{public\_dev} and 0.508 on released phase 2, but it is an upstream optimization controller rather than our learned RL method. Exact source paths, Drive folders, and claim-to-CSV mappings are tracked in \texttt{submission/results/result\_source\_audit.csv} and \texttt{submission/results/paper\_claim\_map.csv}.
 
 \end{document}

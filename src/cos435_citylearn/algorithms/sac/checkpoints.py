@@ -127,9 +127,7 @@ def validate_checkpoint_payload_structure(payload: Any) -> None:
 
     missing = sorted(REQUIRED_CHECKPOINT_KEYS - set(payload))
     if missing:
-        raise ValueError(
-            f"SAC checkpoint payload missing required keys: {', '.join(missing)}"
-        )
+        raise ValueError(f"SAC checkpoint payload missing required keys: {', '.join(missing)}")
 
     if payload["algorithm"] != "sac":
         raise ValueError("checkpoint payload is not a SAC checkpoint")
@@ -149,8 +147,7 @@ def validate_checkpoint_payload_structure(payload: Any) -> None:
     missing_common = sorted(COMMON_CONTROLLER_STATE_KEYS - set(controller_state))
     if missing_common:
         raise ValueError(
-            "SAC checkpoint controller_state missing required keys: "
-            + ", ".join(missing_common)
+            "SAC checkpoint controller_state missing required keys: " + ", ".join(missing_common)
         )
 
     controller_type = controller_state["controller_type"]
@@ -163,8 +160,7 @@ def validate_checkpoint_payload_structure(payload: Any) -> None:
 
     if missing_specific:
         raise ValueError(
-            "SAC checkpoint controller_state missing required keys: "
-            + ", ".join(missing_specific)
+            "SAC checkpoint controller_state missing required keys: " + ", ".join(missing_specific)
         )
 
     if controller_type == "shared_parameter_sac":
@@ -190,12 +186,14 @@ def validate_checkpoint_runner_compatibility(
 
     if checkpoint_payload["algorithm"] != expected_algorithm:
         raise ValueError(
-            f"checkpoint algorithm '{checkpoint_payload['algorithm']}' is incompatible with runner algorithm '{expected_algorithm}'"
+            f"checkpoint algorithm '{checkpoint_payload['algorithm']}' is incompatible "
+            f"with runner algorithm '{expected_algorithm}'"
         )
 
     if checkpoint_payload["control_mode"] != expected_control_mode:
         raise ValueError(
-            f"checkpoint control_mode '{checkpoint_payload['control_mode']}' is incompatible with runner control_mode '{expected_control_mode}'"
+            f"checkpoint control_mode '{checkpoint_payload['control_mode']}' "
+            f"is incompatible with runner control_mode '{expected_control_mode}'"
         )
 
     expected_labels = _expected_runtime_labels(config)
@@ -212,8 +210,7 @@ def validate_checkpoint_runner_compatibility(
         raise ValueError(
             "SAC checkpoint runtime metadata is incompatible with runner config; "
             "pass allow_cross_reward_eval=True to opt into cross-reward evaluation "
-            "(run_id keeps the training label, manifest records the mismatch). "
-            + "; ".join(parts)
+            "(run_id keeps the training label, manifest records the mismatch). " + "; ".join(parts)
         )
     if mismatches:
         parts = [f"{field}: checkpoint={t!r} config={e!r}" for field, (t, e) in mismatches.items()]
@@ -254,13 +251,9 @@ def validate_checkpoint_env_compatibility(
         reference_action_names = checkpoint_action_names[0]
 
         if any(names != reference_observation_names for names in checkpoint_observation_names):
-            raise ValueError(
-                "shared SAC checkpoint observation schema is internally inconsistent"
-            )
+            raise ValueError("shared SAC checkpoint observation schema is internally inconsistent")
         if any(names != reference_action_names for names in checkpoint_action_names):
-            raise ValueError(
-                "shared SAC checkpoint action schema is internally inconsistent"
-            )
+            raise ValueError("shared SAC checkpoint action schema is internally inconsistent")
         env_reference_observation = env_observation_names[0]
         env_reference_action = env_action_names[0]
         if any(names != env_reference_observation for names in env_observation_names):

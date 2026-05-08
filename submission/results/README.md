@@ -2,10 +2,31 @@
 
 These files are the clean tracked summary of the raw outputs under `results/`. Raw run directories, checkpoints, rollout traces, and downloaded Drive bundles remain outside git.
 
+## Canonical refresh path
+
+Regenerate this directory from normalized local outputs with:
+
+```bash
+make submission-results
+```
+
+Then refresh report figures with:
+
+```bash
+make figures
+make cross-figures
+make cross-table
+```
+
+The exporter expects the raw metric CSVs, released-eval metric rows, and sweep
+summary inputs to already exist under ignored `results/` directories. It should
+fail rather than silently writing incomplete final tables when required coverage
+is missing.
+
 ## Files in this directory
 
 - `local_main_results.csv` - tracked method-level summary rows for local `public_dev`
-- `method_comparison.csv` - compact report table for RBC, PPO, and SAC local comparisons
+- `method_comparison.csv` - compact report table for RBC, PPO, SAC, and TD3 local comparisons when all required runs exist
 - `cross_split_scores.csv` - compact report table across `public_dev`, released phase-2, and released phase-3 splits
 - `sac_ablation_summary.csv` - SAC-only variant comparison with seed-aware means and CIs
 - `sac_seed_inventory.csv` - per-seed SAC run inventory for the local phase-2 batch
@@ -13,8 +34,38 @@ These files are the clean tracked summary of the raw outputs under `results/`. R
 - `released_eval_seed_inventory.csv` - per-run released-eval inventory for RBC, PPO, and SAC where artifacts exist
 - `ppo_shared_sweep_summary.csv` - per-learning-rate shared-PPO sweep summary rows
 - `ppo_shared_sweep_inventory.csv` - per-run shared-PPO sweep inventory with KPI columns
+- `shared_sweep_summary.csv` - regenerated per-learning-rate shared PPO/SAC/TD3 sweep summary rows after the full 60-cell sweep
+- `shared_sweep_inventory.csv` - regenerated per-run shared PPO/SAC/TD3 sweep inventory after the full 60-cell sweep
+- `final_sweep_summary.csv` - paper-facing aggregate rows from the latest PPO/SAC/TD3 broad and targeted Neuronic sweeps
+- `final_sweep_best_by_algorithm.csv` - best setting per algorithm/evaluation group from the latest shared-controller sweeps
+- `context_experiment_summary.csv` - compact negative/benchmark context for MAPPO, residual SAC, CHESCA, and the SAC random-episode sprint
+- `result_source_audit.csv` - verified Neuronic and Drive source locations used by the final paper refresh
+- `paper_claim_map.csv` - final-paper numeric claims mapped to tracked CSV evidence
 - `official_benchmark_reference.csv` - published CityLearn 2023 reference numbers
 - `figure_manifest.csv` - tracked report figure inventory
+
+## Report claim map
+
+- `method_comparison.csv` backs the local method comparison headline and final report method table.
+- `local_main_results.csv` backs seed counts, means, standard deviations, and confidence intervals on `public_dev`.
+- `released_eval_main_results.csv` backs released phase-2 and phase-3 held-out claims.
+- `cross_split_scores.csv` backs the public-dev versus released-eval generalization comparison.
+- `sac_ablation_summary.csv` and `sac_seed_inventory.csv` back SAC reward and seed ablations.
+- `ppo_shared_sweep_summary.csv` and `ppo_shared_sweep_inventory.csv` back the existing shared-PPO learning-rate sweep discussion.
+- `shared_sweep_summary.csv` and `shared_sweep_inventory.csv` back the expanded PPO/SAC/TD3 result matrix once the 60-cell sweep has been collected.
+- `final_sweep_summary.csv` and `final_sweep_best_by_algorithm.csv` back the refreshed final-paper PPO/SAC/TD3 shared-controller matrix.
+- `context_experiment_summary.csv` backs context-only statements about noncompetitive MAPPO/residual SAC runs and external CHESCA optimization results.
+- `result_source_audit.csv` and `paper_claim_map.csv` are the audit trail for the final paper's latest numeric claims.
+- `official_benchmark_reference.csv` is context only; it is not mixed into local or released-eval means.
+
+## Latest final-paper matrix
+
+The May 2026 final-paper refresh uses two verified Neuronic summaries:
+
+- `citylearn-72cell-lr-screen-20260506-r1`: 504 rows, PPO/SAC/TD3 x 8 learning rates x 3 seeds x 7 splits.
+- `citylearn-final-hp-20260506-r1`: 567 rows, PPO/SAC/TD3 x targeted algorithm-specific hyperparameters x 3 seeds x 7 splits.
+
+From the targeted final sweep, the best released-all learned controller is SAC at `0.701912`, followed by TD3 at `0.727475` and PPO at `0.799466`. From the broader learning-rate screen, TD3 is the best released phase-3 method at `0.736141`, narrowly ahead of SAC at `0.737915`.
 
 ## Local public_dev snapshot
 

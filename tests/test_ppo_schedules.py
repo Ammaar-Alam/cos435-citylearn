@@ -30,9 +30,7 @@ def test_parse_ent_coef_accepts_float() -> None:
 
 
 def test_parse_ent_coef_accepts_mapping() -> None:
-    initial, schedule = parse_ent_coef(
-        {"start": 0.02, "end": 0.0, "anneal_fraction": 0.5}
-    )
+    initial, schedule = parse_ent_coef({"start": 0.02, "end": 0.0, "anneal_fraction": 0.5})
     assert initial == pytest.approx(0.02)
     assert schedule is not None
     assert schedule.value_at(1.0) == pytest.approx(0.0)

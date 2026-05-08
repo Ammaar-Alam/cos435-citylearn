@@ -37,9 +37,7 @@ def test_rbc_writes_simulation_bundle(tmp_path: Path) -> None:
     with (simulation_dir / "exported_kpis.csv").open(newline="") as handle:
         kpi_rows = list(csv.DictReader(handle))
 
-    assert {"KPI", "District", "Building_1", "Building_2", "Building_3"} <= set(
-        kpi_rows[0].keys()
-    )
+    assert {"KPI", "District", "Building_1", "Building_2", "Building_3"} <= set(kpi_rows[0].keys())
 
     with (simulation_dir / "exported_data_pricing_ep0.csv").open(newline="") as handle:
         pricing_rows = list(csv.DictReader(handle))
@@ -70,9 +68,7 @@ def test_rbc_writes_simulation_bundle(tmp_path: Path) -> None:
     with (simulation_dir / "exported_data_building_1_battery_ep0.csv").open(newline="") as handle:
         battery_rows = list(csv.DictReader(handle))
 
-    assert {"timestamp", "Battery Soc-%", "Battery (Dis)Charge-kWh"} <= set(
-        battery_rows[0].keys()
-    )
+    assert {"timestamp", "Battery Soc-%", "Battery (Dis)Charge-kWh"} <= set(battery_rows[0].keys())
     assert playback_path.exists()
 
 
@@ -107,9 +103,7 @@ def test_rbc_simulation_bundle_matches_official_ui_upload_contract(tmp_path: Pat
         kpi_rows = list(csv.DictReader(handle))
 
     assert kpi_rows
-    assert {"KPI", "District", "Building_1", "Building_2", "Building_3"} <= set(
-        kpi_rows[0].keys()
-    )
+    assert {"KPI", "District", "Building_1", "Building_2", "Building_3"} <= set(kpi_rows[0].keys())
 
     parsed_data_files: dict[str, list[dict[str, str]]] = {}
     available_episodes: set[str] = set()

@@ -11,18 +11,27 @@ LR="${2:?usage: rerun_eval_cell.sh <algo> <lr> <seed>}"
 SEED="${3:?usage: rerun_eval_cell.sh <algo> <lr> <seed>}"
 
 ROOT_DIR="${ROOT_DIR:-/u/${USER}/cos435-citylearn}"
+SWEEP_ROOT="${SWEEP_ROOT:-$ROOT_DIR/results/sweep}"
 cd "$ROOT_DIR"
 source .venv/bin/activate
 
 case "$ALGO" in
   ppo) TRAIN_SCRIPT="scripts/train/run_ppo.py"; CONFIG="configs/train/ppo/ppo_shared_dtde_reward_v2.yaml" ;;
   sac) TRAIN_SCRIPT="scripts/train/run_sac.py"; CONFIG="configs/train/sac/sac_shared_dtde_reward_v2.yaml" ;;
+  td3) TRAIN_SCRIPT="scripts/train/run_td3.py"; CONFIG="configs/train/td3/td3_shared_dtde_reward_v2.yaml" ;;
   *)   echo "unknown algo: $ALGO" >&2; exit 2 ;;
 esac
 
-EVAL_CONFIG="configs/eval/default.yaml"
+EVAL_CONFIG="${EVAL_CONFIG:-configs/eval/official_released.yaml}"
+EVAL_SPLITS="${EVAL_SPLITS:-phase_2_online_eval_1 phase_2_online_eval_2 phase_2_online_eval_3 phase_3_1 phase_3_2 phase_3_3}"
+read -r -a SPLITS <<< "$EVAL_SPLITS"
 CELL_ID="${ALGO}_lr${LR}_seed${SEED}"
-SUMMARY_DIR="$ROOT_DIR/results/sweep/${CELL_ID}"
+SUMMARY_DIR="$SWEEP_ROOT/${CELL_ID}"
+RUNS_ROOT="$SWEEP_ROOT/runs"
+METRICS_ROOT="$SWEEP_ROOT/metrics"
+MANIFESTS_ROOT="$SWEEP_ROOT/manifests"
+UI_EXPORTS_ROOT="$SWEEP_ROOT/ui_exports"
+mkdir -p "$RUNS_ROOT" "$METRICS_ROOT" "$MANIFESTS_ROOT" "$UI_EXPORTS_ROOT"
 
 if [[ ! -f "$SUMMARY_DIR/train.json" ]]; then
   echo "missing $SUMMARY_DIR/train.json — nothing to eval" >&2
@@ -35,7 +44,7 @@ export MPLCONFIGDIR="$ROOT_DIR/.cache/matplotlib"
 RUN_ID="$(python -c "import json; print(json.load(open('$SUMMARY_DIR/train.json'))['run_id'])")"
 echo "rerun evals for $CELL_ID (run_id=$RUN_ID)"
 
-for SPLIT in phase_3_1 phase_3_2 phase_3_3; do
+for SPLIT in "${SPLITS[@]}"; do
   OUT="$SUMMARY_DIR/eval_${SPLIT}.json"
   if [[ -f "$OUT" ]] && python -c "import json; json.load(open('$OUT'))['average_score']" >/dev/null 2>&1; then
     echo "$CELL_ID/$SPLIT already complete; skipping"
@@ -49,6 +58,11 @@ for SPLIT in phase_3_1 phase_3_2 phase_3_3; do
     --split "$SPLIT" \
     --seed "$SEED" \
     --lr "$LR" \
+    --output-root "$RUNS_ROOT" \
+    --metrics-root "$METRICS_ROOT" \
+    --manifests-root "$MANIFESTS_ROOT" \
+    --ui-exports-root "$UI_EXPORTS_ROOT" \
+    --artifacts-root "$SWEEP_ROOT" \
     | tee "$OUT"
 done
 

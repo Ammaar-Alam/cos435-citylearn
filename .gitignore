@@ -22,6 +22,13 @@ node_modules/
 .idea/
 .vscode/
 *.log
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.out
+*.synctex.gz
 
 data/external/*
 !data/external/.gitkeep
