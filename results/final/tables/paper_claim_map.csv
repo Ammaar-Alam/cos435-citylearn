@@ -1,0 +1,9 @@
+claim_id,claim,value,evidence_file,row_filter
+sac_strongest_rl_overall,SAC has the best released-all mean in both broad and final sweeps,0.700027 lr_screen; 0.701912 final_hp,submission/results/final_sweep_best_by_algorithm.csv,"sweep_key in {lr_screen,final_hp}, eval_group=released_all, algorithm=sac"
+td3_phase3_lr_screen,TD3 is the best phase-3 method in the LR screen,0.736141,submission/results/final_sweep_best_by_algorithm.csv,"sweep_key=lr_screen, eval_group=released_phase3, algorithm=td3"
+td3_final_hp_competitive,TD3 remains competitive in the final HP matrix,0.727475 released_all; 0.741802 phase3,submission/results/final_sweep_best_by_algorithm.csv,"sweep_key=final_hp, algorithm=td3"
+ppo_weaker_latest_matrix,PPO is weaker than SAC and TD3 in latest final HP released-all matrix,0.799466,submission/results/final_sweep_best_by_algorithm.csv,"sweep_key=final_hp, eval_group=released_all, algorithm=ppo"
+mappo_not_competitive,MAPPO is not competitive in latest CTDE sweep,0.960650 released_all,submission/results/context_experiment_summary.csv,"experiment=mappo, eval_group=released_all"
+residual_sac_not_competitive,Residual SAC is not competitive in latest residual sweep,1.008194 released_all,submission/results/context_experiment_summary.csv,"experiment=residual_sac, eval_group=released_all"
+chesca_context,"CHESCA reproduction is external optimization context, not our RL method",0.479895 public_dev; 0.508338 released_phase2,submission/results/context_experiment_summary.csv,experiment=chesca_upstream_reproduction
+legacy_local_sac,Earlier central SAC reward_v1 remains the best tracked local learned result,0.527309,submission/results/local_main_results.csv,method_id=sac_central_reward_v1_public_dev

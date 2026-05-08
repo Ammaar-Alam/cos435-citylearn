@@ -141,18 +141,19 @@ scripts/    setup helpers, schema export, smoke runners, and baseline entrypoint
 src/        shared Python package, dataset/env utilities, and baseline code
 tests/      scaffold checks plus benchmark smoke tests
 data/       dataset manifests are tracked, raw benchmark files stay out of git
-results/    generated manifests, metrics, and run artifacts stay out of git
+results/    final result bundle plus local generated outputs
 submission/ tracked final report tables, figures, and presentation artifacts
 ```
 
 ## final submission artifacts
 
-The clean, grader-facing artifacts are tracked under [`submission/`](submission/):
+The final submission artifacts are tracked under [`submission/`](submission/):
 
 - [`submission/results/`](submission/results/) has the CSV tables backing the final report claims.
 - [`submission/figures/`](submission/figures/) has the PNG figures copied into the final report and deck.
 - [`submission/final-paper/final-report.pdf`](submission/final-paper/final-report.pdf) is the compiled final report.
 - [`submission/presentation.pptx`](submission/presentation.pptx) is the generated presentation deck.
+- [`results/final/`](results/final/) mirrors the final paper's result tables and figures.
 
 The canonical local result refresh is:
 
@@ -163,11 +164,9 @@ make cross-figures
 make cross-table
 ```
 
-`make submission-results` reads normalized metrics and sweep summaries from
-`results/` and refreshes the tracked CSV summaries. Figure targets then rebuild
-the tracked report-facing PNGs. Raw datasets, checkpoints, sweep JSONs, Slurm
-logs, playback payloads, and downloaded Drive bundles stay out of git; see
-[`results/README.md`](results/README.md) for the boundary.
+`make submission-results` reads metrics and sweep summaries from `results/` and
+refreshes the tracked CSV summaries. Figure targets rebuild the PNGs used in the
+report. See [`results/README.md`](results/README.md) for the results layout.
 
 ## benchmark flow
 
