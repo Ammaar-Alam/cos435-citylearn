@@ -65,11 +65,9 @@ Due: March 20 , 2026
 ```
 ## References
 
-[ 1 ]CityLearn ( 2023 ). Citylearn challenge 2023 .https://www.citylearn.net/citylearn_challenge/
-2023.html.
+[ 1 ]CityLearn ( 2023 ). Citylearn challenge 2023 .https://www.citylearn.net/citylearn_challenge/2023.html.
 
-[ 2 ]Intelligent Environments Lab ( 2025 ). Citylearn github repository. https://github.com/
-intelligent-environments-lab/CityLearn.
+[ 2 ]Intelligent Environments Lab ( 2025 ). Citylearn github repository. https://github.com/intelligent-environments-lab/CityLearn.
 
 [ 3 ]Vázquez-Canteli, J. R., Khamis, J., Dey, S., Henze, G., and Nagy, Z. ( 2020 ). Citylearn: Standard-
 izing research in multi-agent reinforcement learning for demand response and urban energy

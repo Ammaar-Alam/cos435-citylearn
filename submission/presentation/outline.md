@@ -94,7 +94,7 @@ Each slide is ~30 seconds. All five rubric questions (problem / importance / har
 
 **On-slide content — THE figure (Rubric §2 deliverable)**: [`../figures/per_split_scores.png`](../figures/per_split_scores.png) — the single strongest figure we have, because it shows **all methods on both held-out tiers in one panel**: 3 `phase_2_online_eval` splits (same-size generalization, 3 buildings) on the left, 3 `phase_3` splits (cross-size generalization, 6 buildings) on the right, with a visual separator and a "centralized models not portable" annotation in the phase_3 region. The dashed red line is the CHESCA 2023 public-leaderboard reference (0.562). Backup / supporting figures available: [`cross_split_comparison.png`](../figures/cross_split_comparison.png) (phase_2 bar chart), [`generalization_gap.png`](../figures/generalization_gap.png) (public_dev → phase_2 paired bars).
 
-**Headline numbers (from [released_eval_main_results.csv](submission/results/released_eval_main_results.csv)):**
+**Headline numbers (from [released_eval_main_results.csv](../results/released_eval_main_results.csv)):**
 
 On `phase_2_online_eval` (3 buildings, held-out, mean over 3 splits):
 - RBC baseline: 1.087
@@ -132,7 +132,7 @@ On `phase_3` (6 buildings, held-out — only portable methods):
 
 ## Sources for numbers on slides
 
-All results quoted in the speaker notes trace back to tracked CSVs under [submission/results/](submission/results/) — specifically:
-- Method means + CI: [local_main_results.csv](submission/results/local_main_results.csv) and [method_comparison.csv](submission/results/method_comparison.csv)
-- Cross-split: [cross_split_scores.csv](submission/results/cross_split_scores.csv) and [released_eval_main_results.csv](submission/results/released_eval_main_results.csv)
-- CHESCA + Official RBC: [official_benchmark_reference.csv](submission/results/official_benchmark_reference.csv)
+All results quoted in the speaker notes trace back to tracked CSVs under [submission/results/](../results/) — specifically:
+- Method means + CI: [local_main_results.csv](../results/local_main_results.csv) and [method_comparison.csv](../results/method_comparison.csv)
+- Cross-split: [cross_split_scores.csv](../results/cross_split_scores.csv) and [released_eval_main_results.csv](../results/released_eval_main_results.csv)
+- CHESCA + Official RBC: [official_benchmark_reference.csv](../results/official_benchmark_reference.csv)
