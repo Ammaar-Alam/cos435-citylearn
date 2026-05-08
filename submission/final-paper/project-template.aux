@@ -1,0 +1,96 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyperFirstAtBeginDocument{\AtBeginDocument}
+\HyperFirstAtBeginDocument{\ifx\hyper@anchor\@undefined
+\global\let\oldnewlabel\newlabel
+\gdef\newlabel#1#2{\newlabelxx{#1}#2}
+\gdef\newlabelxx#1#2#3#4#5#6{\oldnewlabel{#1}{{#2}{#3}}}
+\AtEndDocument{\ifx\hyper@anchor\@undefined
+\let\newlabel\oldnewlabel
+\fi}
+\fi}
+\global\let\hyper@last\relax 
+\gdef\HyperFirstAtBeginDocument#1{#1}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{iea2022buildings}
+\citation{citylearn2023}
+\citation{pinto2024citylearn}
+\@writefile{toc}{\contentsline {paragraph}{Authors.}{1}{section*.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Link to GitHub Repo.}{1}{section*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
+\citation{vazquez2020citylearn,citylearnrepo}
+\citation{pinto2024citylearn}
+\citation{zheng2025optimizing}
+\citation{khattar2023winning}
+\citation{schulman2017proximal}
+\citation{haarnoja2018soft}
+\citation{raffin2021stable}
+\citation{kathirgamanathan2021centralised}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Related Work}{2}{section.2}\protected@file@percent }
+\newlabel{sec:related}{{2}{2}{Related Work}{section.2}{}}
+\citation{vazquez2020citylearn,citylearnrepo}
+\citation{schulman2017proximal}
+\citation{raffin2021stable}
+\citation{haarnoja2018soft}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Methods}{3}{section.3}\protected@file@percent }
+\newlabel{sec:methods}{{3}{3}{Methods}{section.3}{}}
+\@writefile{toc}{\contentsline {paragraph}{Environment.}{3}{section*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Control topologies.}{3}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Algorithms and architecture.}{3}{section*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Reward design.}{3}{section*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Evaluation protocol.}{4}{section*.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Implementation and reproducibility.}{4}{section*.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Results}{4}{section.4}\protected@file@percent }
+\newlabel{sec:results}{{4}{4}{Results}{section.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{Local evaluation.}{4}{section*.11}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Local \texttt  {public\_dev} results (lower is better). \% vs.\ RBC = percentage improvement over the local RBC baseline score of 1.023.\relax }}{4}{table.caption.12}\protected@file@percent }
+\newlabel{tab local}{{1}{4}{Local \texttt {public\_dev} results (lower is better). \% vs.\ RBC = percentage improvement over the local RBC baseline score of 1.023.\relax }{table.caption.12}{}}
+\@writefile{toc}{\contentsline {paragraph}{Held out phase 2 generalization.}{4}{section*.13}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces  \texttt  {average\_score} (lower is better) on six released held out evaluation datasets. Left panel three \texttt  {phase\_2\_online\_eval} splits (3 building). Right panel (shaded) three \texttt  {phase\_3} splits (6 building). Centralized policies cannot execute on phase 3 splits due to input/output size mismatch. SAC-DTDE achieves the best phase 3 mean (0.774), confirming that shared parameter decentralization is the only topology that enables cross size generalization. The dashed line at 0.562 is the CHESCA 2023 public leaderboard reference. Note that it is from a private evaluator and shown for benchmark context, not for direct comparison. \relax }}{5}{figure.caption.10}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig per_split}{{1}{5}{\texttt {average\_score} (lower is better) on six released held out evaluation datasets. Left panel three \texttt {phase\_2\_online\_eval} splits (3 building). Right panel (shaded) three \texttt {phase\_3} splits (6 building). Centralized policies cannot execute on phase 3 splits due to input/output size mismatch. SAC-DTDE achieves the best phase 3 mean (0.774), confirming that shared parameter decentralization is the only topology that enables cross size generalization. The dashed line at 0.562 is the CHESCA 2023 public leaderboard reference. Note that it is from a private evaluator and shown for benchmark context, not for direct comparison. \relax }{figure.caption.10}{}}
+\@writefile{toc}{\contentsline {paragraph}{Cross size generalization to phase 3.}{5}{section*.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{KPI breakdown.}{5}{section*.17}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces  Method comparison across the local \texttt  {public\_dev} split and the three released \texttt  {phase\_2\_online\_eval} splits. Error bars show 95\% confidence intervals. All RL methods beat RBC on every split; SAC variants lead consistently, and the smoothness-regularized \texttt  {reward\_v2} variant achieves the best held-out phase-2 performance despite a small local regression. \relax }}{6}{figure.caption.14}\protected@file@percent }
+\newlabel{fig cross_split}{{2}{6}{Method comparison across the local \texttt {public\_dev} split and the three released \texttt {phase\_2\_online\_eval} splits. Error bars show 95\% confidence intervals. All RL methods beat RBC on every split; SAC variants lead consistently, and the smoothness-regularized \texttt {reward\_v2} variant achieves the best held-out phase-2 performance despite a small local regression. \relax }{figure.caption.14}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces  Generalization gap between the local \texttt  {public\_dev} tuning split and the released \texttt  {phase\_2\_online\_eval} mean for each method. SAC variants show modest, consistent degradation from local to held out; PPO shared-DTDE shows higher variance, confirming that SAC's stronger local policies also generalize more stably across weather and demand conditions. Smaller gaps indicate better cross split generalization. \relax }}{6}{figure.caption.16}\protected@file@percent }
+\newlabel{fig:gen_gap}{{3}{6}{Generalization gap between the local \texttt {public\_dev} tuning split and the released \texttt {phase\_2\_online\_eval} mean for each method. SAC variants show modest, consistent degradation from local to held out; PPO shared-DTDE shows higher variance, confirming that SAC's stronger local policies also generalize more stably across weather and demand conditions. Smaller gaps indicate better cross split generalization. \relax }{figure.caption.16}{}}
+\@writefile{toc}{\contentsline {paragraph}{Reward design ablation.}{6}{section*.19}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces  KPI-level breakdown for all methods on the local \texttt  {public\_dev} split (lower is better). Thermal discomfort (rightmost bar) is the single largest source of improvement for all RL methods over RBC---the 0.30 weight on this term dominates the composite score and explains why even weaker RL variants substantially beat the heuristic baseline. \relax }}{7}{figure.caption.18}\protected@file@percent }
+\newlabel{fig:kpi}{{4}{7}{KPI-level breakdown for all methods on the local \texttt {public\_dev} split (lower is better). Thermal discomfort (rightmost bar) is the single largest source of improvement for all RL methods over RBC---the 0.30 weight on this term dominates the composite score and explains why even weaker RL variants substantially beat the heuristic baseline. \relax }{figure.caption.18}{}}
+\@writefile{toc}{\contentsline {paragraph}{PPO training dynamics.}{7}{section*.20}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces  PPO shared-DTDE training curves for both learning rates ($10^{-4}$ and $3\times 10^{-4}$) across 10 seeds. Shaded bands are $\pm 1$ standard deviation. Training plateaus near 1.5M environment steps and seed variance is large relative to the PPO--SAC gap, motivating multiseed reporting over single run results. \relax }}{7}{figure.caption.21}\protected@file@percent }
+\newlabel{fig:ppo_curve}{{5}{7}{PPO shared-DTDE training curves for both learning rates ($10^{-4}$ and $3\times 10^{-4}$) across 10 seeds. Shaded bands are $\pm 1$ standard deviation. Training plateaus near 1.5M environment steps and seed variance is large relative to the PPO--SAC gap, motivating multiseed reporting over single run results. \relax }{figure.caption.21}{}}
+\citation{pinto2024citylearn}
+\citation{zheng2025optimizing}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion and Limitations}{8}{section.5}\protected@file@percent }
+\newlabel{sec:discussion}{{5}{8}{Discussion and Limitations}{section.5}{}}
+\@writefile{toc}{\contentsline {paragraph}{Architectural portability is the primary design axis.}{8}{section*.22}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{SAC substantially outperforms PPO for this domain.}{8}{section*.23}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Reward design matters within SAC.}{8}{section*.24}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Comparison to optimization based methods.}{8}{section*.25}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Limitations.}{8}{section*.26}\protected@file@percent }
+\citation{pinto2024citylearn}
+\bibstyle{apalike}
+\bibdata{references}
+\bibcite{citylearn2023}{{1}{2023}{{CityLearn Team}}{{}}}
+\bibcite{pinto2024citylearn}{{2}{2024}{{Garmendia et~al.}}{{}}}
+\bibcite{haarnoja2018soft}{{3}{2018}{{Haarnoja et~al.}}{{}}}
+\bibcite{iea2022buildings}{{4}{2022}{{International Energy Agency}}{{}}}
+\bibcite{kathirgamanathan2021centralised}{{5}{2021}{{Kathirgamanathan et~al.}}{{}}}
+\bibcite{khattar2023winning}{{6}{2023}{{Khattar and Jin}}{{}}}
+\bibcite{raffin2021stable}{{7}{2021}{{Raffin et~al.}}{{}}}
+\bibcite{schulman2017proximal}{{8}{2017}{{Schulman et~al.}}{{}}}
+\bibcite{citylearnrepo}{{9}{2023}{{Vazquez-Canteli et~al.}}{{}}}
+\bibcite{vazquez2020citylearn}{{10}{2020}{{Vazquez-Canteli et~al.}}{{}}}
+\bibcite{zheng2025optimizing}{{11}{2025}{{Zheng and Wang}}{{}}}
+\citation{pinto2024citylearn}
+\citation{pinto2024citylearn}
+\@writefile{toc}{\contentsline {paragraph}{Per-split generalization table.}{9}{section*.29}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Per-split composite scores ($\downarrow $ better). Phase-2 columns (p2\_e1--p2\_e3) are the released online-evaluation splits; phase-3 columns (p3\_1--p3\_3) are the 6-building held-out splits. CHESCA is the 2023 competition winner reference from \citet  {pinto2024citylearn}, evaluated on the original competition server (different split; shown for context only).\relax }}{10}{table.caption.30}\protected@file@percent }
+\newlabel{tab:cross_split}{{2}{10}{Per-split composite scores ($\downarrow $ better). Phase-2 columns (p2\_e1--p2\_e3) are the released online-evaluation splits; phase-3 columns (p3\_1--p3\_3) are the 6-building held-out splits. CHESCA is the 2023 competition winner reference from \citet {pinto2024citylearn}, evaluated on the original competition server (different split; shown for context only).\relax }{table.caption.30}{}}
+\@writefile{toc}{\contentsline {paragraph}{SAC reward-variant ablation detail.}{10}{section*.31}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces SAC reward-variant ablation on local \texttt  {public\_dev}. KPI columns are seed-averaged means (lower is better). ``Cost'' and ``Carbon'' are normalized district totals; ``Discomfort'' is the proportion of occupant-hours with comfort violations; ``1$-$Resilience'' is the proportion of hours without full thermal resilience.\relax }}{10}{table.caption.32}\protected@file@percent }
+\newlabel{tab:sac_ablation}{{3}{10}{SAC reward-variant ablation on local \texttt {public\_dev}. KPI columns are seed-averaged means (lower is better). ``Cost'' and ``Carbon'' are normalized district totals; ``Discomfort'' is the proportion of occupant-hours with comfort violations; ``1$-$Resilience'' is the proportion of hours without full thermal resilience.\relax }{table.caption.32}{}}
+\gdef \@abspage@last{10}
