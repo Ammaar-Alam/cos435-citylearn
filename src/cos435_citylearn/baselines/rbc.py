@@ -63,7 +63,8 @@ def run_rbc(
     )
     adapter = CentralizedEnvAdapter(env_bundle.env)
     controller_class = _import_from_path(config["algorithm"]["controller_class"])
-    controller = controller_class(env_bundle.env)
+    controller_kwargs = dict(config["algorithm"].get("controller_kwargs", {}))
+    controller = controller_class(env_bundle.env, **controller_kwargs)
     variant = config["algorithm"]["variant"]
     decision_total = max(int(getattr(env_bundle.env, "time_steps", 0)) - 1, 0)
     export_enabled = bool(eval_config["evaluation"].get("export_simulation_data", True))

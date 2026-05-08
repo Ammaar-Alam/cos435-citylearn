@@ -138,3 +138,23 @@ def test_chesca_lite_discharges_electrical_storage_on_high_load() -> None:
 
     assert high_load[1] < low_load[1]
     assert high_load[4] < low_load[4]
+
+
+def test_chesca_lite_accepts_controller_tuning_kwargs() -> None:
+    controller = ChescaLiteController(
+        _fake_env(),
+        cooling_scale=0.5,
+        cooling_bias=0.1,
+        cooling_max_delta=0.2,
+        storage_max_delta=0.1,
+        electrical_charge_scale=0.8,
+        electrical_discharge_scale=1.2,
+        outage_electrical_discharge=-0.6,
+    )
+
+    action = controller.predict(
+        [_observation(hour=15.0, indoor=26.0, set_point=24.0, net_load=1.0)]
+    )[0]
+
+    assert action[2] < 0.78
+    assert action[5] < 0.78

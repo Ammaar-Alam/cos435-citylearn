@@ -27,6 +27,8 @@ It applies:
 - DHW storage rules based on SOC, demand, and hour,
 - electrical storage rules based on load, price, carbon, solar, and hour,
 - action smoothing to reduce ramping.
+- explicit controller kwargs for local tuning of cooling scale, smoothing, and
+  storage charge/discharge strength.
 
 ## Local Pilot Results
 
@@ -35,19 +37,19 @@ official leaderboard submissions.
 
 | split | CHESCA-lite score |
 | --- | ---: |
-| public_dev | 0.641118 |
-| phase_2_online_eval_1 | 0.723521 |
-| phase_2_online_eval_2 | 0.716114 |
-| phase_2_online_eval_3 | 0.611942 |
-| phase_3_1 | 0.722948 |
-| phase_3_2 | 0.705771 |
-| phase_3_3 | 0.721176 |
+| public_dev | 0.624921 |
+| phase_2_online_eval_1 | 0.713237 |
+| phase_2_online_eval_2 | 0.695099 |
+| phase_2_online_eval_3 | 0.609455 |
+| phase_3_1 | 0.693626 |
+| phase_3_2 | 0.677855 |
+| phase_3_3 | 0.694915 |
 
 Summary:
 
-- released average: `0.700245`
-- phase 2 released average: `0.683859`
-- phase 3 released average: `0.716632`
+- released average: `0.680698`
+- phase 2 released average: `0.672597`
+- phase 3 released average: `0.688799`
 
 Reference points from the tracked result tables:
 
@@ -59,17 +61,19 @@ Reference points from the tracked result tables:
 
 This is a useful hybrid baseline and beats the previous shared-SAC phase-3 mean,
 but it does not beat CHESCA. The controller substantially reduces normal comfort
-violations and carbon relative to BasicRBC. The remaining gap is mostly outage
-resilience and grid-smoothness metrics, especially thermal resilience, unserved
-energy, ramping, and load factor.
+violations and carbon relative to BasicRBC. A small local parameter screen found
+that lowering the cooling action smoothing cap from `0.18` to `0.12` improved the
+released average from `0.700245` to `0.680698`. The remaining gap is mostly
+outage resilience and grid-smoothness metrics, especially thermal resilience,
+unserved energy, ramping, and load factor.
 
 The score is strong enough to keep as a documented CHESCA-inspired stretch
 result. It is not strong enough to claim that we beat the official winner.
 
 ## Reproduction Notes
 
-The local pilot used exports disabled for speed and wrote temporary artifacts to
-`/private/tmp/chesca-lite-pilot/results_all_tuned`.
+The final local pilot used exports disabled for speed and wrote temporary
+artifacts to `/private/tmp/chesca-lite-pilot/results_all_cool_delta_0p12`.
 
 Representative command shape:
 

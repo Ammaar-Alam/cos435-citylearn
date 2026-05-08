@@ -47,11 +47,29 @@ class ChescaLiteController:
     smoothing correction.
     """
 
-    def __init__(self, env: Any):
+    def __init__(
+        self,
+        env: Any,
+        *,
+        cooling_scale: float = 1.0,
+        cooling_bias: float = 0.0,
+        cooling_max_delta: float = 0.12,
+        storage_max_delta: float = 0.07,
+        electrical_charge_scale: float = 1.0,
+        electrical_discharge_scale: float = 1.0,
+        outage_electrical_discharge: float = -0.55,
+    ):
         if not bool(getattr(env, "central_agent", False)):
             raise ValueError("ChescaLiteController expects a central-agent CityLearn env")
 
         self.env = env
+        self.cooling_scale = float(cooling_scale)
+        self.cooling_bias = float(cooling_bias)
+        self.cooling_max_delta = float(cooling_max_delta)
+        self.storage_max_delta = float(storage_max_delta)
+        self.electrical_charge_scale = float(electrical_charge_scale)
+        self.electrical_discharge_scale = float(electrical_discharge_scale)
+        self.outage_electrical_discharge = float(outage_electrical_discharge)
         self.observation_names = list(env.observation_names[0])
         self.action_names = list(env.action_names[0])
         self.observation_indices = _all_indices(self.observation_names)
@@ -212,7 +230,9 @@ class ChescaLiteController:
         district_positive_load: float,
     ) -> float:
         if building.power_outage > 0.0:
-            return -0.55 if building.electrical_storage_soc > 0.20 else 0.0
+            if building.electrical_storage_soc > 0.20:
+                return self.outage_electrical_discharge
+            return 0.0
 
         load_reference = max(float(np.mean(self.load_history, dtype="float32")), 1e-6)
         price_reference = max(float(np.mean(self.price_history, dtype="float32")), 1e-6)
@@ -229,21 +249,21 @@ class ChescaLiteController:
         night_charge = int(building.hour) >= 22 or int(building.hour) <= 7
 
         if building.electrical_storage_soc < 0.16:
-            return 0.14
+            return 0.14 * self.electrical_charge_scale
         if building.electrical_storage_soc > 0.82 and (high_load or evening_peak):
-            return -0.26
+            return -0.26 * self.electrical_discharge_scale
         if solar_surplus and building.electrical_storage_soc < 0.88:
-            return 0.20
+            return 0.20 * self.electrical_charge_scale
         if (
             night_charge or low_load or future_price_higher
         ) and building.electrical_storage_soc < 0.78:
-            return 0.12
+            return 0.12 * self.electrical_charge_scale
         if (
             high_load or high_price or high_carbon or evening_peak
         ) and building.electrical_storage_soc > 0.28:
-            return -0.18
+            return -0.18 * self.electrical_discharge_scale
         if building.net_electricity_consumption < 0.0 and building.electrical_storage_soc < 0.88:
-            return 0.08
+            return 0.08 * self.electrical_charge_scale
         return 0.0
 
     def _cooling_action(self, building: BuildingObservation) -> float:
@@ -251,24 +271,27 @@ class ChescaLiteController:
         comfort_error = building.indoor_temperature - building.temperature_set_point
 
         if building.power_outage > 0.0:
-            return 0.75 if occupied and comfort_error > 0.6 else 0.18
+            return self._scaled_cooling(0.75 if occupied and comfort_error > 0.6 else 0.18)
         if not occupied:
             if comfort_error > 1.5:
-                return 0.35
+                return self._scaled_cooling(0.35)
             if comfort_error > 0.5:
-                return 0.22
-            return 0.05
+                return self._scaled_cooling(0.22)
+            return self._scaled_cooling(0.05)
         if comfort_error > 2.0:
-            return 0.78
+            return self._scaled_cooling(0.78)
         if comfort_error > 1.2:
-            return 0.62
+            return self._scaled_cooling(0.62)
         if comfort_error > 0.6:
-            return 0.46
+            return self._scaled_cooling(0.46)
         if comfort_error > 0.1:
-            return 0.30
+            return self._scaled_cooling(0.30)
         if comfort_error < -0.4:
-            return 0.04
-        return 0.16
+            return self._scaled_cooling(0.04)
+        return self._scaled_cooling(0.16)
+
+    def _scaled_cooling(self, value: float) -> float:
+        return max(value * self.cooling_scale + self.cooling_bias, 0.0)
 
     def _smooth_actions(self, raw_actions: Sequence[float]) -> list[float]:
         smoothed: list[float] = []
@@ -284,9 +307,9 @@ class ChescaLiteController:
 
             previous = float(self.previous_action_vector[action_index])
             if action_name == "cooling_device":
-                max_delta = 0.18
+                max_delta = self.cooling_max_delta
             elif action_name in {"dhw_storage", "electrical_storage"}:
-                max_delta = 0.07
+                max_delta = self.storage_max_delta
             else:
                 max_delta = high - low
 
