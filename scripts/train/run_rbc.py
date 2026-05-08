@@ -8,8 +8,15 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/train/rbc/rbc_builtin.yaml")
     parser.add_argument("--eval-config", default="configs/eval/default.yaml")
+    parser.add_argument("--split", default=None)
+    parser.add_argument("--seed", type=int, default=None)
     args = parser.parse_args()
-    payload = run_rbc(config_path=args.config, eval_config_path=args.eval_config)
+    payload = run_rbc(
+        config_path=args.config,
+        eval_config_path=args.eval_config,
+        split_override=args.split,
+        seed_override=args.seed,
+    )
     print(json.dumps(payload, indent=2, sort_keys=True))
 
 

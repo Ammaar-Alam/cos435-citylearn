@@ -46,9 +46,15 @@ def run_rbc(
     job_id: str | None = None,
     job_dir: str | Path | None = None,
     progress_context: Any | None = None,
+    split_override: str | None = None,
+    seed_override: int | None = None,
 ) -> dict[str, Any]:
     config = load_yaml(config_path)
     eval_config = load_yaml(eval_config_path)
+    if split_override is not None:
+        config["env"]["split"] = split_override
+    if seed_override is not None:
+        config["training"]["seed"] = int(seed_override)
     env_bundle = make_citylearn_env(
         config["env"]["base_config"],
         f"configs/splits/{config['env']['split']}.yaml",
