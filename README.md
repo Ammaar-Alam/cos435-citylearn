@@ -142,7 +142,7 @@ src/        shared Python package, dataset/env utilities, and baseline code
 tests/      scaffold checks plus benchmark smoke tests
 data/       dataset manifests are tracked, raw benchmark files stay out of git
 results/    final result bundle plus local generated outputs
-submission/ tracked final report tables, figures, and presentation artifacts
+submission/ proposal, final report, tables, figures, and presentation artifacts
 ```
 
 ## final submission artifacts
