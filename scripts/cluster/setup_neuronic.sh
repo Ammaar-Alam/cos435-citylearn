@@ -26,10 +26,13 @@ git pull --ff-only origin "$BRANCH"
 bash scripts/setup/install_env.sh requirements/benchmark.txt
 
 source .venv/bin/activate
-# training uses phase_2_local_evaluation (default); sweep cross-topology evals
-# need the three phase_3 datasets, so fetch them explicitly here
+# training uses phase_2_local_evaluation (default); sweep held-out evals need
+# the released phase_2_online_eval_* and phase_3_* datasets.
 python scripts/setup/download_citylearn_2023.py \
   --dataset citylearn_challenge_2023_phase_2_local_evaluation \
+  --dataset citylearn_challenge_2023_phase_2_online_evaluation_1 \
+  --dataset citylearn_challenge_2023_phase_2_online_evaluation_2 \
+  --dataset citylearn_challenge_2023_phase_2_online_evaluation_3 \
   --dataset citylearn_challenge_2023_phase_3_1 \
   --dataset citylearn_challenge_2023_phase_3_2 \
   --dataset citylearn_challenge_2023_phase_3_3

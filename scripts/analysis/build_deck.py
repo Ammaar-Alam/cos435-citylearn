@@ -28,10 +28,10 @@ FIGURE_PATH = REPO_ROOT / "submission" / "figures" / "per_split_scores.png"
 OUTPUT_PATH = REPO_ROOT / "submission" / "presentation.pptx"
 
 # Princeton-ish palette with accessible contrast on white.
-COLOR_TITLE = RGBColor(0x0F, 0x1B, 0x2D)        # deep navy
-COLOR_BODY = RGBColor(0x1F, 0x2A, 0x3A)         # near-black
-COLOR_ACCENT = RGBColor(0xE7, 0x72, 0x1E)       # Princeton-ish orange
-COLOR_SUBTLE = RGBColor(0x55, 0x5F, 0x6D)       # muted slate
+COLOR_TITLE = RGBColor(0x0F, 0x1B, 0x2D)  # deep navy
+COLOR_BODY = RGBColor(0x1F, 0x2A, 0x3A)  # near-black
+COLOR_ACCENT = RGBColor(0xE7, 0x72, 0x1E)  # Princeton-ish orange
+COLOR_SUBTLE = RGBColor(0x55, 0x5F, 0x6D)  # muted slate
 COLOR_RULE = RGBColor(0xE7, 0x72, 0x1E)
 COLOR_TABLE_HEADER = RGBColor(0x0F, 0x1B, 0x2D)
 COLOR_TABLE_BODY = RGBColor(0xF6, 0xF2, 0xEC)
@@ -222,19 +222,25 @@ def _add_results_numbers_block(slide) -> None:
     tf.word_wrap = True
 
     blocks = [
-        ("phase_2 (3 buildings, held-out)", [
-            ("RBC", "1.087"),
-            ("PPO central", "0.873"),
-            ("PPO DTDE", "0.793"),
-            ("SAC central reward_v2", "0.653", True),
-            ("SAC DTDE", "0.677"),
-            ("CHESCA public ref", "0.562", False, True),
-        ]),
-        ("phase_3 (6 buildings, held-out — portable only)", [
-            ("RBC", "1.114"),
-            ("PPO DTDE", "0.843"),
-            ("SAC DTDE", "0.774", True),
-        ]),
+        (
+            "phase_2 (3 buildings, held-out)",
+            [
+                ("RBC", "1.087"),
+                ("PPO central", "0.873"),
+                ("PPO DTDE", "0.793"),
+                ("SAC central reward_v2", "0.653", True),
+                ("SAC DTDE", "0.677"),
+                ("CHESCA public ref", "0.562", False, True),
+            ],
+        ),
+        (
+            "phase_3 (6 buildings, held-out — portable only)",
+            [
+                ("RBC", "1.114"),
+                ("PPO DTDE", "0.843"),
+                ("SAC DTDE", "0.774", True),
+            ],
+        ),
     ]
     first = True
     for header, rows in blocks:

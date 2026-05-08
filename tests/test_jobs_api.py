@@ -211,7 +211,9 @@ def test_watch_process_triggers_refresh_when_subprocess_exits(tmp_path: Path) ->
 
     manager.refresh = fake_refresh  # type: ignore[method-assign]
 
-    watcher = threading.Thread(target=manager._watch_process, args=("job_watch", process), daemon=True)
+    watcher = threading.Thread(
+        target=manager._watch_process, args=("job_watch", process), daemon=True
+    )
     watcher.start()
     process.finish()
     watcher.join(timeout=2)
@@ -400,7 +402,10 @@ def test_start_marks_live_state_running_before_worker_progress(tmp_path: Path) -
     )
 
     with (
-        patch("cos435_citylearn.api.services.job_manager.subprocess.Popen", return_value=DummyProcess()),
+        patch(
+            "cos435_citylearn.api.services.job_manager.subprocess.Popen",
+            return_value=DummyProcess(),
+        ),
         patch("cos435_citylearn.api.services.job_manager.threading.Thread", DummyThread),
     ):
         manager._start(job_id, manager._load_job(job_id))
@@ -491,9 +496,7 @@ def test_launch_job_request_accepts_allow_cross_reward_eval() -> None:
     # silently drop it when the artifact evaluate router does
     # ``LaunchJobRequest(**launch_payload)``. Without this field the flag
     # passes preflight but the launched worker always sees ``False``.
-    request = LaunchJobRequest(
-        **{"runner_id": "rbc_builtin", "allow_cross_reward_eval": True}
-    )
+    request = LaunchJobRequest(**{"runner_id": "rbc_builtin", "allow_cross_reward_eval": True})
     assert request.allow_cross_reward_eval is True
 
     # Default stays False so unrelated callers are unaffected.

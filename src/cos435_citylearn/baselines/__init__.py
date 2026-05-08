@@ -12,4 +12,11 @@ def run_ppo(*args, **kwargs):
 
     return _run_ppo(*args, **kwargs)
 
-__all__ = ["run_rbc", "run_sac", "run_ppo"]
+
+def run_td3(*args, **kwargs):
+    from cos435_citylearn.baselines.td3 import run_td3 as _run_td3
+
+    return _run_td3(*args, **kwargs)
+
+
+__all__ = ["run_rbc", "run_sac", "run_ppo", "run_td3"]

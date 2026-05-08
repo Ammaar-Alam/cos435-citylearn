@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import socket
 import shutil
+import socket
 import subprocess
 import sys
 import time

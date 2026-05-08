@@ -2,7 +2,7 @@
 
 Generalizable RL for neighborhood battery control in CityLearn.
 
-This repository contains the shared benchmark foundation for the COS435 / ECE433 final project. The CityLearn environment, official 2023 dataset download flow, schema export, smoke path, built-in RBC baseline, a repo-local PPO baseline entrypoint, and repo-local SAC runners are wired here. The dashboard still focuses on the RBC and SAC launch paths.
+This repository contains the shared benchmark foundation for the COS435 / ECE433 final project. The CityLearn environment, official 2023 dataset download flow, schema export, smoke path, built-in RBC baseline, repo-local PPO runners, repo-local SAC runners, repo-local TD3 runners, tracked final-result summaries, and local dashboard are wired here.
 
 ## overview
 
@@ -10,6 +10,7 @@ The project is scoped around the 2023 CityLearn challenge and the comparison bet
 - RBC
 - centralized PPO
 - centralized SAC
+- centralized TD3
 - later structured RL variants
 
 Foundation in this repo now has:
@@ -21,8 +22,11 @@ Foundation in this repo now has:
 - random rollout smoke coverage
 - built-in RBC evaluation path with metric export
 - centralized PPO baseline runner with local artifact export
+- shared-parameter PPO runner for cross-topology evaluation
 - centralized native-SAC baseline with checkpoint export
 - parameter-shared decentralized SAC with shared district context
+- centralized TD3 baseline with SB3 artifact export
+- parameter-shared decentralized TD3 with count-invariant shared district context
 - repo-local reward ladder for SAC (`reward_v0` through `reward_v3`)
 - default simulation-data export for completed evaluation runs
 - local dashboard backend and frontend for launch, playback, and comparison
@@ -63,6 +67,8 @@ make smoke
 make train-rbc
 make train-sac
 make train-sac-shared
+make train-td3
+make train-td3-shared
 ```
 
 ## benchmark target
@@ -88,10 +94,12 @@ The 2023 challenge trains on 3 buildings (phase-2 local_evaluation ≈ `public_d
 
 - `sac_shared_dtde_*` — shared-parameter per-building SAC. One actor-critic is called once per building. Eligible for phase-3 held-out evaluation and AICrowd submission.
 - `ppo_shared_dtde_*` — shared-parameter per-building PPO. Mirrors the SAC-shared design (one actor + one critic, called once per building, GAE(λ) on-policy updates) with a count-invariant `shared_context_version=v2`. Also eligible for phase-3 held-out evaluation.
+- `td3_shared_dtde_*` — shared-parameter per-building TD3. Uses deterministic shared actor, twin critics, target policy smoothing, delayed actor updates, and the same count-invariant context v2 for phase-3 held-out evaluation.
 - `ppo_central_baseline` — centralized PPO (stable-baselines3). Fixed-topology reference number on `public_dev` only.
 - `sac_central_*` — centralized SAC. Fixed-topology reference numbers on `public_dev` only.
+- `td3_central_baseline` — centralized TD3 (stable-baselines3). Fixed-topology reference number on `public_dev` and released phase-2 only.
 
-The runners enforce this at eval time. Running `scripts/train/run_sac.py --artifact-id <central_checkpoint> --split phase_3_1` raises with a message naming the building-count mismatch; the same preflight runs for PPO via a sibling `topology.json` that each training run now writes alongside the model.
+The runners enforce this at eval time. Running `scripts/train/run_sac.py --artifact-id <central_checkpoint> --split phase_3_1` raises with a message naming the building-count mismatch; the same preflight runs for PPO and TD3 via a sibling `topology.json` that each central training run writes alongside the model.
 
 When evaluating a saved checkpoint with `--artifact-id`, you must also pass `--config <the training config for that checkpoint>` so the controller is rebuilt with the matching `control_mode`; mismatches are caught by `validate_checkpoint_runner_compatibility`.
 
@@ -107,8 +115,15 @@ make env-schema
 make smoke
 make train-rbc
 make train-ppo
+make train-ppo-shared
 make train-sac
 make train-sac-shared
+make train-td3
+make train-td3-shared
+make submission-results
+make figures
+make cross-figures
+make cross-table
 make dashboard-install
 make dashboard-build
 make dashboard-backend
@@ -127,7 +142,31 @@ src/        shared Python package, dataset/env utilities, and baseline code
 tests/      scaffold checks plus benchmark smoke tests
 data/       dataset manifests are tracked, raw benchmark files stay out of git
 results/    generated manifests, metrics, and run artifacts stay out of git
+submission/ tracked final report tables, figures, and presentation artifacts
 ```
+
+## final submission artifacts
+
+The clean, grader-facing artifacts are tracked under [`submission/`](submission/):
+
+- [`submission/results/`](submission/results/) has the CSV tables backing the final report claims.
+- [`submission/figures/`](submission/figures/) has the PNG figures copied into the final report and deck.
+- [`submission/presentation.pptx`](submission/presentation.pptx) is the generated presentation deck.
+
+The canonical local result refresh is:
+
+```bash
+make submission-results
+make figures
+make cross-figures
+make cross-table
+```
+
+`make submission-results` reads normalized metrics and sweep summaries from
+`results/` and refreshes the tracked CSV summaries. Figure targets then rebuild
+the tracked report-facing PNGs. Raw datasets, checkpoints, sweep JSONs, Slurm
+logs, playback payloads, and downloaded Drive bundles stay out of git; see
+[`results/README.md`](results/README.md) for the boundary.
 
 ## benchmark flow
 
@@ -138,7 +177,11 @@ results/    generated manifests, metrics, and run artifacts stay out of git
 5. `make smoke`
 6. `make train-rbc`
 7. `make train-ppo`
-8. `make train-sac`
+8. `make train-ppo-shared`
+9. `make train-sac`
+10. `make train-sac-shared`
+11. `make train-td3`
+12. `make train-td3-shared`
 
 If you want the full released 2023 dataset family instead of just the default
 local-evaluation package, run:
@@ -158,13 +201,17 @@ make download-citylearn-all
 - a `SimulationData/<run_id>/` export under `results/ui_exports/`
 - a playback payload under `results/ui_exports/playback/`
 
-`make train-sac` and `make train-sac-shared` write:
+`make train-sac`, `make train-sac-shared`, and `make train-td3-shared` write:
 - a run directory under `results/runs/`
 - JSON metrics plus a flat CSV row in `results/metrics/`
 - `checkpoint.pt` for later deterministic evaluation
 - `training_curve.csv` with step-level optimization stats
 - a `rollout_trace.json` preview trace
 - a `SimulationData/<run_id>/` export and playback payload for completed full evaluations
+
+`make train-td3` writes the same run metadata plus a Stable-Baselines3
+`td3_model.zip`, `vec_normalize.pkl`, `topology.json`, and
+`checkpoint_metadata.json` sidecar for same-topology central evaluation.
 
 To re-evaluate a saved SAC checkpoint on one of the released official
 post-competition datasets without retraining, use:
@@ -256,14 +303,16 @@ The dashboard currently supports:
 - launching the built-in RBC benchmark from the UI
 - launching the centralized SAC baseline from the UI
 - launching the centralized PPO baseline from the UI
+- launching the centralized TD3 baseline from the UI
 - launching the shared SAC `reward_v2` runner from the UI
 - launching the shared PPO `reward_v2` runner from the UI
+- launching the shared TD3 `reward_v2` runner from the UI
 - watching live preview payloads and worker logs while the benchmark job runs
 - listing discovered runs from `results/runs/`
 - inspecting one run with synchronized metrics, trace playback, and render media
 - comparing multiple runs side by side
 - importing playback payloads or other artifacts into a local registry
 - inspecting imported playback payloads directly in the UI
-- importing SAC or shared PPO checkpoints and evaluating them through a checkpoint-capable runner
+- importing SAC, PPO, or TD3 checkpoints and evaluating them through a checkpoint-capable runner
 
-The dashboard exposes the launchable runners (RBC, centralized SAC, centralized PPO, shared SAC `reward_v2`, and shared PPO `reward_v2`) rather than every config variant in `configs/train/`.
+The dashboard exposes the launchable runners (RBC, centralized SAC/PPO/TD3, shared SAC/PPO/TD3 `reward_v2`) rather than every config variant in `configs/train/`.

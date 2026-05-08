@@ -37,7 +37,8 @@ def _require_checkpoint_list_length(
     actual_count = len(values)
     if actual_count != expected_count:
         raise ValueError(
-            f"SAC checkpoint {field_name} count {actual_count} does not match expected controller count {expected_count}"
+            f"SAC checkpoint {field_name} count {actual_count} does not match "
+            f"expected controller count {expected_count}"
         )
 
 
@@ -132,22 +133,38 @@ class CentralizedSACController(CityLearnSAC):
                 )
                 self.replay_buffer[index].buffer = [
                     (
-                        np.hstack(self.get_normalized_observations(index, sample_observation).reshape(1, -1)[0]),
+                        np.hstack(
+                            self.get_normalized_observations(index, sample_observation).reshape(
+                                1, -1
+                            )[0]
+                        ),
                         sample_action,
                         self.get_normalized_reward(index, sample_reward),
                         np.hstack(
-                            self.get_normalized_observations(index, sample_next_observation).reshape(1, -1)[0]
+                            self.get_normalized_observations(
+                                index, sample_next_observation
+                            ).reshape(1, -1)[0]
                         ),
                         sample_done,
                     )
-                    for sample_observation, sample_action, sample_reward, sample_next_observation, sample_done in self.replay_buffer[index].buffer
+                    for (
+                        sample_observation,
+                        sample_action,
+                        sample_reward,
+                        sample_next_observation,
+                        sample_done,
+                    ) in self.replay_buffer[index].buffer
                 ]
                 self.normalized[index] = True
 
             for _ in range(self.update_per_time_step):
-                sample_observation, sample_action, sample_reward, sample_next_observation, sample_done = self.replay_buffer[
-                    index
-                ].sample(self.batch_size)
+                (
+                    sample_observation,
+                    sample_action,
+                    sample_reward,
+                    sample_next_observation,
+                    sample_done,
+                ) = self.replay_buffer[index].sample(self.batch_size)
                 observation_tensor = _tensor(sample_observation, device=self.device)
                 next_observation_tensor = _tensor(sample_next_observation, device=self.device)
                 action_tensor = _tensor(sample_action, device=self.device)
@@ -155,12 +172,17 @@ class CentralizedSACController(CityLearnSAC):
                 done_tensor = _tensor(sample_done, device=self.device).unsqueeze(1)
 
                 with torch.no_grad():
-                    next_action, next_log_pi, _ = self.policy_net[index].sample(next_observation_tensor)
+                    next_action, next_log_pi, _ = self.policy_net[index].sample(
+                        next_observation_tensor
+                    )
                     alpha_value = self._alpha_value(index)
-                    target_q = torch.min(
-                        self.target_soft_q_net1[index](next_observation_tensor, next_action),
-                        self.target_soft_q_net2[index](next_observation_tensor, next_action),
-                    ) - alpha_value * next_log_pi
+                    target_q = (
+                        torch.min(
+                            self.target_soft_q_net1[index](next_observation_tensor, next_action),
+                            self.target_soft_q_net2[index](next_observation_tensor, next_action),
+                        )
+                        - alpha_value * next_log_pi
+                    )
                     q_target = reward_tensor + (1.0 - done_tensor) * self.discount * target_q
 
                 q1_prediction = self.soft_q_net1[index](observation_tensor, action_tensor)
@@ -200,13 +222,17 @@ class CentralizedSACController(CityLearnSAC):
                     self.target_soft_q_net1[index].parameters(),
                     self.soft_q_net1[index].parameters(),
                 ):
-                    target_param.data.copy_(target_param.data * (1.0 - self.tau) + param.data * self.tau)
+                    target_param.data.copy_(
+                        target_param.data * (1.0 - self.tau) + param.data * self.tau
+                    )
 
                 for target_param, param in zip(
                     self.target_soft_q_net2[index].parameters(),
                     self.soft_q_net2[index].parameters(),
                 ):
-                    target_param.data.copy_(target_param.data * (1.0 - self.tau) + param.data * self.tau)
+                    target_param.data.copy_(
+                        target_param.data * (1.0 - self.tau) + param.data * self.tau
+                    )
 
                 stats.append(
                     {
@@ -251,11 +277,21 @@ class CentralizedSACController(CityLearnSAC):
             "policy_state_dicts": [network.state_dict() for network in self.policy_net],
             "soft_q1_state_dicts": [network.state_dict() for network in self.soft_q_net1],
             "soft_q2_state_dicts": [network.state_dict() for network in self.soft_q_net2],
-            "target_soft_q1_state_dicts": [network.state_dict() for network in self.target_soft_q_net1],
-            "target_soft_q2_state_dicts": [network.state_dict() for network in self.target_soft_q_net2],
-            "policy_optimizer_state_dicts": [optimizer.state_dict() for optimizer in self.policy_optimizer],
-            "soft_q_optimizer1_state_dicts": [optimizer.state_dict() for optimizer in self.soft_q_optimizer1],
-            "soft_q_optimizer2_state_dicts": [optimizer.state_dict() for optimizer in self.soft_q_optimizer2],
+            "target_soft_q1_state_dicts": [
+                network.state_dict() for network in self.target_soft_q_net1
+            ],
+            "target_soft_q2_state_dicts": [
+                network.state_dict() for network in self.target_soft_q_net2
+            ],
+            "policy_optimizer_state_dicts": [
+                optimizer.state_dict() for optimizer in self.policy_optimizer
+            ],
+            "soft_q_optimizer1_state_dicts": [
+                optimizer.state_dict() for optimizer in self.soft_q_optimizer1
+            ],
+            "soft_q_optimizer2_state_dicts": [
+                optimizer.state_dict() for optimizer in self.soft_q_optimizer2
+            ],
             "log_alpha": [
                 None if value is None else float(value.detach().cpu().item())
                 for value in self.log_alpha
@@ -318,12 +354,10 @@ class CentralizedSACController(CityLearnSAC):
             for value in payload["norm_std"]
         ]
         self.r_norm_mean = [
-            None if value is None else float(value)
-            for value in payload["r_norm_mean"]
+            None if value is None else float(value) for value in payload["r_norm_mean"]
         ]
         self.r_norm_std = [
-            None if value is None else float(value)
-            for value in payload["r_norm_std"]
+            None if value is None else float(value) for value in payload["r_norm_std"]
         ]
 
         for network, state_dict in zip(self.policy_net, payload["policy_state_dicts"]):
@@ -397,7 +431,8 @@ class SharedSACController(RLC):
         self.last_update_stats: dict[str, float] = {}
         if self.shared_context_dimension != SHARED_CONTEXT_DIMENSION:
             raise ValueError(
-                f"shared_context_dimension must be {SHARED_CONTEXT_DIMENSION} for the current shared SAC feature set"
+                f"shared_context_dimension must be {SHARED_CONTEXT_DIMENSION} "
+                "for the current shared SAC feature set"
             )
         # This follows the same encoder/replay/network conventions as CityLearn's
         # native SAC, but uses one shared actor-critic pair across all buildings.
@@ -451,7 +486,11 @@ class SharedSACController(RLC):
         encoded_lengths = []
 
         for encoders, space in zip(self.encoders, self.observation_space):
-            encoded = [value for value in np.hstack(encoders * np.ones(len(space.low))) if value is not None]
+            encoded = [
+                value
+                for value in np.hstack(encoders * np.ones(len(space.low)))
+                if value is not None
+            ]
             encoded_lengths.append(len(encoded))
 
         if len(set(encoded_lengths)) != 1:
@@ -463,12 +502,12 @@ class SharedSACController(RLC):
         observation_dimension = self._observation_dimension()
         action_dimension = self.action_dimension[0]
         action_space = self.action_space[0]
-        self.soft_q_net1 = SoftQNetwork(observation_dimension, action_dimension, self.hidden_dimension).to(
-            self.device
-        )
-        self.soft_q_net2 = SoftQNetwork(observation_dimension, action_dimension, self.hidden_dimension).to(
-            self.device
-        )
+        self.soft_q_net1 = SoftQNetwork(
+            observation_dimension, action_dimension, self.hidden_dimension
+        ).to(self.device)
+        self.soft_q_net2 = SoftQNetwork(
+            observation_dimension, action_dimension, self.hidden_dimension
+        ).to(self.device)
         self.target_soft_q_net1 = SoftQNetwork(
             observation_dimension, action_dimension, self.hidden_dimension
         ).to(self.device)
@@ -507,9 +546,17 @@ class SharedSACController(RLC):
 
         return encoders
 
-    def _encode_observation(self, index: int, observation: Sequence[float], shared_context: np.ndarray) -> np.ndarray:
+    def _encode_observation(
+        self, index: int, observation: Sequence[float], shared_context: np.ndarray
+    ) -> np.ndarray:
         encoded = np.asarray(
-            [value for value in np.hstack(self.encoders[index] * np.asarray(observation, dtype="float32")) if value is not None],
+            [
+                value
+                for value in np.hstack(
+                    self.encoders[index] * np.asarray(observation, dtype="float32")
+                )
+                if value is not None
+            ],
             dtype="float32",
         )
         return np.concatenate([encoded, shared_context], dtype="float32")
@@ -529,11 +576,16 @@ class SharedSACController(RLC):
             return float(self.alpha)
         return self.log_alpha.exp()
 
-    def predict(self, observations: list[list[float]], deterministic: bool = False) -> list[list[float]]:
+    def predict(
+        self, observations: list[list[float]], deterministic: bool = False
+    ) -> list[list[float]]:
         if self.time_step > self.end_exploration_time_step or deterministic:
             actions = self._predict_with_policy(observations, deterministic=deterministic)
         else:
-            actions = [list(self.action_scaling_coefficient * space.sample()) for space in self.action_space]
+            actions = [
+                list(self.action_scaling_coefficient * space.sample())
+                for space in self.action_space
+            ]
 
         self.actions = actions
         self.next_time_step()
@@ -577,7 +629,9 @@ class SharedSACController(RLC):
             zip(observations, actions, reward, next_observations)
         ):
             encoded_observation = self._encode_observation(index, observation, shared_context)
-            encoded_next_observation = self._encode_observation(index, next_observation, next_shared_context)
+            encoded_next_observation = self._encode_observation(
+                index, next_observation, next_shared_context
+            )
             if self.normalized:
                 encoded_observation = self._normalize_observation(encoded_observation)
                 encoded_next_observation = self._normalize_observation(encoded_next_observation)
@@ -603,7 +657,9 @@ class SharedSACController(RLC):
             )
             self.norm_mean = np.nanmean(observations_batch, axis=0)
             self.norm_std = np.nanstd(observations_batch, axis=0) + 1e-5
-            rewards_batch = np.asarray([item[2] for item in self.replay_buffer.buffer], dtype="float32")
+            rewards_batch = np.asarray(
+                [item[2] for item in self.replay_buffer.buffer], dtype="float32"
+            )
             self.r_norm_mean = float(np.nanmean(rewards_batch, dtype="float32"))
             self.r_norm_std = (
                 float(np.nanstd(rewards_batch, dtype="float32")) / self.reward_scaling + 1e-5
@@ -616,15 +672,25 @@ class SharedSACController(RLC):
                     self._normalize_observation(sample_next_observation),
                     sample_done,
                 )
-                for sample_observation, sample_action, sample_reward, sample_next_observation, sample_done in self.replay_buffer.buffer
+                for (
+                    sample_observation,
+                    sample_action,
+                    sample_reward,
+                    sample_next_observation,
+                    sample_done,
+                ) in self.replay_buffer.buffer
             ]
             self.normalized = True
 
         stats: list[dict[str, float]] = []
         for _ in range(self.update_per_time_step):
-            sample_observation, sample_action, sample_reward, sample_next_observation, sample_done = self.replay_buffer.sample(
-                self.batch_size
-            )
+            (
+                sample_observation,
+                sample_action,
+                sample_reward,
+                sample_next_observation,
+                sample_done,
+            ) = self.replay_buffer.sample(self.batch_size)
             observation_tensor = _tensor(sample_observation, device=self.device)
             next_observation_tensor = _tensor(sample_next_observation, device=self.device)
             action_tensor = _tensor(sample_action, device=self.device)
@@ -634,10 +700,13 @@ class SharedSACController(RLC):
             with torch.no_grad():
                 next_action, next_log_pi, _ = self.policy_net.sample(next_observation_tensor)
                 alpha_value = self._alpha_value()
-                target_q = torch.min(
-                    self.target_soft_q_net1(next_observation_tensor, next_action),
-                    self.target_soft_q_net2(next_observation_tensor, next_action),
-                ) - alpha_value * next_log_pi
+                target_q = (
+                    torch.min(
+                        self.target_soft_q_net1(next_observation_tensor, next_action),
+                        self.target_soft_q_net2(next_observation_tensor, next_action),
+                    )
+                    - alpha_value * next_log_pi
+                )
                 q_target = reward_tensor + (1.0 - done_tensor) * self.discount * target_q
 
             q1_prediction = self.soft_q_net1(observation_tensor, action_tensor)
@@ -663,7 +732,11 @@ class SharedSACController(RLC):
             self.policy_optimizer.step()
 
             alpha_loss_value = 0.0
-            if self.auto_entropy_tuning and self.log_alpha is not None and self.alpha_optimizer is not None:
+            if (
+                self.auto_entropy_tuning
+                and self.log_alpha is not None
+                and self.alpha_optimizer is not None
+            ):
                 alpha_loss = -(self.log_alpha * (log_pi + self.target_entropy).detach()).mean()
                 self.alpha_optimizer.zero_grad()
                 alpha_loss.backward()
@@ -675,13 +748,17 @@ class SharedSACController(RLC):
                 self.target_soft_q_net1.parameters(),
                 self.soft_q_net1.parameters(),
             ):
-                target_param.data.copy_(target_param.data * (1.0 - self.tau) + param.data * self.tau)
+                target_param.data.copy_(
+                    target_param.data * (1.0 - self.tau) + param.data * self.tau
+                )
 
             for target_param, param in zip(
                 self.target_soft_q_net2.parameters(),
                 self.soft_q_net2.parameters(),
             ):
-                target_param.data.copy_(target_param.data * (1.0 - self.tau) + param.data * self.tau)
+                target_param.data.copy_(
+                    target_param.data * (1.0 - self.tau) + param.data * self.tau
+                )
 
             stats.append(
                 {
@@ -697,8 +774,7 @@ class SharedSACController(RLC):
             )
 
         self.last_update_stats = {
-            key: float(np.mean([item[key] for item in stats], dtype="float32"))
-            for key in stats[0]
+            key: float(np.mean([item[key] for item in stats], dtype="float32")) for key in stats[0]
         }
 
     def training_stats(self) -> dict[str, float]:
@@ -731,7 +807,9 @@ class SharedSACController(RLC):
             "policy_optimizer_state_dict": self.policy_optimizer.state_dict(),
             "soft_q_optimizer1_state_dict": self.soft_q_optimizer1.state_dict(),
             "soft_q_optimizer2_state_dict": self.soft_q_optimizer2.state_dict(),
-            "log_alpha": None if self.log_alpha is None else float(self.log_alpha.detach().cpu().item()),
+            "log_alpha": None
+            if self.log_alpha is None
+            else float(self.log_alpha.detach().cpu().item()),
             "alpha_optimizer_state_dict": None
             if self.alpha_optimizer is None
             else self.alpha_optimizer.state_dict(),
@@ -745,14 +823,16 @@ class SharedSACController(RLC):
         _restore_time_state(self, restored_time_step=int(payload["time_step"]))
         self.normalized = bool(payload["normalized"])
         self.norm_mean = (
-            None if payload["norm_mean"] is None else np.asarray(payload["norm_mean"], dtype="float32")
+            None
+            if payload["norm_mean"] is None
+            else np.asarray(payload["norm_mean"], dtype="float32")
         )
         self.norm_std = (
-            None if payload["norm_std"] is None else np.asarray(payload["norm_std"], dtype="float32")
+            None
+            if payload["norm_std"] is None
+            else np.asarray(payload["norm_std"], dtype="float32")
         )
-        self.r_norm_mean = (
-            None if payload["r_norm_mean"] is None else float(payload["r_norm_mean"])
-        )
+        self.r_norm_mean = None if payload["r_norm_mean"] is None else float(payload["r_norm_mean"])
         self.r_norm_std = None if payload["r_norm_std"] is None else float(payload["r_norm_std"])
 
         self.policy_net.load_state_dict(payload["policy_state_dict"])

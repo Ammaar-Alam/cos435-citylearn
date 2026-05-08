@@ -80,9 +80,7 @@ def validate_ppo_checkpoint_payload_structure(payload: Any) -> None:
 
     missing = sorted(REQUIRED_CHECKPOINT_KEYS - set(payload))
     if missing:
-        raise ValueError(
-            f"PPO checkpoint payload missing required keys: {', '.join(missing)}"
-        )
+        raise ValueError(f"PPO checkpoint payload missing required keys: {', '.join(missing)}")
 
     format_version = payload["format_version"]
     if format_version not in SUPPORTED_FORMAT_VERSIONS:
@@ -168,8 +166,7 @@ def validate_ppo_checkpoint_runner_compatibility(
         raise ValueError(
             "PPO checkpoint runtime metadata is incompatible with runner config; "
             "pass allow_cross_reward_eval=True to opt into cross-reward evaluation "
-            "(run_id keeps the training label, manifest records the mismatch). "
-            + "; ".join(parts)
+            "(run_id keeps the training label, manifest records the mismatch). " + "; ".join(parts)
         )
     if mismatches:
         parts = [f"{field}: checkpoint={t!r} config={e!r}" for field, (t, e) in mismatches.items()]
@@ -214,9 +211,7 @@ def validate_ppo_checkpoint_env_compatibility(
         )
 
     if not checkpoint_action_names or not env_action_names:
-        raise ValueError(
-            "shared PPO checkpoint requires non-empty action schema on both sides"
-        )
+        raise ValueError("shared PPO checkpoint requires non-empty action schema on both sides")
     ckpt_per_building_act = checkpoint_action_names[0]
     env_per_building_act = env_action_names[0]
     if any(list(b) != ckpt_per_building_act for b in checkpoint_action_names):

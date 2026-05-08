@@ -65,7 +65,10 @@ class CityLearnGymWrapper(gym.Env):
         obs_dim = sum(box.shape[0] for box in self.citylearn_env.observation_space)
 
         self.observation_space = spaces.Box(
-            low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32,
+            low=-np.inf,
+            high=np.inf,
+            shape=(obs_dim,),
+            dtype=np.float32,
         )
         # use actual bounds from CityLearn action spaces
         act_lows = np.concatenate([box.low for box in self.citylearn_env.action_space])
@@ -138,16 +141,18 @@ class TrainingLogCallback(BaseCallback):
         if len(self.model.ep_info_buffer) > 0:
             mean_reward = float(np.mean([ep["r"] for ep in self.model.ep_info_buffer]))
 
-        self.curve_rows.append({
-            "step": int(self.num_timesteps),
-            "mean_reward": mean_reward,
-            "policy_loss": _get("train/policy_gradient_loss"),
-            "value_loss": _get("train/value_loss"),
-            "entropy_loss": _get("train/entropy_loss"),
-            "approx_kl": _get("train/approx_kl"),
-            "clip_fraction": _get("train/clip_fraction"),
-            "explained_variance": _get("train/explained_variance"),
-        })
+        self.curve_rows.append(
+            {
+                "step": int(self.num_timesteps),
+                "mean_reward": mean_reward,
+                "policy_loss": _get("train/policy_gradient_loss"),
+                "value_loss": _get("train/value_loss"),
+                "entropy_loss": _get("train/entropy_loss"),
+                "approx_kl": _get("train/approx_kl"),
+                "clip_fraction": _get("train/clip_fraction"),
+                "explained_variance": _get("train/explained_variance"),
+            }
+        )
 
         if self.progress_context is not None and self.total_timesteps > 0:
             self.progress_context.update(
@@ -279,9 +284,7 @@ def _load_imported_central_ppo_artifact(
         # use the local-run layout under ``artifacts_root``.
         return _resolve_artifact_paths(artifact_id, artifacts_root)
     if artifacts_root is None:
-        raise ValueError(
-            "artifacts_root must be set when imported_artifacts_root is provided"
-        )
+        raise ValueError("artifacts_root must be set when imported_artifacts_root is provided")
     # Lazy import to match ``_load_imported_ppo_checkpoint`` below and avoid a
     # module-top dependency on the SAC checkpoint utilities.
     from cos435_citylearn.algorithms.sac.checkpoints import resolve_imported_checkpoint_path
@@ -362,6 +365,7 @@ def run_ppo(
     split_override: str | None = None,
     seed_override: int | None = None,
     lr_override: float | None = None,
+    ent_coef_override: float | None = None,
     allow_cross_reward_eval: bool = False,
     **kwargs,
 ) -> dict[str, Any]:
@@ -374,6 +378,8 @@ def run_ppo(
         config["training"]["seed"] = int(seed_override)
     if lr_override is not None:
         config["training"]["learning_rate"] = float(lr_override)
+    if ent_coef_override is not None:
+        config["training"]["ent_coef"] = float(ent_coef_override)
 
     split_config_path = f"configs/splits/{config['env']['split']}.yaml"
     split_config = load_yaml(split_config_path)
@@ -523,16 +529,18 @@ def run_ppo(
         if len(model.ep_info_buffer) > 0:
             final_mean_reward = float(np.mean([ep["r"] for ep in model.ep_info_buffer]))
 
-        log_callback.curve_rows.append({
-            "step": int(total_timesteps),
-            "mean_reward": final_mean_reward,
-            "policy_loss": _final("train/policy_gradient_loss"),
-            "value_loss": _final("train/value_loss"),
-            "entropy_loss": _final("train/entropy_loss"),
-            "approx_kl": _final("train/approx_kl"),
-            "clip_fraction": _final("train/clip_fraction"),
-            "explained_variance": _final("train/explained_variance"),
-        })
+        log_callback.curve_rows.append(
+            {
+                "step": int(total_timesteps),
+                "mean_reward": final_mean_reward,
+                "policy_loss": _final("train/policy_gradient_loss"),
+                "value_loss": _final("train/value_loss"),
+                "entropy_loss": _final("train/entropy_loss"),
+                "approx_kl": _final("train/approx_kl"),
+                "clip_fraction": _final("train/clip_fraction"),
+                "explained_variance": _final("train/explained_variance"),
+            }
+        )
 
         # save model and VecNormalize stats
         ensure_parent(model_path)
@@ -545,14 +553,17 @@ def run_ppo(
         _write_central_ppo_sidecar(run_dir, config)
 
         # save topology for cross-topology preflight
-        write_json(topology_path, {
-            "observation_names": train_bundle.env.observation_names,
-            "action_names": train_bundle.env.action_names,
-            "observation_shape": list(train_env.observation_space.shape),
-            "action_shape": list(train_env.action_space.shape),
-            "trained_on_split": config["env"]["split"],
-            "control_mode": "centralized",
-        })
+        write_json(
+            topology_path,
+            {
+                "observation_names": train_bundle.env.observation_names,
+                "action_names": train_bundle.env.action_names,
+                "observation_shape": list(train_env.observation_space.shape),
+                "action_shape": list(train_env.action_space.shape),
+                "trained_on_split": config["env"]["split"],
+                "control_mode": "centralized",
+            },
+        )
 
         # write training curve
         ensure_parent(curve_path)
@@ -660,12 +671,14 @@ def run_ppo(
         obs, _, terminated, truncated, info = raw_eval_env.step(action)
 
         if save_rollout_trace and len(rollout_trace) < trace_limit:
-            rollout_trace.append({
-                "step": step_index,
-                "actions": info["per_building_actions"],
-                "rewards": info["per_building_rewards"],
-                "terminated": bool(terminated),
-            })
+            rollout_trace.append(
+                {
+                    "step": step_index,
+                    "actions": info["per_building_actions"],
+                    "rewards": info["per_building_rewards"],
+                    "terminated": bool(terminated),
+                }
+            )
 
         step_index += 1
         done = terminated or truncated
@@ -734,12 +747,14 @@ def run_ppo(
     write_csv_row(metrics_dir / f"{run_id}.csv", row)
     write_json(
         manifests_dir / "environment_lock.json",
-        build_environment_lock({
-            "dataset_name": eval_bundle.dataset_name,
-            "schema_path": str(eval_bundle.schema_path),
-            "seed": seed,
-            "run_id": run_id,
-        }),
+        build_environment_lock(
+            {
+                "dataset_name": eval_bundle.dataset_name,
+                "schema_path": str(eval_bundle.schema_path),
+                "seed": seed,
+                "run_id": run_id,
+            }
+        ),
     )
 
     if progress_context is not None:
@@ -808,9 +823,7 @@ def _shared_ppo_controller_kwargs(config: dict[str, Any]) -> dict[str, Any]:
         "normalize_observations": bool(training.get("normalize_observations", True)),
         "normalize_rewards": bool(training.get("normalize_rewards", True)),
         "normalize_advantage": bool(training.get("normalize_advantage", True)),
-        "target_kl": (
-            None if training.get("target_kl") is None else float(training["target_kl"])
-        ),
+        "target_kl": (None if training.get("target_kl") is None else float(training["target_kl"])),
     }
 
 
@@ -896,10 +909,9 @@ def _load_imported_ppo_checkpoint(
             )
     else:
         if artifacts_root is None:
-            raise ValueError(
-                "artifacts_root must be set when imported_artifacts_root is provided"
-            )
+            raise ValueError("artifacts_root must be set when imported_artifacts_root is provided")
         from cos435_citylearn.algorithms.sac.checkpoints import resolve_imported_checkpoint_path
+
         checkpoint_path = resolve_imported_checkpoint_path(
             artifact_id=artifact_id,
             imported_artifacts_root=imported_artifacts_root,

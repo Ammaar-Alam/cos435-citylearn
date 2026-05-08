@@ -1,0 +1,50 @@
+env:
+  base_config: configs/env/citylearn_2023.yaml
+  split: public_dev
+
+algorithm:
+  name: td3
+  control_mode: shared_dtde
+  variant: td3_shared_dtde_smoke
+  policy: deterministic_mlp
+
+reward:
+  version: reward_v2
+
+features:
+  version: shared_district_context_v2
+  shared_context_dimension: 4
+  shared_context_version: v2
+
+training:
+  total_timesteps: 64
+  seed: 0
+  batch_size: 16
+  learning_rate: 0.0003
+  replay_buffer_size: 512
+  hidden_dimension: [64, 64]
+  discount: 0.99
+  tau: 0.005
+  reward_scaling: 5.0
+  update_per_time_step: 1
+  exploration_steps: 16
+  standardize_start_time_step: 16
+  action_scaling_coefficient: 0.5
+  exploration_noise: 0.1
+  policy_delay: 2
+  target_policy_noise: 0.2
+  target_noise_clip: 0.5
+  log_interval_steps: 8
+
+evaluation:
+  deterministic: true
+  eval_episodes: 1
+  save_rollout_trace: true
+  trace_limit: 64
+  preview_stride: 8
+
+logging:
+  run_group: td3_smoke
+  output_root: results/runs
+  metrics_root: results/metrics
+  manifests_root: results/manifests
