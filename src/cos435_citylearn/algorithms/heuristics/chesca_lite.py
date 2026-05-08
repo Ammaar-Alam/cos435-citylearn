@@ -51,7 +51,7 @@ class ChescaLiteController:
         self,
         env: Any,
         *,
-        cooling_scale: float = 0.8,
+        cooling_scale: float = 0.6,
         cooling_bias: float = 0.0,
         cooling_max_delta: float = 0.12,
         storage_max_delta: float = 0.07,

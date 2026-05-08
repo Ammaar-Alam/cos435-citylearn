@@ -37,19 +37,19 @@ official leaderboard submissions.
 
 | split | CHESCA-lite score |
 | --- | ---: |
-| public_dev | 0.612715 |
-| phase_2_online_eval_1 | 0.690901 |
-| phase_2_online_eval_2 | 0.683173 |
-| phase_2_online_eval_3 | 0.599379 |
-| phase_3_1 | 0.678634 |
-| phase_3_2 | 0.668941 |
-| phase_3_3 | 0.681231 |
+| public_dev | 0.618049 |
+| phase_2_online_eval_1 | 0.680990 |
+| phase_2_online_eval_2 | 0.677772 |
+| phase_2_online_eval_3 | 0.594212 |
+| phase_3_1 | 0.671487 |
+| phase_3_2 | 0.664418 |
+| phase_3_3 | 0.675197 |
 
 Summary:
 
-- released average: `0.667043`
-- phase 2 released average: `0.657818`
-- phase 3 released average: `0.676269`
+- released average: `0.660679`
+- phase 2 released average: `0.650991`
+- phase 3 released average: `0.670368`
 
 Reference points from the tracked result tables:
 
@@ -63,8 +63,8 @@ This is a useful hybrid baseline and beats the previous shared-SAC phase-3 mean,
 but it does not beat CHESCA. The controller substantially reduces normal comfort
 violations and carbon relative to BasicRBC. A small local parameter screen found
 that lowering the cooling action smoothing cap from `0.18` to `0.12`, then
-lowering the cooling action scale to `0.8`, improved the released average from
-`0.700245` to `0.667043`. The remaining gap is mostly outage resilience and
+lowering the cooling action scale to `0.6`, improved the released average from
+`0.700245` to `0.660679`. The remaining gap is mostly outage resilience and
 grid-smoothness metrics, especially thermal resilience, unserved energy,
 ramping, and load factor.
 
@@ -74,7 +74,7 @@ result. It is not strong enough to claim that we beat the official winner.
 ## Reproduction Notes
 
 The final local pilot used exports disabled for speed and wrote temporary
-artifacts to `/private/tmp/chesca-lite-pilot/results_all_scale_0p8_delta_0p12`.
+artifacts to `/private/tmp/chesca-lite-pilot/results_all_scale_0p6_delta_0p12`.
 
 Representative command shape:
 

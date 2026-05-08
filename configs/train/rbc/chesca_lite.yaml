@@ -7,7 +7,7 @@ algorithm:
   controller: custom
   controller_class: cos435_citylearn.algorithms.heuristics.ChescaLiteController
   controller_kwargs:
-    cooling_scale: 0.8
+    cooling_scale: 0.6
     cooling_bias: 0.0
     cooling_max_delta: 0.12
     storage_max_delta: 0.07
