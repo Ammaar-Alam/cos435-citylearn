@@ -149,6 +149,25 @@ class ChescaLiteController:
 
         return float(observation[index])
 
+    def _temperature_set_point(
+        self, observation: Sequence[float], building_index: int
+    ) -> float:
+        set_point = self._value(
+            observation,
+            "indoor_dry_bulb_temperature_cooling_set_point",
+            building_index=building_index,
+            default=float("nan"),
+        )
+        if np.isfinite(set_point):
+            return set_point
+
+        return self._value(
+            observation,
+            "indoor_dry_bulb_temperature_set_point",
+            building_index=building_index,
+            default=24.0,
+        )
+
     def _building_observation(
         self, observation: Sequence[float], building_index: int
     ) -> BuildingObservation:
@@ -198,12 +217,7 @@ class ChescaLiteController:
             occupant_count=self._value(
                 observation, "occupant_count", building_index=building_index, default=0.0
             ),
-            temperature_set_point=self._value(
-                observation,
-                "indoor_dry_bulb_temperature_set_point",
-                building_index=building_index,
-                default=24.0,
-            ),
+            temperature_set_point=self._temperature_set_point(observation, building_index),
             power_outage=self._value(
                 observation, "power_outage", building_index=building_index, default=0.0
             ),

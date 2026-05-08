@@ -126,6 +126,20 @@ def test_chesca_lite_cooling_tracks_occupied_comfort_error() -> None:
     assert warm[5] > comfortable[5]
 
 
+def test_chesca_lite_reads_cooling_set_point_alias() -> None:
+    env = _fake_env()
+    env.observation_names[0][28] = "indoor_dry_bulb_temperature_cooling_set_point"
+    env.observation_names[0][39] = "indoor_dry_bulb_temperature_cooling_set_point"
+    controller = ChescaLiteController(env)
+
+    action = controller.predict(
+        [_observation(hour=15.0, indoor=25.0, set_point=26.0, net_load=1.0)]
+    )[0]
+
+    assert action[2] < 0.1
+    assert action[5] < 0.1
+
+
 def test_chesca_lite_discharges_electrical_storage_on_high_load() -> None:
     controller = ChescaLiteController(_fake_env())
 
