@@ -309,6 +309,8 @@ class ChescaLiteController:
             if action_name == "cooling_device":
                 max_delta = self.cooling_max_delta
             elif action_name in {"dhw_storage", "electrical_storage"}:
+                # Keep outage dispatch ramp-limited too: fast outage-storage
+                # screens reduced one unserved term but worsened released score.
                 max_delta = self.storage_max_delta
             else:
                 max_delta = high - low

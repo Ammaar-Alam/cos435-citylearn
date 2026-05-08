@@ -68,6 +68,12 @@ lowering the cooling action scale to `0.6`, improved the released average from
 grid-smoothness metrics, especially thermal resilience, unserved energy,
 ramping, and load factor.
 
+One rejected screen bypassed storage action smoothing during outages so the
+battery could jump immediately to the outage-discharge action. That reduced one
+public-dev unserved-energy term, but worsened the representative released-screen
+aggregate through thermal-resilience regressions, so the final controller keeps
+storage actions ramp-limited during outages.
+
 The score is strong enough to keep as a documented CHESCA-inspired stretch
 result. It is not strong enough to claim that we beat the official winner.
 
