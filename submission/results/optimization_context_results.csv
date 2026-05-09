@@ -1,0 +1,4 @@
+method_id,method_label,category,public_dev_average_score,released_phase2_average_score,phase3_average_score,phase2_eval_jobs,phase3_eval_jobs,claim_status,notes
+chesca_reproduction,Upstream CHESCA reproduction,optimization_reference,0.479895234108,0.508338073889,,3,,external_optimization_context,reproduced optimization-controller reference
+chesca_residual_sac_blend,CHESCA residual plus SAC action blend,optimization_hybrid,0.465203762054,0.500519891580,,3,,external_optimization_context,uses upstream CHESCA with district residual and SAC action blending
+chesca_residual_phase3,CHESCA residual phase-3 wrapper,optimization_hybrid,,,0.544919629892,,3,external_optimization_context,uses upstream CHESCA with district residual on six-building splits

@@ -38,7 +38,9 @@ is missing.
 - `shared_sweep_inventory.csv` - regenerated per-run shared PPO/SAC/TD3 sweep inventory after the full 60-cell sweep
 - `final_sweep_summary.csv` - paper-facing aggregate rows from the latest PPO/SAC/TD3 broad and targeted Neuronic sweeps
 - `final_sweep_best_by_algorithm.csv` - best setting per algorithm/evaluation group from the latest shared-controller sweeps
-- `context_experiment_summary.csv` - compact negative/benchmark context for MAPPO, residual SAC, CHESCA, and the SAC random-episode sprint
+- `context_experiment_summary.csv` - compact negative/benchmark context for MAPPO, residual SAC, CHESCA, and SAC candidate runs
+- `sac_ensemble_phase2_results.csv` - SAC checkpoint-ensemble phase-2 summary used by the final report
+- `optimization_context_results.csv` - CHESCA reproduction and residual-wrapper context rows
 - `result_source_audit.csv` - verified Neuronic and Drive source locations used by the final paper refresh
 - `paper_claim_map.csv` - final-report numeric claims mapped to tracked CSV evidence
 - `official_benchmark_reference.csv` - published CityLearn 2023 reference numbers
@@ -54,7 +56,9 @@ is missing.
 - `ppo_shared_sweep_summary.csv` and `ppo_shared_sweep_inventory.csv` back the existing shared-PPO learning-rate sweep discussion.
 - `shared_sweep_summary.csv` and `shared_sweep_inventory.csv` back the expanded PPO/SAC/TD3 result matrix once the 60-cell sweep has been collected.
 - `final_sweep_summary.csv` and `final_sweep_best_by_algorithm.csv` back the refreshed final-report PPO/SAC/TD3 shared-controller matrix.
-- `context_experiment_summary.csv` backs context-only statements about noncompetitive MAPPO/residual SAC runs and external CHESCA optimization results.
+- `context_experiment_summary.csv` backs context-only statements about noncompetitive MAPPO/residual SAC runs, the SAC checkpoint ensemble, and external CHESCA optimization results.
+- `sac_ensemble_phase2_results.csv` backs the checkpoint-ensemble result in the final report.
+- `optimization_context_results.csv` backs CHESCA reproduction and residual-wrapper context.
 - `result_source_audit.csv` and `paper_claim_map.csv` are the audit trail for the final paper's latest numeric claims.
 - `official_benchmark_reference.csv` is context only; it is not mixed into local or released-eval means.
 
@@ -89,6 +93,10 @@ Per-learning-rate breakdown behind the shared-PPO summary row above:
 - Shared DTDE PPO reward_v2 lr=`3e-4` across released `phase_3_*`: mean `0.847783`, std `0.032190`, 95% CI `0.011519`, eval jobs `30`
 
 The best shared-PPO local sweep setting is lr=`3e-4` at `0.783261` on `public_dev`.
+
+## SAC checkpoint ensemble
+
+The best SAC-only phase-2 ensemble is the all-central mean-action ensemble at `0.616318` across the three released phase-2 splits. It improves the earlier best single-checkpoint SAC reward_v2 phase-2 mean of `0.652703` by `0.036385`.
 
 ## Local tuning headline
 

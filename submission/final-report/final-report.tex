@@ -75,7 +75,7 @@ The reward variant ablation is fully crossed for centralized SAC. PPO uses \text
 
 \paragraph{Evaluation protocol.} We evaluate in three regimes. Local \texttt{public\_dev} is our primary tuning environment (one 3-building dataset available during development). Released phase-2 online-eval contains three held-out 3-building datasets, testing same-topology generalization. Released phase-3 contains three held-out 6-building datasets, testing cross-size generalization. Only shared-DTDE policies can run on phase-3. We report seed-averaged means with 95\% confidence intervals. For single-split results, intervals are over seeds; for aggregate held-out results, intervals are over seed $\times$ split evaluation jobs unless otherwise noted. A stricter protocol would cluster by split, so these intervals should be read as job-level uncertainty rather than fully independent split-level uncertainty.
 
-\paragraph{Implementation and reproducibility.} All reported numbers come from saved checkpoints evaluated against named split configs, not last-step training scores. Aggregation scripts write the tables and figures from recorded evaluation summaries in \texttt{submission/results/} and \texttt{submission/figures/}. Seed counts are reported in the relevant tables; for example, the SAC-DTDE pilot is labeled as a 3-seed run.
+\paragraph{Implementation and reproducibility.} All reported numbers come from saved checkpoints evaluated against named split configs, not last-step training scores. Aggregation scripts write the tables and figures from recorded evaluation summaries in \texttt{submission/results/} and \texttt{submission/figures/}. The ensemble and optimization-context summaries are tracked as compact CSVs in \texttt{submission/results/}. Seed counts are reported in the relevant tables; for example, the SAC-DTDE pilot is labeled as a 3-seed run.
 
 \section{Results}\label{sec:results}
 
@@ -83,16 +83,14 @@ We organize results around local tuning performance, same-topology held-out gene
 
 \paragraph{Final shared-controller sweep.} The original ablation below compares PPO and SAC under the reward and topology design choices developed during the project. After adding TD3 and running the larger shared-controller sweeps, the learned-controller ordering remains SAC first, TD3 close behind, and PPO weaker. In the targeted final sweep, SAC achieves the best released-all learned score at $0.702 \pm 0.023$, followed by TD3 at $0.727 \pm 0.017$ and PPO at $0.799 \pm 0.018$. The same table keeps the RBC reference visible, showing that every learned shared controller improves over RBC while still trailing the CHESCA optimization reference on released phase-2.
 
-\begin{figure}[h]
+\begin{figure}[ht]
     \centering
     \includegraphics[width=\linewidth]{figures/final_result_matrix.png}
-    \caption{
-        Final shared-controller result matrix from the targeted PPO/SAC/TD3 sweep. Bars show the best setting per learned algorithm and evaluation group; error bars are 95\% confidence intervals over evaluation jobs. The CHESCA marker is an optimization-controller reference and is included as benchmark context, not as part of our learned RL method average.
-    }
+    \caption{Targeted PPO/SAC/TD3 shared-controller sweep. Bars show the best setting per learned algorithm and evaluation group; error bars are 95\% confidence intervals over evaluation jobs. CHESCA is an optimization reference.}
     \label{fig:final_matrix}
 \end{figure}
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \small
 \begin{tabular}{lcccc}
@@ -105,33 +103,22 @@ SAC & 0.553 & 0.664 & 0.738 & 0.702 \\
 TD3 & 0.601 & 0.713 & 0.742 & 0.727 \\
 \bottomrule
 \end{tabular}
-\caption{Best shared-controller scores from the final targeted hyperparameter sweep. For learned methods, each cell selects the best setting for that algorithm and evaluation group; exact learning rates and hyperparameters are recorded in \texttt{submission/results/final\_sweep\_best\_by\_algorithm.csv}.}
+\caption{Best shared-controller scores from the targeted sweep. Each learned-method cell selects that algorithm's best setting for the evaluation group.}
 \label{tab:final_matrix}
 \end{table}
 
 \paragraph{TD3 stretch result.} TD3 was added as a compute-heavy stretch algorithm to test whether deterministic off-policy control could improve cross-topology transfer. The broad learning-rate screen gives its strongest result: TD3 with learning rate $3{\times}10^{-4}$ achieves $0.736 \pm 0.020$ on the released phase-3 splits, just ahead of SAC at $0.738 \pm 0.008$. In the targeted final sweep, SAC slightly retakes the phase-3 lead ($0.738$ versus $0.742$), but TD3 remains competitive and beats PPO by roughly 0.075 absolute score units on the released phase-3 splits.
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=0.92\linewidth]{figures/lr_screen_phase3.png}
-    \caption{
-        Broad learning-rate screen on the released phase-3 transfer splits. Each point aggregates three seeds over three 6-building splits. SAC is stable across mid-to-high learning rates, while TD3 has a sharper optimum at $3{\times}10^{-4}$ that gives the best phase-3 score in the broad sweep.
-    }
-    \label{fig:lr_phase3}
-\end{figure}
-
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{figures/per_split_scores.png}
-    \caption{
-        \texttt{average\_score} (lower is better) on six released held-out evaluation datasets. The left panel shows three \texttt{phase\_2\_online\_eval} splits (3 buildings); the shaded right panel shows three \texttt{phase\_3} splits (6 buildings). Centralized policies cannot execute on phase-3 due to input/output size mismatch. SAC-DTDE achieves the best phase-3 mean (0.774), showing that shared-parameter decentralization enables cross-size evaluation. The dashed line is the CHESCA 2023 public leaderboard reference from a different evaluator and is shown only as benchmark context.
-    }
+    \caption{Released held-out scores across phase-2 (3 buildings) and phase-3 (6 buildings). Centralized policies cannot run on phase-3; SAC-DTDE is the best portable phase-3 policy. The dashed line is the CHESCA 2023 leaderboard reference.}
     \label{fig:per_split}
 \end{figure}
 
 \paragraph{Local evaluation.} Table~\ref{tab:local} summarizes results on the local \texttt{public\_dev} split. The local RBC baseline scores 1.023, and every RL method improves on it. The best local variant is SAC centralized \texttt{reward\_v1} at $0.527 \pm 0.011$ (5 seeds), a 48.4\% reduction relative to RBC. SAC \texttt{reward\_v2} ($0.536 \pm 0.016$) and the SAC baseline ($0.554 \pm 0.009$) trail by 0.009--0.027 absolute score units, indicating that reward alignment helps but is not the sole driver. SAC shared-DTDE scores $0.569 \pm 0.018$ (3-seed pilot), modestly behind centralized SAC. The decentralized controller sees only per-building observations and cannot jointly coordinate charge/discharge across the neighborhood. PPO variants are substantially weaker (0.777--0.883), consistent with SAC's expected advantage in continuous control tasks from off-policy replay and entropy regularization.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \small
 \begin{tabular}{lcccc}
@@ -147,55 +134,31 @@ SAC centralized \texttt{rv1}    & 5  & 0.527 $\pm$ 0.011 & 0.014 & $-48.4\%$ \\
 SAC shared-DTDE \texttt{rv2}    & 3  & 0.569 $\pm$ 0.018 & 0.044 & $-$44.4\% \\
 \bottomrule
 \end{tabular}
-\caption{Local \texttt{public\_dev} results (lower is better). \% vs.\ RBC = percentage improvement over the local RBC baseline score of 1.023.}
+\caption{Local \texttt{public\_dev} results. Lower is better; \% vs.\ RBC is relative to RBC $=1.023$.}
 \label{tab:local}
 \end{table}
 
-\paragraph{Held-out phase-2 generalization.} The released phase-2 splits change the weather and demand traces while keeping the 3-building topology. Absolute scores shift, but the local rank ordering mostly persists. RBC rises to 1.087 (mean over three splits). SAC centralized \texttt{reward\_v2} achieves the best RL result at $0.653 \pm 0.043$ (15 seed $\times$ split evaluation jobs), a 40\% improvement over held-out RBC. Importantly, \texttt{rv2} outperforms \texttt{rv1} here despite losing locally (0.653 vs.\ 0.668). The smoothness penalties reduce overfitting to the development split, suggesting that SoC-change and sign-flip penalties act as behavioral regularization that transfers better across weather and demand conditions. SAC shared-DTDE scores $0.677 \pm 0.047$, 0.024 absolute score units (2.4 percentage points) behind centralized SAC despite operating on only per-building observations. PPO variants retain their advantage over RBC (0.793 and 0.873) while remaining well behind SAC. PPO shared-DTDE has a smaller local-to-phase-2 gap than SAC, but it starts from a much weaker local score, so the smaller gap does not imply better held-out performance.
+\paragraph{Held-out phase-2 generalization.} The released phase-2 splits change the weather and demand traces while keeping the 3-building topology. Absolute scores shift, but the local rank ordering mostly persists. RBC rises to 1.087 (mean over three splits). SAC centralized \texttt{reward\_v2} achieves the best single-checkpoint RL result at $0.653 \pm 0.043$ (15 seed $\times$ split evaluation jobs), a 40\% improvement over held-out RBC. Importantly, \texttt{rv2} outperforms \texttt{rv1} here despite losing locally (0.653 vs.\ 0.668). The smoothness penalties reduce overfitting to the development split, suggesting that SoC-change and sign-flip penalties act as behavioral regularization that transfers better across weather and demand conditions. SAC shared-DTDE scores $0.677 \pm 0.047$, 0.024 absolute score units (2.4 percentage points) behind centralized SAC despite operating on only per-building observations. PPO variants retain their advantage over RBC (0.793 and 0.873) while remaining well behind SAC. PPO shared-DTDE has a smaller local-to-phase-2 gap than SAC, but it starts from a much weaker local score, so the smaller gap does not imply better held-out performance. For same-topology phase-2, a centralized SAC mean-action ensemble improves the phase-2 mean from 0.653 to 0.616, but it is not portable to phase-3.
 
-\begin{figure}[h]
+\begin{figure}[ht]
     \centering
     \includegraphics[width=\linewidth]{figures/cross_split_comparison.png}
-    \caption{
-        Method comparison on the three released \texttt{phase\_2\_online\_eval} splits. Bars aggregate the three held-out 3-building splits; error bars show 95\% confidence intervals over evaluation jobs. All learned methods beat the phase-2 RBC baseline, SAC variants lead, and the smoothness-regularized \texttt{reward\_v2} variant achieves the best held-out phase-2 performance.
-    }
+    \caption{Released phase-2 comparison. Bars aggregate three held-out 3-building splits; error bars show 95\% confidence intervals over evaluation jobs. SAC \texttt{reward\_v2} is the best single-checkpoint policy.}
     \label{fig:cross_split}
 \end{figure}
 
 \paragraph{Cross-size generalization to phase-3.} The released phase-3 splits expand the cluster from 3 to 6 buildings, providing the strictest generalization test. Centralized policies fail outright here: feeding a 6-building observation to a 3-building checkpoint is a shape mismatch, not a performance question. Among portable methods, SAC shared-DTDE achieves 0.774 (mean over three splits, nine seed $\times$ split evaluation jobs), compared to 0.843 for PPO shared-DTDE and 1.114 for RBC. Shared-DTDE treats buildings as repeated instances of the same local control problem, so the same forward pass applies independently to each building's observation and no architectural change is needed. SAC-DTDE's advantage over PPO-DTDE persists on phase-3, likely because additional buildings supply more diverse per-building replay data for the off-policy learner.
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=\linewidth]{figures/generalization_gap.png}
-    \caption{
-        Local-to-held-out comparison for each method. The lighter bar shows the local \texttt{public\_dev} score and the darker bar shows the mean over released \texttt{phase\_2\_online\_eval} splits. SAC variants retain the best absolute held-out performance despite moderate degradation from local scores. PPO shared-DTDE has a smaller absolute gap but starts from a weaker local score, so the smaller gap does not imply better final performance.
-    }
-    \label{fig:gen_gap}
-\end{figure}
-
 \paragraph{KPI breakdown.} Figure~\ref{fig:kpi} disaggregates the local composite score into its constituent KPI groups. The dominant improvement comes from thermal discomfort, which carries weight 0.30 in the scoring formula. The best SAC variants reduce the discomfort proportion from 0.944 (RBC) to below 0.020. This single term explains why all RL policies beat RBC substantially even when cost and carbon reductions differ. Carbon emissions and electricity cost both fall by roughly 55\%. The main remaining weakness is thermal-resilience loss (\texttt{one\_minus\_thermal\_resilience}). SAC centralized \texttt{reward\_v1} improves this term relative to RBC (0.290 vs.\ 0.454), but it remains a visible contributor. Optimization-based methods such as CHESCA and MPC have a structural advantage here because they can plan over storage and resilience constraints with an explicit horizon rather than learning tradeoffs only from sampled trajectories.
 
-\begin{figure}[h]
+\begin{figure}[ht]
     \centering
     \includegraphics[width=\linewidth]{figures/kpi_breakdown.png}
-    \caption{
-        KPI-level breakdown on the local \texttt{public\_dev} split, normalized relative to RBC for each KPI (RBC $=1$; lower is better). The fourth group is thermal discomfort, where RL methods improve most sharply over RBC. The rightmost group is thermal-resilience loss, which remains a visible residual weakness for several learned policies.
-    }
+    \caption{KPI breakdown on local \texttt{public\_dev}, normalized relative to RBC (RBC $=1$; lower is better). RL improves thermal discomfort most sharply; thermal-resilience loss remains the main residual weakness.}
     \label{fig:kpi}
 \end{figure}
 
 \paragraph{Reward design ablation.} Among centralized SAC variants, the baseline reward (\texttt{rv0}) is weakest locally at 0.554. \texttt{reward\_v1}, which mirrors the official 8-term weighting, achieves the best local mean at 0.527. \texttt{reward\_v2} is slightly worse locally (0.536) but leads on phase-2 (0.653 vs.\ 0.668 for \texttt{rv1}), supporting the hypothesis that smoothness penalties reduce local overfitting. The full KPI breakdown is in Table~\ref{tab:sac_ablation} in the Appendix. The most notable pattern is that the baseline reward produces the best thermal-resilience-loss score (0.166 vs.\ 0.290--0.338), possibly because explicit KPI weighting redirects battery capacity away from resilience-improving behavior.
-
-\paragraph{PPO training diagnostic.} Figure~\ref{fig:ppo_curve} shows the centralized PPO baseline training curve used as a learning sanity check. Mean episode reward rises rapidly early in training and then flattens, indicating that PPO learns a nontrivial policy before final evaluation. This figure is not the multiseed shared-DTDE learning-rate sweep; final PPO comparisons come from Tables~\ref{tab:local} and~\ref{tab:final_matrix}.
-
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=0.75\linewidth]{figures/ppo_training_curve.png}
-    \caption{
-        Centralized PPO baseline training curve. The x-axis is training steps (thousands) and the y-axis is mean episode reward (thousands). The curve improves quickly early in training and then plateaus; final algorithm comparisons use the multiseed evaluation scores in Tables~\ref{tab:local} and~\ref{tab:final_matrix}, not this training-reward trace.
-    }
-    \label{fig:ppo_curve}
-\end{figure}
 
 \section{Discussion and Limitations}\label{sec:discussion}
 
@@ -209,7 +172,7 @@ The results above establish that architectural portability is the binding constr
 
 \paragraph{Reward design matters within SAC.} The gap between the SAC baseline and \texttt{reward\_v1} (0.554 vs.\ 0.527 locally) shows that training on the official scoring objective outperforms training on a proxy. The smoothness penalties in \texttt{reward\_v2} trade a small local regression for better phase-2 generalization. Large SoC swings and repeated sign flips become costly even if they improve a short local trajectory, and this behavioral regularization transfers better when weather and demand traces change. For deployment on new buildings, \texttt{reward\_v2} is therefore the more robust choice. An important practical implication is that the reward design decision is inseparable from the evaluation protocol. If we had only measured performance on the local \texttt{public\_dev} split, we would have selected \texttt{rv1} as the best reward and missed the fact that \texttt{rv2} generalizes better. This underscores the value of held-out evaluation even for design choices that appear secondary to algorithm selection.
 
-\paragraph{Comparison to optimization-based methods.} CHESCA achieved 0.562 on the official 2023 public leaderboard \citep{pinto2024citylearn}, below our best held-out SAC result of 0.653 on the released phase-2 splits. This is benchmark context, not a head-to-head comparison. Our phase-2 results use the subsequently released evaluation datasets, not the original competition server, so a direct numerical comparison is not valid. Substantively, CHESCA and the HKUST solution \citep{zheng2025optimizing} use hierarchy to separate building-level and community-level objectives, giving them a natural way to reserve storage for future events and enforce resilience constraints. Our shared-DTDE policies gain portability by treating buildings as independent instances, but they give up the community-level optimization layer. A natural next step is a hybrid controller that combines the portability of shared-DTDE with an MPC or optimization layer that enforces aggregate grid and resilience constraints.
+\paragraph{Comparison to optimization-based methods.} CHESCA achieved 0.562 on the official 2023 public leaderboard \citep{pinto2024citylearn}, better than our best SAC-only phase-2 result of 0.616. This is benchmark context, not a head-to-head comparison, because our phase-2 results use the subsequently released evaluation datasets rather than the original competition server. In our released phase-2 reproduction harness, upstream CHESCA scores 0.508, and a CHESCA residual plus SAC action blend reaches 0.501; those rows are optimization and hybrid context rather than standalone learned-controller evidence. Substantively, CHESCA and the HKUST solution \citep{zheng2025optimizing} use hierarchy to separate building-level and community-level objectives, giving them a natural way to reserve storage for future events and enforce resilience constraints. Our shared-DTDE policies gain portability by treating buildings as independent instances, but they give up the community-level optimization layer. A natural next step is a hybrid controller that combines the portability of shared-DTDE with an MPC or optimization layer that enforces aggregate grid and resilience constraints.
 
 \paragraph{Limitations.}
 \begin{itemize}
@@ -217,6 +180,7 @@ The results above establish that architectural portability is the binding constr
     \item Compute constraints. SAC shared-DTDE was run with only 3 seeds in the pilot matrix, and the reward-variant ablation was not conducted for PPO due to GPU budget limits. The PPO sweep covered 10 seeds but only two learning rates; wider sweeps might yield better configurations.
     \item Confidence intervals. Our CIs aggregate evaluation jobs unless otherwise stated. Because jobs from the same released split are correlated, a split-clustered bootstrap would be a stronger uncertainty estimate for cross-split generalization claims.
     \item Final sweep selection. The PPO/SAC/TD3 matrix uses three seeds per hyperparameter cell and selects the best setting within each algorithm/evaluation group. This is useful for robustness evidence, but it is not a blind leaderboard protocol.
+    \item Checkpoint ensembling is same-topology only. The SAC ensemble improves released phase-2 performance, but it uses centralized three-building checkpoints and does not change the phase-3 portability result.
     \item Centralized policies not portable. The centralized SAC variants, which achieve the best local scores, cannot be evaluated on phase-3 (6-building) splits. Generalization claims for centralized SAC are necessarily limited to same-topology held-out sets.
     \item No forecast model. We use only the short-horizon forecasts provided by the environment. A learned demand-prediction module could improve policy quality and is a common component of strong model-predictive baselines.
     \item CHESCA comparison is indirect. The 0.562 CHESCA reference is from the competition paper \citep{pinto2024citylearn} and was scored on a hidden split via an evaluation server that is no longer publicly accessible, making a direct numerical comparison impossible.
@@ -231,11 +195,20 @@ The results above establish that architectural portability is the binding constr
 
 \section*{Appendix}
 
+\paragraph{TD3 learning-rate screen.}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.92\linewidth]{figures/lr_screen_phase3.png}
+    \caption{Broad learning-rate screen on released phase-3 transfer splits. Each point aggregates three seeds over three 6-building splits; TD3 peaks at $3{\times}10^{-4}$.}
+    \label{fig:lr_phase3}
+\end{figure}
+
 \paragraph{Per-split generalization table.}
 
 Table~\ref{tab:cross_split} reports the per-split composite scores used in Figure~\ref{fig:per_split}. Entries marked ``---'' indicate that a method cannot execute on that split (centralized policies on phase-3) or that results were not collected.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \small
 \begin{tabular}{lccccccc}
@@ -248,20 +221,30 @@ PPO DTDE           & 0.777 & 0.829 & 0.813 & 0.738 & 0.846 & 0.844 & 0.840 \\
 SAC Central        & 0.554 & 0.684 & 0.687 & 0.615 & --- & --- & --- \\
 SAC \texttt{rv1}   & 0.527 & 0.707 & 0.686 & 0.611 & --- & --- & --- \\
 SAC \texttt{rv2}   & 0.536 & 0.691 & 0.670 & 0.597 & --- & --- & --- \\
+SAC ensemble       & 0.526 & 0.660 & 0.636 & 0.553 & --- & --- & --- \\
 SAC DTDE           & 0.569 & 0.715 & 0.700 & 0.615 & 0.786 & 0.762 & 0.775 \\
 \midrule
 CHESCA (ref.)      & --- & 0.562 & --- & --- & --- & --- & --- \\
 \bottomrule
 \end{tabular}
-\caption{Per-split composite scores ($\downarrow$ better). Phase-2 columns (p2\_e1--p2\_e3) are the released online-evaluation splits; phase-3 columns (p3\_1--p3\_3) are the 6-building held-out splits. CHESCA is the 2023 competition winner reference from \citet{pinto2024citylearn}, evaluated on the original competition server (different split; shown for context only).}
+\caption{Per-split composite scores ($\downarrow$ better). Phase-2 columns are 3-building released splits; phase-3 columns are 6-building released splits. CHESCA is the 2023 leaderboard reference from \citet{pinto2024citylearn}.}
 \label{tab:cross_split}
 \end{table}
+
+\paragraph{Local-to-held-out comparison.}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{figures/generalization_gap.png}
+    \caption{Local vs.\ released phase-2 scores by method. SAC variants retain the best held-out scores; PPO shared-DTDE has a smaller gap but a weaker absolute score.}
+    \label{fig:gen_gap}
+\end{figure}
 
 \paragraph{SAC reward-variant ablation detail.}
 
 Table~\ref{tab:sac_ablation} extends the local SAC comparison with KPI-level columns. All SAC variants reduce thermal discomfort from the RBC level of 0.944 to near zero ($\leq 0.020$), consistent with the 0.30 weight on this term. The SAC baseline achieves a similar reduction despite not explicitly weighting discomfort, suggesting that the net-consumption proxy also indirectly rewards occupant comfort. Differences across variants are most visible in thermal-resilience loss (0.166 vs.\ 0.290--0.338), where the baseline reward outperforms the shaped variants.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \small
 \begin{tabular}{lccccc}
@@ -276,8 +259,17 @@ SAC shared-DTDE \texttt{rv2} & 0.569 & 0.809 & 0.829 & 0.023 & 0.338 \\
 Local RBC                   & 1.023 & 1.839 & 1.890 & 0.944 & 0.454 \\
 \bottomrule
 \end{tabular}
-\caption{SAC reward-variant ablation on local \texttt{public\_dev}. KPI columns are seed-averaged means (lower is better). ``Cost'' and ``Carbon'' are normalized district totals; ``Discomfort'' is the proportion of occupant-hours with comfort violations; ``1$-$Resilience'' is the thermal-resilience-loss term.}
+\caption{SAC reward-variant ablation on local \texttt{public\_dev}. KPI columns are seed-averaged means; lower is better.}
 \label{tab:sac_ablation}
 \end{table}
+
+\paragraph{PPO training diagnostic.} The centralized PPO baseline learning curve rises early and then plateaus, confirming that PPO learned a nontrivial policy before the final multiseed comparisons in Tables~\ref{tab:local} and~\ref{tab:final_matrix}.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.75\linewidth]{figures/ppo_training_curve.png}
+    \caption{Centralized PPO baseline training curve.}
+    \label{fig:ppo_curve}
+\end{figure}
 
 \end{document}
