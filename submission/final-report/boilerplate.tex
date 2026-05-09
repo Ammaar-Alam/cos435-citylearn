@@ -22,7 +22,20 @@
 \newcommand{\xmark}{\ding{55}}%
 \usepackage{amsthm}
 \usepackage{subcaption}
-\captionsetup{font=footnotesize,labelfont=bf,skip=3pt}
+\captionsetup{
+    font=scriptsize,
+    labelfont=bf,
+    justification=raggedright,
+    singlelinecheck=false,
+    skip=2pt
+}
+\AtBeginDocument{\captionsetup{
+    font=scriptsize,
+    labelfont=bf,
+    justification=raggedright,
+    singlelinecheck=false,
+    skip=2pt
+}}
 \setlength{\textfloatsep}{10pt plus 2pt minus 2pt}
 \setlength{\floatsep}{8pt plus 2pt minus 2pt}
 \setlength{\intextsep}{8pt plus 2pt minus 2pt}
