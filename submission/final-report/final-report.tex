@@ -109,13 +109,6 @@ TD3 & 0.601 & 0.713 & 0.742 & 0.727 \\
 
 \paragraph{TD3 stretch result.} TD3 was added as a compute-heavy stretch algorithm to test whether deterministic off-policy control could improve cross-topology transfer. The broad learning-rate screen gives its strongest result: TD3 with learning rate $3{\times}10^{-4}$ achieves $0.736 \pm 0.020$ on the released phase-3 splits, just ahead of SAC at $0.738 \pm 0.008$. In the targeted final sweep, SAC slightly retakes the phase-3 lead ($0.738$ versus $0.742$), but TD3 remains competitive and beats PPO by roughly 0.075 absolute score units on the released phase-3 splits.
 
-\begin{figure}[ht]
-    \centering
-    \includegraphics[width=0.92\linewidth]{figures/lr_screen_phase3.png}
-    \caption{Broad learning-rate screen on released phase-3 transfer splits. Each point aggregates three seeds over three 6-building splits; TD3 peaks at $3{\times}10^{-4}$.}
-    \label{fig:lr_phase3}
-\end{figure}
-
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{figures/per_split_scores.png}
@@ -201,6 +194,15 @@ The results above establish that architectural portability is the binding constr
 }
 
 \section*{Appendix}
+
+\paragraph{TD3 learning-rate screen.}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.92\linewidth]{figures/lr_screen_phase3.png}
+    \caption{Broad learning-rate screen on released phase-3 transfer splits. Each point aggregates three seeds over three 6-building splits; TD3 peaks at $3{\times}10^{-4}$.}
+    \label{fig:lr_phase3}
+\end{figure}
 
 \paragraph{Per-split generalization table.}
 
