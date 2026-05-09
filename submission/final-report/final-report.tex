@@ -154,7 +154,7 @@ SAC shared-DTDE \texttt{rv2}    & 3  & 0.569 $\pm$ 0.018 & 0.044 & $-$44.4\% \\
 \begin{figure}[ht]
     \centering
     \includegraphics[width=\linewidth]{figures/kpi_breakdown.png}
-    \caption{KPI breakdown on local \texttt{public\_dev}, normalized relative to RBC (RBC $=1$; lower is better). RL improves thermal discomfort most sharply; thermal-resilience loss remains the main residual weakness.}
+    \caption{KPI breakdown on local \texttt{public\_dev}, normalized relative to RBC (RBC $=1$; lower is better). SAC variants sharply reduce thermal discomfort, cost, and carbon; thermal-resilience loss remains the largest residual SAC weakness, while PPO central shows a severe resilience regression.}
     \label{fig:kpi}
 \end{figure}
 
@@ -162,7 +162,7 @@ SAC shared-DTDE \texttt{rv2}    & 3  & 0.569 $\pm$ 0.018 & 0.044 & $-$44.4\% \\
 
 \section{Discussion and Limitations}\label{sec:discussion}
 
-The results above establish that architectural portability is the binding constraint for real deployment, SAC substantially outperforms PPO in this continuous-control setting, and RL baselines can close much of the gap to RBC through careful reward design and evaluation discipline, but remain below published optimization-based winners. We discuss these findings and limitations below.
+The results above establish that architectural portability is the binding constraint for real deployment, SAC substantially outperforms PPO in this continuous-control setting, and RL baselines substantially improve over RBC and close part of the gap to optimization-based winners through careful reward design and evaluation discipline. We discuss these findings and limitations below.
 
 \paragraph{Architectural portability is the primary design axis.} The cleanest finding is architectural rather than algorithmic. If deployment may involve a different number of buildings than training, a centralized policy is incompatible by construction, while a shared-DTDE policy transfers without any network changes. On 3-building splits, centralized SAC slightly outperforms shared-DTDE SAC; the cost of decentralization is a small local score penalty of about 0.04 absolute score units. Phase-3 reverses the ordering entirely. Shared-DTDE is the only topology that can produce a score at all (0.774 for SAC-DTDE vs.\ N/A for SAC centralized). Because real neighborhoods vary in size and a deployed system may be extended over time, practical RL controllers for building energy management should account for this portability constraint at design time rather than treating it as an afterthought.
 
@@ -172,7 +172,7 @@ The results above establish that architectural portability is the binding constr
 
 \paragraph{Reward design matters within SAC.} The gap between the SAC baseline and \texttt{reward\_v1} (0.554 vs.\ 0.527 locally) shows that training on the official scoring objective outperforms training on a proxy. The smoothness penalties in \texttt{reward\_v2} trade a small local regression for better phase-2 generalization. Large SoC swings and repeated sign flips become costly even if they improve a short local trajectory, and this behavioral regularization transfers better when weather and demand traces change. For deployment on new buildings, \texttt{reward\_v2} is therefore the more robust choice. An important practical implication is that the reward design decision is inseparable from the evaluation protocol. If we had only measured performance on the local \texttt{public\_dev} split, we would have selected \texttt{rv1} as the best reward and missed the fact that \texttt{rv2} generalizes better. This underscores the value of held-out evaluation even for design choices that appear secondary to algorithm selection.
 
-\paragraph{Comparison to optimization-based methods.} CHESCA achieved 0.562 on the official 2023 public leaderboard \citep{pinto2024citylearn}, better than our best SAC-only phase-2 result of 0.616. This is benchmark context, not a head-to-head comparison, because our phase-2 results use the subsequently released evaluation datasets rather than the original competition server. In our released phase-2 reproduction harness, upstream CHESCA scores 0.508, and a CHESCA residual plus SAC action blend reaches 0.501; those rows are optimization and hybrid context rather than standalone learned-controller evidence. Substantively, CHESCA and the HKUST solution \citep{zheng2025optimizing} use hierarchy to separate building-level and community-level objectives, giving them a natural way to reserve storage for future events and enforce resilience constraints. Our shared-DTDE policies gain portability by treating buildings as independent instances, but they give up the community-level optimization layer. A natural next step is a hybrid controller that combines the portability of shared-DTDE with an MPC or optimization layer that enforces aggregate grid and resilience constraints.
+\paragraph{Comparison to optimization-based methods.} CHESCA achieved 0.562 on the official 2023 public leaderboard \citep{pinto2024citylearn}, better than our best same-topology SAC ensemble phase-2 result of 0.616 and our best single-checkpoint SAC result of 0.653. This is benchmark context, not a head-to-head comparison, because our phase-2 results use the subsequently released evaluation datasets rather than the original competition server. In our released phase-2 reproduction harness, upstream CHESCA scores 0.508, and a CHESCA residual plus SAC action blend reaches 0.501; those rows are optimization and hybrid context rather than standalone learned-controller evidence. Substantively, CHESCA and the HKUST solution \citep{zheng2025optimizing} use hierarchy to separate building-level and community-level objectives, giving them a natural way to reserve storage for future events and enforce resilience constraints. Our shared-DTDE policies gain portability by treating buildings as independent instances, but they give up the community-level optimization layer. A natural next step is a hybrid controller that combines the portability of shared-DTDE with an MPC or optimization layer that enforces aggregate grid and resilience constraints.
 
 \paragraph{Limitations.}
 \begin{itemize}
@@ -195,9 +195,9 @@ The results above establish that architectural portability is the binding constr
 
 \section*{Appendix}
 
-\paragraph{TD3 learning-rate screen.}
+\noindent\textbf{TD3 learning-rate screen.}
 
-\begin{figure}[ht]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.92\linewidth]{figures/lr_screen_phase3.png}
     \caption{Broad learning-rate screen on released phase-3 transfer splits. Each point aggregates three seeds over three 6-building splits; TD3 peaks at $3{\times}10^{-4}$.}
@@ -231,9 +231,9 @@ CHESCA (ref.)      & --- & 0.562 & --- & --- & --- & --- & --- \\
 \label{tab:cross_split}
 \end{table}
 
-\paragraph{Local-to-held-out comparison.}
+\noindent\textbf{Local-to-held-out comparison.}
 
-\begin{figure}[ht]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\linewidth]{figures/generalization_gap.png}
     \caption{Local vs.\ released phase-2 scores by method. SAC variants retain the best held-out scores; PPO shared-DTDE has a smaller gap but a weaker absolute score.}
@@ -263,9 +263,10 @@ Local RBC                   & 1.023 & 1.839 & 1.890 & 0.944 & 0.454 \\
 \label{tab:sac_ablation}
 \end{table}
 
-\paragraph{PPO training diagnostic.} The centralized PPO baseline learning curve rises early and then plateaus, confirming that PPO learned a nontrivial policy before the final multiseed comparisons in Tables~\ref{tab:local} and~\ref{tab:final_matrix}.
+\clearpage
+\paragraph{PPO training diagnostic.} The centralized PPO baseline learning curve rises early and then plateaus, confirming that PPO learned a nontrivial policy before the final multiseed comparisons in Tables~\ref{tab:final_matrix} and~\ref{tab:local}.
 
-\begin{figure}[ht]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.75\linewidth]{figures/ppo_training_curve.png}
     \caption{Centralized PPO baseline training curve.}
